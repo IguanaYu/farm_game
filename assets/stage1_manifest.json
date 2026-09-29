@@ -1,0 +1,9 @@
+{
+  "sprite_source_dir": "art/lowpoly/farm_asset_pack/sprites",
+  "model_source_dir": "art/lowpoly/farm_asset_pack/glb",
+  "runtime_model_dir": "assets/models",
+  "runtime_sprite_dir": "assets/sprites",
+  "models": ["plot_empty", "plot_cabbage_sprout", "plot_cabbage_growing", "plot_cabbage_mature", "facility_shop", "facility_warehouse", "deco_tree", "deco_fence", "deco_flower"],
+  "panel_icons": ["facility_shop", "facility_warehouse", "item_harvest_crate", "item_coin", "seed_cabbage", "crop_cabbage"],
+  "status": "stage 1 farm scene uses GLB models and panel-only PNG; pending external asset audit"
+}

@@ -1,0 +1,209 @@
+{
+  "project": "farm",
+  "asset_count": 33,
+  "notes": [
+    "Carrot is a visual placeholder for the unnamed 2-hour crop.",
+    "Six guest appearances are provisional concepts.",
+    "All GLB models use a ground-level origin and meter-scale Blender units."
+  ],
+  "assets": [
+    {
+      "id": "plot_empty",
+      "label": "EMPTY PLOT",
+      "category": "plot",
+      "file": "glb/plot_empty.glb"
+    },
+    {
+      "id": "plot_wet",
+      "label": "WATERED PLOT",
+      "category": "plot",
+      "file": "glb/plot_wet.glb"
+    },
+    {
+      "id": "plot_fertilized",
+      "label": "FERTILIZED PLOT",
+      "category": "plot",
+      "file": "glb/plot_fertilized.glb"
+    },
+    {
+      "id": "plot_seeded",
+      "label": "SOWN PLOT",
+      "category": "plot",
+      "file": "glb/plot_seeded.glb"
+    },
+    {
+      "id": "plot_cabbage_sprout",
+      "label": "CABBAGE SPROUT",
+      "category": "plot",
+      "file": "glb/plot_cabbage_sprout.glb"
+    },
+    {
+      "id": "plot_cabbage_growing",
+      "label": "CABBAGE GROWING",
+      "category": "plot",
+      "file": "glb/plot_cabbage_growing.glb"
+    },
+    {
+      "id": "plot_cabbage_mature",
+      "label": "CABBAGE RIPE",
+      "category": "plot",
+      "file": "glb/plot_cabbage_mature.glb"
+    },
+    {
+      "id": "plot_carrot_sprout",
+      "label": "CARROT SPROUT",
+      "category": "plot",
+      "file": "glb/plot_carrot_sprout.glb"
+    },
+    {
+      "id": "plot_carrot_growing",
+      "label": "CARROT GROWING",
+      "category": "plot",
+      "file": "glb/plot_carrot_growing.glb"
+    },
+    {
+      "id": "plot_carrot_mature",
+      "label": "CARROT RIPE",
+      "category": "plot",
+      "file": "glb/plot_carrot_mature.glb"
+    },
+    {
+      "id": "crop_cabbage",
+      "label": "CABBAGE",
+      "category": "crop",
+      "file": "glb/crop_cabbage.glb"
+    },
+    {
+      "id": "crop_carrot",
+      "label": "CARROT",
+      "category": "crop",
+      "file": "glb/crop_carrot.glb"
+    },
+    {
+      "id": "seed_cabbage",
+      "label": "CABBAGE SEED",
+      "category": "item",
+      "file": "glb/seed_cabbage.glb"
+    },
+    {
+      "id": "seed_carrot",
+      "label": "CARROT SEED",
+      "category": "item",
+      "file": "glb/seed_carrot.glb"
+    },
+    {
+      "id": "fertilizer_basic",
+      "label": "BASIC FEED",
+      "category": "item",
+      "file": "glb/fertilizer_basic.glb"
+    },
+    {
+      "id": "fertilizer_mutation",
+      "label": "MUTATION FEED",
+      "category": "item",
+      "file": "glb/fertilizer_mutation.glb"
+    },
+    {
+      "id": "fertilizer_preserve",
+      "label": "PRESERVE FEED",
+      "category": "item",
+      "file": "glb/fertilizer_preserve.glb"
+    },
+    {
+      "id": "fertilizer_golden",
+      "label": "GOLDEN FEED",
+      "category": "item",
+      "file": "glb/fertilizer_golden.glb"
+    },
+    {
+      "id": "tool_watering_can",
+      "label": "WATERING CAN",
+      "category": "item",
+      "file": "glb/tool_watering_can.glb"
+    },
+    {
+      "id": "item_harvest_crate",
+      "label": "HARVEST CRATE",
+      "category": "item",
+      "file": "glb/item_harvest_crate.glb"
+    },
+    {
+      "id": "item_coin",
+      "label": "GOLD COIN",
+      "category": "item",
+      "file": "glb/item_coin.glb"
+    },
+    {
+      "id": "facility_shop",
+      "label": "SEED SHOP",
+      "category": "building",
+      "file": "glb/facility_shop.glb"
+    },
+    {
+      "id": "facility_warehouse",
+      "label": "WAREHOUSE",
+      "category": "building",
+      "file": "glb/facility_warehouse.glb"
+    },
+    {
+      "id": "facility_breeder",
+      "label": "SEED BREEDER",
+      "category": "building",
+      "file": "glb/facility_breeder.glb"
+    },
+    {
+      "id": "guest_01",
+      "label": "GUEST 01",
+      "category": "guest",
+      "file": "glb/guest_01.glb"
+    },
+    {
+      "id": "guest_02",
+      "label": "GUEST 02",
+      "category": "guest",
+      "file": "glb/guest_02.glb"
+    },
+    {
+      "id": "guest_03",
+      "label": "GUEST 03",
+      "category": "guest",
+      "file": "glb/guest_03.glb"
+    },
+    {
+      "id": "guest_04",
+      "label": "GUEST 04",
+      "category": "guest",
+      "file": "glb/guest_04.glb"
+    },
+    {
+      "id": "guest_05",
+      "label": "GUEST 05",
+      "category": "guest",
+      "file": "glb/guest_05.glb"
+    },
+    {
+      "id": "guest_06",
+      "label": "GUEST 06",
+      "category": "guest",
+      "file": "glb/guest_06.glb"
+    },
+    {
+      "id": "deco_tree",
+      "label": "TREE",
+      "category": "decoration",
+      "file": "glb/deco_tree.glb"
+    },
+    {
+      "id": "deco_fence",
+      "label": "FENCE",
+      "category": "decoration",
+      "file": "glb/deco_fence.glb"
+    },
+    {
+      "id": "deco_flower",
+      "label": "FLOWER",
+      "category": "decoration",
+      "file": "glb/deco_flower.glb"
+    }
+  ]
+}
