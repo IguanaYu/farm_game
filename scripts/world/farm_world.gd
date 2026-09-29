@@ -2,14 +2,24 @@ extends Node3D
 
 const HUD_SCRIPT := preload("res://scripts/ui/farm_hud.gd")
 const PLOT_EMPTY := preload("res://assets/models/plot_empty.glb")
-const PLOT_SPROUT := preload("res://assets/models/plot_cabbage_sprout.glb")
-const PLOT_GROWING := preload("res://assets/models/plot_cabbage_growing.glb")
-const PLOT_MATURE := preload("res://assets/models/plot_cabbage_mature.glb")
 const SHOP_MODEL := preload("res://assets/models/facility_shop.glb")
 const WAREHOUSE_MODEL := preload("res://assets/models/facility_warehouse.glb")
 const TREE_MODEL := preload("res://assets/models/deco_tree.glb")
 const FENCE_MODEL := preload("res://assets/models/deco_fence.glb")
 const FLOWER_MODEL := preload("res://assets/models/deco_flower.glb")
+
+const STAGE_MODELS := {
+	"cabbage": {
+		"sprout": preload("res://assets/models/plot_cabbage_sprout.glb"),
+		"growing": preload("res://assets/models/plot_cabbage_growing.glb"),
+		"mature": preload("res://assets/models/plot_cabbage_mature.glb"),
+	},
+	"carrot": {
+		"sprout": preload("res://assets/models/plot_carrot_sprout.glb"),
+		"growing": preload("res://assets/models/plot_carrot_growing.glb"),
+		"mature": preload("res://assets/models/plot_carrot_mature.glb"),
+	},
+}
 
 var game: FarmGame
 var hud: FarmHud
@@ -167,14 +177,22 @@ func _build_hud() -> void:
 	add_child(canvas)
 	hud = HUD_SCRIPT.new()
 	hud.name = "FarmHud"
+	hud.game = game
 	canvas.add_child(hud)
-	hud.buy_requested.connect(_on_buy_requested)
+	hud.buy_seed_requested.connect(_on_buy_seed_requested)
+	hud.buy_fertilizer_requested.connect(_on_buy_fertilizer_requested)
+	hud.upgrade_shop_requested.connect(_on_upgrade_shop_requested)
+	hud.plant_requested.connect(_on_plant_requested)
+	hud.water_requested.connect(_on_water_requested)
+	hud.fertilize_requested.connect(_on_fertilize_requested)
+	hud.harvest_all_requested.connect(_on_harvest_all_requested)
 	hud.sell_batch_requested.connect(_on_sell_batch_requested)
 	hud.sell_all_requested.connect(_on_sell_all_requested)
 	hud.debug_mature_requested.connect(_debug_mature_all)
 
 
 func _refresh_all() -> void:
+	hud.view_now = _now()
 	for plot_id in range(1, FarmGame.PLOT_COUNT + 1):
 		_refresh_plot_model(plot_id)
 	hud.refresh(game.state)
@@ -186,15 +204,16 @@ func _refresh_plot_model(plot_id: int) -> void:
 	var model_key := "empty"
 	var model: PackedScene = PLOT_EMPTY
 	if plot["seed_id"] != 0:
+		var kind: String = plot.get("kind", "cabbage")
+		var defn := PlantDefs.get_plant(kind)
+		var elapsed: int = _now() - plot["planted_at"]
+		var stage := "sprout"
 		if _now() >= plot["ready_at"]:
-			model_key = "mature"
-			model = PLOT_MATURE
-		elif _now() - plot["planted_at"] >= FarmGame.GROW_SECONDS / 3:
-			model_key = "growing"
-			model = PLOT_GROWING
-		else:
-			model_key = "sprout"
-			model = PLOT_SPROUT
+			stage = "mature"
+		elif elapsed >= defn["grow_seconds"] / 3:
+			stage = "growing"
+		model_key = "%s_%s" % [kind, stage]
+		model = STAGE_MODELS[kind][stage]
 	if plot_model_keys.get(plot_id, "") == model_key:
 		return
 	var holder: Node3D = plot_holders[plot_id]
@@ -210,9 +229,11 @@ func _refresh_plot_model(plot_id: int) -> void:
 
 
 func _on_clock_tick() -> void:
+	hud.view_now = _now()
 	for plot_id in range(1, FarmGame.PLOT_COUNT + 1):
 		_refresh_plot_model(plot_id)
 	_refresh_hover_hint()
+	hud.update_harvest_entry()
 
 
 func _on_plot_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int, plot_id: int) -> void:
@@ -240,25 +261,25 @@ func _refresh_hover_hint() -> void:
 func _on_plot_action(plot_id: int) -> void:
 	var plot := game.get_plot(plot_id)
 	if plot["seed_id"] == 0:
-		var result := game.plant(plot_id, _now())
-		if result != "":
-			hud.show_status(result)
-			return
-		_save()
-		_refresh_all()
-		hud.show_status("第 %d 块地已播种，20 分钟后成熟。" % plot_id)
+		hud.open_seed_picker(plot_id)
 		return
 	if not game.is_ready(plot_id, _now()):
-		hud.show_status("第 %d 块地还在生长。" % plot_id)
+		hud.open_plot_care(plot_id)
 		return
+	_do_harvest(plot_id)
+
+
+func _do_harvest(plot_id: int) -> void:
 	var result := game.harvest(plot_id, _now())
 	if not result["ok"]:
 		hud.show_status(result["message"])
 		return
-	_save()
+	if not _save():
+		hud.show_status("存档写入失败，本次收获结果可能没有保存！")
 	_refresh_all()
-	hud.show_status("第 %d 块地收获了 5 个白菜和 %d 粒新种子。" % [plot_id, result["seeds"]])
-	hud.show_harvest(plot_id, result["seeds"])
+	var defn := PlantDefs.get_plant(result["batch"]["kind"])
+	hud.show_status("第 %d 块地收获了 %d 个%s和 %d 粒新种子。" % [plot_id, result["batch"]["count"], defn["display_name"], result["seeds"]])
+	hud.show_harvest(result)
 
 
 func _on_building_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int, kind: String) -> void:
@@ -269,14 +290,85 @@ func _on_building_input(_camera: Node, event: InputEvent, _position: Vector3, _n
 			hud.open_warehouse()
 
 
-func _on_buy_requested(quantity: int) -> void:
-	var result := game.buy_seeds(quantity)
+func _on_plant_requested(plot_id: int, kind: String) -> void:
+	var result := game.plant(plot_id, _now(), kind)
 	if result != "":
 		hud.show_status(result)
 		return
-	_save()
+	if not _save():
+		hud.show_status("存档写入失败，本次播种可能没有保存！")
 	_refresh_all()
-	hud.show_status("购买了 %d 粒种子，花费 %d 金币。" % [quantity, quantity * FarmGame.SEED_PRICE])
+	var defn := PlantDefs.get_plant(kind)
+	hud.show_status("第 %d 块地已播种%s，约 %d 分钟后成熟。" % [plot_id, defn["display_name"], int(defn["grow_seconds"] / 60)])
+	hud.close_modal_after_action()
+
+
+func _on_water_requested(plot_id: int) -> void:
+	var result := game.water(plot_id, _now())
+	hud.show_status(result["message"] if not result["ok"] else "第 %d 块地浇水完成，本时段加分已记录。" % plot_id)
+	if result["ok"]:
+		if not _save():
+			hud.show_status("存档写入失败，本次浇水可能没有保存！")
+	_refresh_all()
+
+
+func _on_fertilize_requested(plot_id: int, kind: String) -> void:
+	var result := game.apply_fertilizer(plot_id, kind, _now())
+	if not result["ok"]:
+		hud.show_status(result["message"])
+		_refresh_all()
+		return
+	if not _save():
+		hud.show_status("存档写入失败，本次施肥可能没有保存！")
+	_refresh_all()
+	hud.show_status("第 %d 块地已施肥，2 小时内的轮次都会获得加分。" % plot_id)
+
+
+func _on_buy_seed_requested(kind: String, quantity: int) -> void:
+	var result := game.buy_seeds(quantity, kind)
+	if result != "":
+		hud.show_status(result)
+		return
+	if not _save():
+		hud.show_status("存档写入失败，本次购买可能没有保存！")
+	_refresh_all()
+	var defn := PlantDefs.get_plant(kind)
+	hud.show_status("购买了 %d 粒%s种子，花费 %d 金币。" % [quantity, defn["display_name"], quantity * defn["seed_price"]])
+
+
+func _on_buy_fertilizer_requested(kind: String) -> void:
+	var result := game.buy_fertilizer(kind)
+	if result != "":
+		hud.show_status(result)
+		return
+	if not _save():
+		hud.show_status("存档写入失败，本次购买可能没有保存！")
+	_refresh_all()
+	var defn: Dictionary = PlantDefs.FERTILIZERS[kind]
+	hud.show_status("购买了一份%s（%d 次使用），花费 %d 金币。" % [defn["display_name"], defn["uses_per_pack"], defn["price"]])
+
+
+func _on_upgrade_shop_requested() -> void:
+	var result := game.upgrade_shop()
+	if result != "":
+		hud.show_status(result)
+		return
+	if not _save():
+		hud.show_status("存档写入失败，商店升级可能没有保存！")
+	_refresh_all()
+	hud.show_status("商店升到 2 级！种地到 2 级后即可购买第二种种子。")
+
+
+func _on_harvest_all_requested() -> void:
+	var summary := game.harvest_all(_now())
+	if not summary["ok"]:
+		hud.show_status("现在没有成熟的地块。")
+		return
+	if not _save():
+		hud.show_status("存档写入失败，本次收获结果可能没有保存！")
+	_refresh_all()
+	hud.show_status("一键收获 %d 块地：作物 ×%d，新种子 ×%d，经验 +%d。" % [summary["results"].size(), summary["total_crops"], summary["total_seeds"], summary["total_exp"]])
+	hud.show_harvest_all(summary)
 
 
 func _on_sell_batch_requested(batch_id: int) -> void:
@@ -284,9 +376,10 @@ func _on_sell_batch_requested(batch_id: int) -> void:
 	if not result["ok"]:
 		hud.show_status(result["message"])
 		return
-	_save()
+	if not _save():
+		hud.show_status("存档写入失败，本次出售可能没有保存！")
 	_refresh_all()
-	hud.show_status("出售一批白菜，获得 %d 金币。" % result["coins"])
+	hud.show_status("出售一批作物，获得 %d 金币。" % result["coins"])
 
 
 func _on_sell_all_requested() -> void:
@@ -294,7 +387,8 @@ func _on_sell_all_requested() -> void:
 		hud.show_status("仓库里没有可出售的作物。")
 		return
 	var earned := game.sell_all_batches()
-	_save()
+	if not _save():
+		hud.show_status("存档写入失败，本次出售可能没有保存！")
 	_refresh_all()
 	hud.show_status("全部出售完成，获得 %d 金币。" % earned)
 
@@ -318,4 +412,7 @@ func _now() -> int:
 
 
 func _save() -> bool:
-	return SaveStore.save_state(game.state)
+	var ok := SaveStore.save_state(game.state)
+	if not ok:
+		push_error("存档写入失败，请检查磁盘空间与 user:// 目录权限。")
+	return ok
