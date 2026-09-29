@@ -7,6 +7,7 @@ const WAREHOUSE_MODEL := preload("res://assets/models/facility_warehouse.glb")
 const TREE_MODEL := preload("res://assets/models/deco_tree.glb")
 const FENCE_MODEL := preload("res://assets/models/deco_fence.glb")
 const FLOWER_MODEL := preload("res://assets/models/deco_flower.glb")
+const BREEDER_MODEL := preload("res://assets/models/facility_breeder.glb")
 
 const STAGE_MODELS := {
 	"cabbage": {
@@ -38,6 +39,8 @@ func _ready() -> void:
 		loaded = not saved.is_empty() and game.load_state(saved)
 	if not loaded:
 		game.new_game(_now())
+		_save()
+	if game.breeder_settle(_now()):
 		_save()
 	_build_farm()
 	_build_hud()
@@ -95,6 +98,7 @@ func _build_farm() -> void:
 			_add_plot(plot_id, Vector3(x, 0.08, z))
 	_add_building("ShopBuilding", SHOP_MODEL, Vector3(-5.75, 0.08, -0.6), "shop")
 	_add_building("WarehouseBuilding", WAREHOUSE_MODEL, Vector3(5.85, 0.08, -2.6), "warehouse")
+	_add_building("BreederBuilding", BREEDER_MODEL, Vector3(-5.75, 0.08, 3.1), "breeder")
 	for position in [Vector3(-6.35, 0.08, -3.7), Vector3(6.45, 0.08, 3.65)]:
 		_add_decoration(TREE_MODEL, position)
 	for position in [Vector3(-4.6, 0.08, 3.8), Vector3(-1.3, 0.08, 3.8), Vector3(2.0, 0.08, 3.8), Vector3(4.5, 0.08, -3.7)]:
@@ -182,12 +186,22 @@ func _build_hud() -> void:
 	hud.buy_seed_requested.connect(_on_buy_seed_requested)
 	hud.buy_fertilizer_requested.connect(_on_buy_fertilizer_requested)
 	hud.upgrade_shop_requested.connect(_on_upgrade_shop_requested)
-	hud.plant_requested.connect(_on_plant_requested)
+	hud.plant_seed_requested.connect(_on_plant_seed_requested)
 	hud.water_requested.connect(_on_water_requested)
 	hud.fertilize_requested.connect(_on_fertilize_requested)
 	hud.harvest_all_requested.connect(_on_harvest_all_requested)
 	hud.sell_batch_requested.connect(_on_sell_batch_requested)
 	hud.sell_all_requested.connect(_on_sell_all_requested)
+	hud.recycle_seed_requested.connect(_on_recycle_seed_requested)
+	hud.recycle_pending_seed_requested.connect(_on_recycle_pending_seed_requested)
+	hud.sell_pending_crop_requested.connect(_on_sell_pending_crop_requested)
+	hud.claim_pending_requested.connect(_on_claim_pending_requested)
+	hud.upgrade_warehouse_requested.connect(_on_upgrade_warehouse_requested)
+	hud.buy_breeder_requested.connect(_on_buy_breeder_requested)
+	hud.upgrade_breeder_requested.connect(_on_upgrade_breeder_requested)
+	hud.set_template_requested.connect(_on_set_template_requested)
+	hud.clear_template_requested.connect(_on_clear_template_requested)
+	hud.collect_breeder_requested.connect(_on_collect_breeder_requested)
 	hud.debug_mature_requested.connect(_debug_mature_all)
 
 
@@ -278,28 +292,39 @@ func _do_harvest(plot_id: int) -> void:
 		hud.show_status("存档写入失败，本次收获结果可能没有保存！")
 	_refresh_all()
 	var defn := PlantDefs.get_plant(result["batch"]["kind"])
-	hud.show_status("第 %d 块地收获了 %d 个%s和 %d 粒新种子。" % [plot_id, result["batch"]["count"], defn["display_name"], result["seeds"]])
+	var message := "第 %d 块地收获了 %d 个%s和 %d 粒新种子。" % [plot_id, result["batch"]["count"], defn["display_name"], result["seeds"]]
+	if not result["stored_crops"]:
+		message += " 作物区已满，这批作物进入待领取。"
+	if not result["stored_seeds"]:
+		message += " 种子区已满，新种子进入待领取。"
+	hud.show_status(message)
 	hud.show_harvest(result)
 
 
 func _on_building_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int, kind: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		if kind == "shop":
-			hud.open_shop()
-		else:
-			hud.open_warehouse()
+		match kind:
+			"shop":
+				hud.open_shop()
+			"warehouse":
+				hud.open_warehouse()
+			"breeder":
+				hud.view_now = _now()
+				hud.open_breeder()
 
 
-func _on_plant_requested(plot_id: int, kind: String) -> void:
-	var result := game.plant(plot_id, _now(), kind)
+func _on_plant_seed_requested(plot_id: int, seed_id: int) -> void:
+	var result := game.plant_seed(plot_id, seed_id, _now())
 	if result != "":
 		hud.show_status(result)
+		_refresh_all()
 		return
 	if not _save():
 		hud.show_status("存档写入失败，本次播种可能没有保存！")
 	_refresh_all()
-	var defn := PlantDefs.get_plant(kind)
-	hud.show_status("第 %d 块地已播种%s，约 %d 分钟后成熟。" % [plot_id, defn["display_name"], int(defn["grow_seconds"] / 60)])
+	var plot := game.get_plot(plot_id)
+	var defn := PlantDefs.get_plant(plot["kind"])
+	hud.show_status("第 %d 块地已播种%s（品质 %d 分），约 %d 分钟后成熟。" % [plot_id, defn["display_name"], BreedingDefs.quality_score(plot["parent_traits"]), int(defn["grow_seconds"] / 60)])
 	hud.close_modal_after_action()
 
 
@@ -393,6 +418,111 @@ func _on_sell_all_requested() -> void:
 	hud.show_status("全部出售完成，获得 %d 金币。" % earned)
 
 
+func _on_recycle_seed_requested(seed_id: int) -> void:
+	var result := game.recycle_seed(seed_id)
+	hud.show_status("回收 1 粒种子，获得 %d 金币。" % result["coins"] if result["ok"] else result["message"])
+	if result["ok"] and not _save():
+		hud.show_status("存档写入失败，本次回收可能没有保存！")
+	_refresh_all()
+
+
+func _on_recycle_pending_seed_requested(seed_id: int) -> void:
+	var result := game.recycle_pending_seed(seed_id)
+	hud.show_status("回收 1 粒待领取种子，获得 %d 金币。" % result["coins"] if result["ok"] else result["message"])
+	if result["ok"] and not _save():
+		hud.show_status("存档写入失败，本次回收可能没有保存！")
+	_refresh_all()
+
+
+func _on_sell_pending_crop_requested(batch_id: int) -> void:
+	var result := game.sell_pending_crop(batch_id)
+	hud.show_status("出售一批待领取作物，获得 %d 金币。" % result["coins"] if result["ok"] else result["message"])
+	if result["ok"] and not _save():
+		hud.show_status("存档写入失败，本次出售可能没有保存！")
+	_refresh_all()
+
+
+func _on_claim_pending_requested() -> void:
+	var moved := game.claim_pending()
+	if moved["crops"] == 0 and moved["seeds"] == 0:
+		hud.show_status("仓库空间仍然不足，先出售或回收一些存货。")
+		_refresh_all()
+		return
+	if not _save():
+		hud.show_status("存档写入失败，本次领取可能没有保存！")
+	_refresh_all()
+	hud.show_status("领取入库：作物 %d 批、种子 %d 粒。" % [moved["crops"], moved["seeds"]])
+
+
+func _on_upgrade_warehouse_requested() -> void:
+	var result := game.upgrade_warehouse()
+	if result != "":
+		hud.show_status(result)
+		_refresh_all()
+		return
+	if not _save():
+		hud.show_status("存档写入失败，仓库升级可能没有保存！")
+	_refresh_all()
+	hud.show_status("仓库升级完成，两个区的容量都提高了。")
+
+
+func _on_buy_breeder_requested() -> void:
+	var result := game.buy_breeder(_now())
+	if result != "":
+		hud.show_status(result)
+		_refresh_all()
+		return
+	if not _save():
+		hud.show_status("存档写入失败，购买可能没有保存！")
+	_refresh_all()
+	hud.show_status("育种机买好了！到仓库的种子区选一粒种子设为模板。")
+
+
+func _on_upgrade_breeder_requested() -> void:
+	var result := game.upgrade_breeder()
+	if result != "":
+		hud.show_status(result)
+		_refresh_all()
+		return
+	if not _save():
+		hud.show_status("存档写入失败，升级可能没有保存！")
+	_refresh_all()
+	hud.show_status("育种机升级完成。")
+
+
+func _on_set_template_requested(seed_id: int) -> void:
+	var result := game.set_breeder_template(seed_id, _now())
+	if not result["ok"]:
+		hud.show_status(result["message"])
+		_refresh_all()
+		return
+	if not _save():
+		hud.show_status("存档写入失败，模板设置可能没有保存！")
+	_refresh_all()
+	hud.show_status("模板已锁定，原种保留在仓库；副本会按周期积存在机内。")
+
+
+func _on_clear_template_requested() -> void:
+	var result := game.clear_breeder_template(_now())
+	if result != "":
+		hud.show_status(result)
+	_refresh_all()
+	if not _save():
+		hud.show_status("存档写入失败，模板解除可能没有保存！")
+
+
+func _on_collect_breeder_requested() -> void:
+	var result := game.collect_breeder(_now())
+	if not result["ok"]:
+		hud.show_status(result["message"])
+		_refresh_all()
+		return
+	if not _save():
+		hud.show_status("存档写入失败，采摘可能没有保存！")
+	_refresh_all()
+	hud.show_status("采摘了 %d 粒模板副本，已放入种子区。" % result["count"])
+
+
 func _debug_mature_all() -> void:
 	if not OS.is_debug_build():
 		return
@@ -412,6 +542,7 @@ func _now() -> int:
 
 
 func _save() -> bool:
+	game.breeder_settle(_now())
 	var ok := SaveStore.save_state(game.state)
 	if not ok:
 		push_error("存档写入失败，请检查磁盘空间与 user:// 目录权限。")

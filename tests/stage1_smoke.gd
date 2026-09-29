@@ -2,13 +2,15 @@ extends SceneTree
 
 const TEST_SAVE := "user://stage1_smoke_save.json"
 
+var failed := false
+
 
 func _initialize() -> void:
 	var game := FarmGame.new()
 	game.set_debug_random_seed(20260928)
 	game.new_game(1000)
 	_check(game.state["seeds"].size() == 6, "new game must start with six seeds")
-	_check(game.state["version"] == 2, "new game must use save version 2")
+	_check(game.state["version"] == 3, "new game must use save version 3")
 	for plot_id in range(1, 7):
 		_check(game.plant(plot_id, 1000) == "", "plant should succeed")
 	_check(game.state["seeds"].is_empty(), "planting six plots must consume six seeds")
@@ -53,16 +55,19 @@ func _initialize() -> void:
 	_check(restored.state["crop_batches"].is_empty(), "sold crops must stay sold")
 	_check(restored.farming_level() == 2, "farming level must persist")
 	_cleanup()
-	print("STAGE1_SMOKE_PASS")
-	quit(0)
+	if failed:
+		print("STAGE1_SMOKE_FAIL")
+		quit(1)
+	else:
+		print("STAGE1_SMOKE_PASS")
+		quit(0)
 
 
 func _check(condition: bool, message: String) -> void:
 	if condition:
 		return
 	push_error("STAGE1_SMOKE_FAIL: " + message)
-	_cleanup()
-	quit(1)
+	failed = true
 
 
 func _cleanup() -> void:

@@ -4,12 +4,22 @@ extends Control
 signal buy_seed_requested(kind: String, quantity: int)
 signal buy_fertilizer_requested(kind: String)
 signal upgrade_shop_requested
-signal plant_requested(plot_id: int, kind: String)
+signal plant_seed_requested(plot_id: int, seed_id: int)
 signal water_requested(plot_id: int)
 signal fertilize_requested(plot_id: int, kind: String)
 signal harvest_all_requested
 signal sell_batch_requested(batch_id: int)
 signal sell_all_requested
+signal recycle_seed_requested(seed_id: int)
+signal recycle_pending_seed_requested(seed_id: int)
+signal sell_pending_crop_requested(batch_id: int)
+signal claim_pending_requested
+signal upgrade_warehouse_requested
+signal buy_breeder_requested
+signal upgrade_breeder_requested
+signal set_template_requested(seed_id: int)
+signal clear_template_requested
+signal collect_breeder_requested
 signal debug_mature_requested
 
 const SHOP_ICON := preload("res://assets/sprites/facility_shop.png")
@@ -155,9 +165,16 @@ func open_shop() -> void:
 	_render_modal()
 
 
-func open_warehouse() -> void:
-	active_modal = "warehouse"
-	_apply_modal_height(240)
+func open_warehouse(tab := "crops") -> void:
+	active_modal = "warehouse_seeds" if tab == "seeds" else "warehouse_crops"
+	_apply_modal_height(285)
+	modal_overlay.visible = true
+	_render_modal()
+
+
+func open_breeder() -> void:
+	active_modal = "breeder"
+	_apply_modal_height(285)
 	modal_overlay.visible = true
 	_render_modal()
 
@@ -385,10 +402,16 @@ func _render_modal() -> void:
 		"shop":
 			sell_all_button.visible = false
 			_render_shop()
-		"warehouse":
+		"warehouse_crops", "warehouse":
 			sell_all_button.visible = not current_state["crop_batches"].is_empty()
 			sell_all_button.text = "全部出售（%d 批）" % current_state["crop_batches"].size()
-			_render_warehouse()
+			_render_warehouse_crops()
+		"warehouse_seeds":
+			sell_all_button.visible = false
+			_render_warehouse_seeds()
+		"breeder":
+			sell_all_button.visible = false
+			_render_breeder()
 		"harvest":
 			sell_all_button.visible = false
 			_render_harvest()
@@ -419,6 +442,15 @@ func _render_harvest() -> void:
 	rewards.add_child(_reward_card(CROP_ICONS[batch["kind"]], defn["display_name"], "×%d" % batch["count"]))
 	rewards.add_child(_reward_card(SEED_ICONS[batch["kind"]], "新种子", "×%d" % result["seeds"]))
 	rewards.add_child(_reward_card(COIN_ICON, "默认售价", "%d 金币" % game.batch_sale_price(batch)))
+	if result.get("child_traits", []) is Array and not result["child_traits"].is_empty():
+		var trait_lines := ""
+		for index in range(result["child_traits"].size()):
+			if index > 0:
+				trait_lines += "  ·  "
+			trait_lines += "种子%d[%s]" % [index + 1, BreedingDefs.traits_text(result["child_traits"][index])]
+		var child_label := _label("新种子词条（每粒独立判定）：%s" % trait_lines, 14, TEXT_MUTED)
+		child_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		modal_content.add_child(child_label)
 	modal_content.add_child(_breakdown_card(breakdown, batch))
 	var story_card := _panel(Color("#f2ecd9"), Color("#ddd0ae"), 12)
 	modal_content.add_child(story_card)
@@ -491,42 +523,46 @@ func _breakdown_card(breakdown: Dictionary, batch: Dictionary, compact := false)
 func _render_seed_picker() -> void:
 	modal_title.text = "选择要播种的种子"
 	modal_icon.texture = SEED_ICONS["cabbage"]
-	modal_content.add_child(_label("第 %d 块地是空地。选择一种种子播种：" % picker_plot_id, 18, TEXT_DARK))
-	var counts := game.seed_counts()
-	if counts.is_empty():
-		modal_content.add_child(_label("没有种子了，请先到商店购买。", 17, LOCK_RED))
+	modal_content.add_child(_label("第 %d 块地是空地。选定一组种子播种（消耗其中 1 粒）：" % picker_plot_id, 18, TEXT_DARK))
+	var groups := game.seed_groups()
+	if groups.is_empty():
+		var empty_stack: Array = current_state.get("pending", {}).get("seeds", [])
+		if not empty_stack.is_empty():
+			modal_content.add_child(_label("种子区已满，还有 %d 粒新种子待领取。请先整理仓库。" % empty_stack.size(), 17, LOCK_RED))
+		else:
+			modal_content.add_child(_label("没有种子了，请先到商店购买。", 17, LOCK_RED))
 		var shop_button := _solid_button("打开种子商店", LEAF)
 		shop_button.pressed.connect(func(): open_shop())
 		modal_content.add_child(shop_button)
 		return
-	for kind in PlantDefs.plant_kinds():
-		var owned: int = counts.get(kind, 0)
-		if owned <= 0:
-			continue
-		var defn := PlantDefs.get_plant(kind)
+	for group in groups:
+		var defn := PlantDefs.get_plant(group["kind"])
 		var card := _panel(Color("#f6ead0"), Color("#e3d1ac"), 12)
+		card.name = "SeedGroup_%d" % int(group["seed_ids"][0])
 		modal_content.add_child(card)
 		var margin := _margin(12, 8)
 		card.add_child(margin)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 11)
 		margin.add_child(row)
-		row.add_child(_image(SEED_ICONS[kind], Vector2(58, 58)))
+		row.add_child(_image(SEED_ICONS[group["kind"]], Vector2(52, 52)))
 		var details := VBoxContainer.new()
 		details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		details.add_theme_constant_override("separation", 1)
 		row.add_child(details)
-		details.add_child(_label("%s种子 ×%d" % [defn["display_name"], owned], 18, TEXT_DARK))
-		details.add_child(_label("%d 分钟成熟 · 每作物基准 %d 分 · 每地每轮 2~3 粒新种子" % [int(defn["grow_seconds"] / 60), defn["base_score"]], 14, TEXT_MUTED))
+		var quality: int = BreedingDefs.quality_score(group["traits"])
+		details.add_child(_label("%s种子 ×%d  ·  品质 %d 分" % [defn["display_name"], group["count"], quality], 17, TEXT_DARK))
+		details.add_child(_label("词条：%s" % BreedingDefs.traits_text(group["traits"]), 13, TEXT_MUTED))
+		details.add_child(_label("%d 分钟成熟 · 每作物基准 %d 分" % [int(defn["grow_seconds"] / 60), defn["base_score"]], 13, TEXT_MUTED))
 		var plant_button := _solid_button("播种", LEAF)
-		plant_button.custom_minimum_size.x = 96
+		plant_button.custom_minimum_size.x = 88
 		plant_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-		plant_button.pressed.connect(_emit_plant.bind(picker_plot_id, kind))
+		plant_button.pressed.connect(_emit_plant_seed.bind(picker_plot_id, int(group["seed_ids"][0])))
 		row.add_child(plant_button)
 
 
-func _emit_plant(plot_id: int, kind: String) -> void:
-	plant_requested.emit(plot_id, kind)
+func _emit_plant_seed(plot_id: int, seed_id: int) -> void:
+	plant_seed_requested.emit(plot_id, seed_id)
 
 
 func _render_plot_care() -> void:
@@ -620,7 +656,41 @@ func _render_shop() -> void:
 		modal_content.add_child(_fertilizer_product_card(kind))
 	modal_content.add_child(_section_label("商店升级"))
 	modal_content.add_child(_shop_upgrade_card())
+	modal_content.add_child(_section_label("设施"))
+	modal_content.add_child(_breeder_product_card())
 	modal_content.add_child(_label("当前金币：%d" % current_state["coins"], 17, TEXT_DARK))
+
+
+func _breeder_product_card() -> PanelContainer:
+	var card := _panel(Color("#f6ead0"), Color("#e3d1ac"), 12)
+	card.name = "BreederProductCard"
+	var margin := _margin(12, 8)
+	card.add_child(margin)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	margin.add_child(row)
+	row.add_child(_image(WAREHOUSE_ICON, Vector2(54, 54)))
+	var details := VBoxContainer.new()
+	details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	details.add_theme_constant_override("separation", 2)
+	row.add_child(details)
+	if bool(current_state["breeder"]["owned"]):
+		details.add_child(_label("育种机 · 已拥有（%d 级）" % int(current_state["breeder"]["level"]), 18, TEXT_DARK))
+		details.add_child(_label("到仓库 → 育种机页签使用；升级也在那里。", 14, TEXT_MUTED))
+		return card
+	var farming_level := PlantDefs.level_from_exp(int(current_state["farming_exp"]))
+	details.add_child(_label("育种机（复制种子）", 18, TEXT_DARK))
+	details.add_child(_label("种地 2 级解锁 · %d 金币 · 每 60 分钟复制 1 粒模板种子" % BreedingDefs.BREEDER_BUY_COST, 14, TEXT_MUTED))
+	var button := _solid_button("购买 · %d 金币" % BreedingDefs.BREEDER_BUY_COST, LEAF)
+	button.custom_minimum_size.x = 150
+	button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	if farming_level < BreedingDefs.BREEDER_UNLOCK_FARMING_LEVEL:
+		details.add_child(_label("🔒 需要种地 %d 级（当前 %d）" % [BreedingDefs.BREEDER_UNLOCK_FARMING_LEVEL, farming_level], 13, LOCK_RED))
+		button.disabled = true
+		button.text = "未解锁"
+	button.pressed.connect(func(): buy_breeder_requested.emit())
+	row.add_child(button)
+	return card
 
 
 func _section_label(text: String) -> Label:
@@ -738,40 +808,253 @@ func _shop_upgrade_card() -> PanelContainer:
 	return card
 
 
-func _render_warehouse() -> void:
+func _warehouse_tabs(active: String) -> HBoxContainer:
+	var tabs := HBoxContainer.new()
+	tabs.name = "WarehouseTabs"
+	tabs.add_theme_constant_override("separation", 8)
+	var crops_tab := _solid_button("作物区（%d/%d 格）" % [game.crop_slots_used(), game.warehouse_capacity()], LEAF if active == "crops" else Color("#9aa392"))
+	crops_tab.custom_minimum_size.x = 200
+	crops_tab.pressed.connect(func(): open_warehouse("crops"))
+	tabs.add_child(crops_tab)
+	var seeds_tab := _solid_button("种子区（%d/%d 格）" % [game.seed_slots_used(), game.warehouse_capacity()], LEAF if active == "seeds" else Color("#9aa392"))
+	seeds_tab.custom_minimum_size.x = 200
+	seeds_tab.pressed.connect(func(): open_warehouse("seeds"))
+	tabs.add_child(seeds_tab)
+	var breeder_tab := _solid_button("育种机", LEAF if active == "breeder" else Color("#9aa392"))
+	breeder_tab.custom_minimum_size.x = 120
+	breeder_tab.pressed.connect(func(): open_breeder())
+	tabs.add_child(breeder_tab)
+	return tabs
+
+
+func _render_pending_section() -> void:
+	var pending: Dictionary = current_state.get("pending", {"crops": [], "seeds": []})
+	if pending["crops"].is_empty() and pending["seeds"].is_empty():
+		return
+	var card := _panel(Color("#f7e3d2"), Color("#e0b89a"), 12)
+	card.name = "PendingCard"
+	modal_content.add_child(card)
+	var margin := _margin(12, 8)
+	card.add_child(margin)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 5)
+	margin.add_child(stack)
+	stack.add_child(_label("待领取结果：作物 %d 批 · 种子 %d 粒（仓库满时收获的产出）" % [pending["crops"].size(), pending["seeds"].size()], 17, Color("#8a4a2a")))
+	for batch in pending["crops"]:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		stack.add_child(row)
+		row.add_child(_label("· 第 %d 块地 %s ×%d · 默认售价 %d 金币" % [batch["plot_id"], PlantDefs.get_plant(batch.get("kind", "cabbage"))["display_name"], batch["count"], game.batch_sale_price(batch)], 14, TEXT_MUTED))
+		var sell_button := _plain_button("出售", Color("#ffd98a"))
+		sell_button.custom_minimum_size.x = 60
+		sell_button.pressed.connect(func(): sell_pending_crop_requested.emit(batch["id"]))
+		row.add_child(sell_button)
+	for seed in pending["seeds"]:
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 8)
+		stack.add_child(row)
+		row.add_child(_label("· %s种子 · 词条：%s" % [PlantDefs.get_plant(seed["kind"])["display_name"], BreedingDefs.traits_text(seed.get("traits", []))], 14, TEXT_MUTED))
+		var recycle_button := _plain_button("回收 5 金币", Color("#ffd98a"))
+		recycle_button.custom_minimum_size.x = 100
+		recycle_button.pressed.connect(func(): recycle_pending_seed_requested.emit(seed["id"]))
+		row.add_child(recycle_button)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	stack.add_child(actions)
+	var claim_button := _solid_button("领取入库（先腾出空间）", LEAF)
+	claim_button.pressed.connect(func(): claim_pending_requested.emit())
+	actions.add_child(claim_button)
+
+
+func _render_warehouse_crops() -> void:
 	modal_title.text = "作物仓库"
 	modal_icon.texture = WAREHOUSE_ICON
+	modal_content.add_child(_warehouse_tabs("crops"))
+	_render_pending_section()
 	if current_state["crop_batches"].is_empty():
 		var empty := _panel(Color("#f6ead0"), Color("#e3d1ac"), 13)
 		modal_content.add_child(empty)
 		var margin := _margin(16, 17)
 		empty.add_child(margin)
-		margin.add_child(_label("仓库还是空的。\n点击成熟的地块收获第一批作物。", 19, TEXT_DARK))
+		margin.add_child(_label("作物区还是空的。\n点击成熟的地块收获第一批作物。", 19, TEXT_DARK))
+	else:
+		modal_content.add_child(_label("每块地的收获单独存放 · 当前可按默认价 1.2 倍出售", 17, TEXT_MUTED))
+		for batch in current_state["crop_batches"]:
+			var card := _panel(Color("#f6ead0"), Color("#e3d1ac"), 12)
+			card.name = "BatchCard_%d" % batch["id"]
+			modal_content.add_child(card)
+			var margin := _margin(12, 8)
+			card.add_child(margin)
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 11)
+			margin.add_child(row)
+			var icon: Texture2D = CROP_ICONS.get(batch.get("kind", "cabbage"), CROP_ICONS["cabbage"])
+			row.add_child(_image(icon, Vector2(54, 54)))
+			var details := VBoxContainer.new()
+			details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			details.add_theme_constant_override("separation", 1)
+			row.add_child(details)
+			var kind_name: String = PlantDefs.get_plant(batch.get("kind", "cabbage"))["display_name"]
+			var attributes: Dictionary = batch.get("attributes", {})
+			details.add_child(_label("第 %d 块地 · %s ×%d · 每作物 %d 分" % [batch["plot_id"], kind_name, batch["count"], int(batch.get("per_crop_score", batch["base_score"]))], 18, TEXT_DARK))
+			var attribute_line := "属性：水 %d · 纤维 %d · 色泽 %d" % [int(attributes.get("water", 0)), int(attributes.get("fiber", 0)), int(attributes.get("color", 0))]
+			details.add_child(_label("%s · 默认售价 %d 金币" % [attribute_line, game.batch_sale_price(batch)], 15, ACCENT_GOLD))
+			var sell_button := _solid_button("出售", Color("#9b713f"))
+			sell_button.custom_minimum_size.x = 86
+			sell_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+			sell_button.pressed.connect(_emit_batch_sale.bind(batch["id"]))
+			row.add_child(sell_button)
+	_render_warehouse_upgrade()
+
+
+func _render_warehouse_seeds() -> void:
+	modal_title.text = "种子仓库"
+	modal_icon.texture = SEED_ICONS["cabbage"]
+	modal_content.add_child(_warehouse_tabs("seeds"))
+	_render_pending_section()
+	var groups := game.seed_groups()
+	if groups.is_empty():
+		var empty := _panel(Color("#f6ead0"), Color("#e3d1ac"), 13)
+		modal_content.add_child(empty)
+		var margin := _margin(16, 17)
+		empty.add_child(margin)
+		margin.add_child(_label("种子区还是空的。收获或购买种子后会出现在这里。", 18, TEXT_DARK))
+		_render_warehouse_upgrade()
 		return
-	modal_content.add_child(_label("每块地的收获单独存放 · 当前可按默认价 1.2 倍出售", 17, TEXT_MUTED))
-	for batch in current_state["crop_batches"]:
+	modal_content.add_child(_label("属性与词条完全相同的种子叠放，每格最多 %d 粒；品质只取最高单条词条分。" % BreedingDefs.SEED_STACK_MAX, 15, TEXT_MUTED))
+	var template_id := int(current_state["breeder"]["template_seed_id"])
+	for group in groups:
+		var defn := PlantDefs.get_plant(group["kind"])
 		var card := _panel(Color("#f6ead0"), Color("#e3d1ac"), 12)
-		card.name = "BatchCard_%d" % batch["id"]
+		card.name = "SeedCard_%d" % int(group["seed_ids"][0])
 		modal_content.add_child(card)
 		var margin := _margin(12, 8)
 		card.add_child(margin)
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 11)
 		margin.add_child(row)
-		var icon: Texture2D = CROP_ICONS.get(batch.get("kind", "cabbage"), CROP_ICONS["cabbage"])
-		row.add_child(_image(icon, Vector2(54, 54)))
+		row.add_child(_image(SEED_ICONS[group["kind"]], Vector2(50, 50)))
 		var details := VBoxContainer.new()
 		details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		details.add_theme_constant_override("separation", 1)
 		row.add_child(details)
-		var kind_name: String = PlantDefs.get_plant(batch.get("kind", "cabbage"))["display_name"]
-		details.add_child(_label("第 %d 块地 · %s ×%d · 每作物 %d 分" % [batch["plot_id"], kind_name, batch["count"], int(batch.get("per_crop_score", batch["base_score"]))], 18, TEXT_DARK))
-		details.add_child(_label("默认售价 %d 金币" % game.batch_sale_price(batch), 16, ACCENT_GOLD))
-		var sell_button := _solid_button("出售", Color("#9b713f"))
-		sell_button.custom_minimum_size.x = 86
-		sell_button.size_flags_horizontal = Control.SIZE_SHRINK_END
-		sell_button.pressed.connect(_emit_batch_sale.bind(batch["id"]))
-		row.add_child(sell_button)
+		var is_template: bool = template_id != 0 and template_id in group["seed_ids"]
+		var quality: int = BreedingDefs.quality_score(group["traits"])
+		var title := "%s种子 ×%d · 品质 %d 分" % [defn["display_name"], group["count"], quality]
+		if is_template:
+			title += "  ★ 育种机模板"
+		details.add_child(_label(title, 17, TEXT_DARK))
+		details.add_child(_label("词条：%s" % BreedingDefs.traits_text(group["traits"]), 13, TEXT_MUTED))
+		var buttons := HBoxContainer.new()
+		buttons.add_theme_constant_override("separation", 6)
+		row.add_child(buttons)
+		var template_button := _solid_button("解除模板" if is_template else "设为模板", Color("#3f6d8e") if not is_template else Color("#8a6d3f"))
+		template_button.custom_minimum_size.x = 104
+		template_button.pressed.connect(_emit_template_toggle.bind(int(group["seed_ids"][0]), is_template))
+		buttons.add_child(template_button)
+		var recycle_button := _solid_button("回收 5 金币", Color("#9b713f"))
+		recycle_button.custom_minimum_size.x = 96
+		recycle_button.disabled = is_template
+		recycle_button.pressed.connect(_emit_recycle.bind(int(group["seed_ids"][0])))
+		buttons.add_child(recycle_button)
+	_render_warehouse_upgrade()
+
+
+func _emit_template_toggle(seed_id: int, is_template: bool) -> void:
+	if is_template:
+		clear_template_requested.emit()
+	else:
+		set_template_requested.emit(seed_id)
+
+
+func _emit_recycle(seed_id: int) -> void:
+	recycle_seed_requested.emit(seed_id)
+
+
+func _render_warehouse_upgrade() -> void:
+	var level := int(current_state["warehouse_level"])
+	var card := _panel(Color("#f6ead0"), Color("#e3d1ac"), 12)
+	card.name = "WarehouseUpgradeCard"
+	modal_content.add_child(card)
+	var margin := _margin(12, 8)
+	card.add_child(margin)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	margin.add_child(row)
+	row.add_child(_image(WAREHOUSE_ICON, Vector2(50, 50)))
+	var details := VBoxContainer.new()
+	details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	details.add_theme_constant_override("separation", 2)
+	row.add_child(details)
+	details.add_child(_label("仓库等级 %d 级 · 每区 %d 格" % [level, BreedingDefs.WAREHOUSE_CAPACITY_BY_LEVEL[level - 1]], 17, TEXT_DARK))
+	if level >= BreedingDefs.WAREHOUSE_CAPACITY_BY_LEVEL.size():
+		details.add_child(_label("已达当前版本最高等级。", 14, TEXT_MUTED))
+		return
+	var cost: int = BreedingDefs.WAREHOUSE_UPGRADE_COSTS[level + 1]
+	details.add_child(_label("升级到 %d 级：每区 %d 格 · %d 金币" % [level + 1, BreedingDefs.WAREHOUSE_CAPACITY_BY_LEVEL[level], cost], 14, TEXT_MUTED))
+	var button := _solid_button("升级仓库", Color("#8a6d3f"))
+	button.custom_minimum_size.x = 120
+	button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	button.pressed.connect(func(): upgrade_warehouse_requested.emit())
+	row.add_child(button)
+
+
+func _render_breeder() -> void:
+	modal_title.text = "育种机"
+	modal_icon.texture = WAREHOUSE_ICON
+	modal_content.add_child(_warehouse_tabs("breeder"))
+	var status := game.breeder_status(view_now)
+	if not status["owned"]:
+		var card := _panel(Color("#f6ead0"), Color("#e3d1ac"), 12)
+		modal_content.add_child(card)
+		var margin := _margin(14, 12)
+		card.add_child(margin)
+		var stack := VBoxContainer.new()
+		stack.add_theme_constant_override("separation", 6)
+		margin.add_child(stack)
+		stack.add_child(_label("复制种子的机器：放入 1 粒模板，定期产出词条完全相同的副本。", 17, TEXT_DARK))
+		stack.add_child(_label("购买需要种地 2 级 + %d 金币；1 级每 60 分钟复制 1 粒，机内最多存 8 粒。" % BreedingDefs.BREEDER_BUY_COST, 15, TEXT_MUTED))
+		var buy_button := _solid_button("购买育种机 · %d 金币" % BreedingDefs.BREEDER_BUY_COST, LEAF)
+		buy_button.pressed.connect(func(): buy_breeder_requested.emit())
+		stack.add_child(buy_button)
+		return
+	var level: int = status["level"]
+	var card := _panel(Color("#f6ead0"), Color("#e3d1ac"), 12)
+	card.name = "BreederStatusCard"
+	modal_content.add_child(card)
+	var margin := _margin(12, 8)
+	card.add_child(margin)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 4)
+	margin.add_child(stack)
+	stack.add_child(_label("育种机 %d 级 · 每 %d 分钟 1 粒 · 机内 %d/%d 粒" % [level, int(status["cycle_seconds"] / 60), status["pending"], status["capacity"]], 18, TEXT_DARK))
+	if status["template"].is_empty():
+		stack.add_child(_label("当前没有模板。到种子区选一粒种子点\"设为模板\"。", 15, TEXT_MUTED))
+	else:
+		var template: Dictionary = status["template"]
+		stack.add_child(_label("模板：%s种子 · 品质 %d 分（原种保留在仓库）" % [PlantDefs.get_plant(template["kind"])["display_name"], BreedingDefs.quality_score(template.get("traits", []))], 16, TEXT_DARK))
+		stack.add_child(_label("词条：%s" % BreedingDefs.traits_text(template.get("traits", [])), 13, TEXT_MUTED))
+		if status["running"]:
+			var progress: int = status["progress_seconds"]
+			var percent := int(float(progress) / float(status["cycle_seconds"]) * 100.0)
+			stack.add_child(_label("本周期进度：%d%%（%d/%d 秒）；切换模板后进度按种子保存，切回可继续。" % [percent, progress, status["cycle_seconds"]], 15, Color("#3f6d8e")))
+		else:
+			stack.add_child(_label("机内已满，复制暂停；采摘后继续。", 15, LOCK_RED))
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 8)
+	stack.add_child(actions)
+	if int(status["pending"]) > 0:
+		var collect_button := _solid_button("采摘 %d 粒副本" % status["pending"], LEAF)
+		collect_button.pressed.connect(func(): collect_breeder_requested.emit())
+		actions.add_child(collect_button)
+	var next_cost: int = BreedingDefs.BREEDER_LEVELS[level]["upgrade_cost"]
+	if level < 3:
+		if next_cost < 0:
+			actions.add_child(_label("升级到 %d 级：价格待定（占位）" % (level + 1), 15, TEXT_MUTED))
+		else:
+			var upgrade_button := _solid_button("升级 %d 级 · %d 金币" % [level + 1, next_cost], Color("#8a6d3f"))
+			upgrade_button.pressed.connect(func(): upgrade_breeder_requested.emit())
+			actions.add_child(upgrade_button)
 
 
 func _reward_card(texture: Texture2D, caption: String, count: String) -> PanelContainer:

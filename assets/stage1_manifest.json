@@ -3,12 +3,58 @@
   "model_source_dir": "art/lowpoly/farm_asset_pack/glb",
   "runtime_model_dir": "assets/models",
   "runtime_sprite_dir": "assets/sprites",
-  "models": ["plot_empty", "plot_cabbage_sprout", "plot_cabbage_growing", "plot_cabbage_mature", "plot_carrot_sprout", "plot_carrot_growing", "plot_carrot_mature", "facility_shop", "facility_warehouse", "deco_tree", "deco_fence", "deco_flower"],
-  "panel_icons": ["facility_shop", "facility_warehouse", "item_harvest_crate", "item_coin", "seed_cabbage", "crop_cabbage", "seed_carrot", "crop_carrot", "fertilizer_basic", "fertilizer_mutation", "fertilizer_preserve", "fertilizer_golden", "tool_watering_can"],
+  "models": [
+    "plot_empty",
+    "plot_cabbage_sprout",
+    "plot_cabbage_growing",
+    "plot_cabbage_mature",
+    "plot_carrot_sprout",
+    "plot_carrot_growing",
+    "plot_carrot_mature",
+    "facility_shop",
+    "facility_warehouse",
+    "deco_tree",
+    "deco_fence",
+    "deco_flower",
+    "facility_breeder"
+  ],
+  "panel_icons": [
+    "facility_shop",
+    "facility_warehouse",
+    "item_harvest_crate",
+    "item_coin",
+    "seed_cabbage",
+    "crop_cabbage",
+    "seed_carrot",
+    "crop_carrot",
+    "fertilizer_basic",
+    "fertilizer_mutation",
+    "fertilizer_preserve",
+    "fertilizer_golden",
+    "tool_watering_can"
+  ],
   "stage2_additions": {
-    "models": ["plot_carrot_sprout", "plot_carrot_growing", "plot_carrot_mature"],
-    "panel_icons": ["seed_carrot", "crop_carrot", "fertilizer_basic", "fertilizer_mutation", "fertilizer_preserve", "fertilizer_golden", "tool_watering_can"],
+    "models": [
+      "plot_carrot_sprout",
+      "plot_carrot_growing",
+      "plot_carrot_mature"
+    ],
+    "panel_icons": [
+      "seed_carrot",
+      "crop_carrot",
+      "fertilizer_basic",
+      "fertilizer_mutation",
+      "fertilizer_preserve",
+      "fertilizer_golden",
+      "tool_watering_can"
+    ],
     "notes": "plot_wet / plot_fertilized / facility_breeder / guest_* 尚未接入，留给阶段 3~5。"
   },
-  "status": "stage 2 adds carrot plot models and fertilizer/watering-can panel icons; pending external asset audit"
+  "status": "stage 3 adds breeder facility model; pending external asset audit",
+  "stage3_additions": {
+    "models": [
+      "facility_breeder"
+    ],
+    "notes": "guest_* / plot_wet / plot_fertilized 仍未接入，留给阶段 4~5。"
+  }
 }

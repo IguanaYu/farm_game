@@ -47,7 +47,7 @@ func _grant_carrot_seed(game: FarmGame, seed_id: int) -> void:
 
 func _test_new_game_defaults() -> void:
 	var game := _fresh_game()
-	_check(game.state["version"] == 2, "new game writes save version 2")
+	_check(game.state["version"] == 3, "new game writes save version 3")
 	_check(game.state["plots"].size() == 6, "new game has six plots")
 	_check(game.state["seeds"].size() == 6 and game.seed_counts()["cabbage"] == 6, "new game grants six cabbage seeds")
 	_check(game.state["shop_level"] == 1 and game.state["can_level"] == 1, "shop and can start at level 1")
@@ -77,7 +77,7 @@ func _test_v1_migration() -> void:
 			v1["plots"].append({"id": index + 1, "seed_id": 0, "planted_at": 0, "ready_at": 0, "roll_seed": 0})
 	var game := FarmGame.new()
 	_check(game.load_state(v1), "version 1 save must migrate and load")
-	_check(game.state["version"] == 2, "migrated save reports version 2")
+	_check(game.state["version"] == 3, "migrated save reports version 3")
 	_check(game.state["coins"] == 500, "migration keeps coins")
 	_check(game.state["seeds"].size() == 1 and game.state["seeds"][0]["id"] == 6, "migration keeps seeds")
 	_check(game.state["crop_batches"].size() == 1, "migration keeps crop batches")

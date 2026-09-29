@@ -1,7 +1,7 @@
 class_name FarmGame
 extends RefCounted
 
-const SAVE_VERSION := 2
+const SAVE_VERSION := 3
 const PLOT_COUNT := 6
 const ROUND_EVENT_LIMIT := 24
 
@@ -27,7 +27,10 @@ func new_game(now: int) -> void:
 		"plant_exp": {},
 		"shop_level": 1,
 		"can_level": 1,
+		"warehouse_level": 1,
 		"fertilizers": {},
+		"breeder": _default_breeder(),
+		"pending": {"crops": [], "seeds": []},
 		"plots": [],
 		"seeds": [],
 		"crop_batches": [],
@@ -41,12 +44,18 @@ func new_game(now: int) -> void:
 		state["seeds"].append(_new_seed("cabbage"))
 
 
+func _default_breeder() -> Dictionary:
+	return {"owned": false, "level": 1, "template_seed_id": 0, "pending": 0, "progress": {}, "last_settled": 0}
+
+
 func load_state(saved: Dictionary) -> bool:
 	if saved.is_empty():
 		return false
 	var source := saved
 	if int(saved.get("version", -1)) == 1:
 		source = _migrate_v1_to_v2(saved)
+	if int(source.get("version", -1)) == 2:
+		source = _migrate_v2_to_v3(source)
 	if int(source.get("version", -1)) != SAVE_VERSION:
 		return false
 	# JSON 会把整数解析成浮点（3 → 3.0），而数组/字典的相等比较对类型严格；统一把整数值浮点归一化为 int。
@@ -66,6 +75,14 @@ func load_state(saved: Dictionary) -> bool:
 		return false
 	if int(source.get("can_level", 0)) < 1 or int(source.get("can_level", 0)) > PlantDefs.WATER_BONUS_BY_CAN.size():
 		return false
+	if int(source.get("warehouse_level", 0)) < 1 or int(source.get("warehouse_level", 0)) > BreedingDefs.WAREHOUSE_CAPACITY_BY_LEVEL.size():
+		return false
+	var breeder: Dictionary = source.get("breeder", {})
+	if not breeder is Dictionary or not breeder.get("progress") is Dictionary:
+		return false
+	var pending: Dictionary = source.get("pending", {})
+	if not pending is Dictionary or not pending.get("crops") is Array or not pending.get("seeds") is Array:
+		return false
 	for plot in source["plots"]:
 		if not plot is Dictionary:
 			return false
@@ -80,6 +97,15 @@ func load_state(saved: Dictionary) -> bool:
 	for seed in source["seeds"]:
 		if not seed is Dictionary or not _is_number(seed.get("id")) or not PlantDefs.is_known_plant(str(seed.get("kind", ""))):
 			return false
+		if not seed.get("traits") is Array:
+			return false
+		for entry in seed["traits"]:
+			if not entry is Dictionary or not BreedingDefs.get_effect(str(entry.get("effect", ""))) is Dictionary:
+				return false
+			if not BreedingDefs.EFFECTS.has(str(entry.get("effect", ""))):
+				return false
+			if not _is_number(entry.get("tier")):
+				return false
 	for batch in source["crop_batches"]:
 		if not batch is Dictionary:
 			return false
@@ -94,6 +120,14 @@ func load_state(saved: Dictionary) -> bool:
 	state["farming_exp"] = int(state["farming_exp"])
 	state["shop_level"] = int(state["shop_level"])
 	state["can_level"] = int(state["can_level"])
+	state["warehouse_level"] = int(state["warehouse_level"])
+	var breeder_state: Dictionary = state["breeder"]
+	breeder_state["level"] = int(breeder_state["level"])
+	breeder_state["template_seed_id"] = int(breeder_state["template_seed_id"])
+	breeder_state["pending"] = int(breeder_state["pending"])
+	breeder_state["last_settled"] = int(breeder_state["last_settled"])
+	for key in breeder_state["progress"]:
+		breeder_state["progress"][key] = int(breeder_state["progress"][key])
 	for key in state["plant_exp"]:
 		state["plant_exp"][key] = int(state["plant_exp"][key])
 	for kind in state["fertilizers"]:
@@ -148,6 +182,306 @@ func seed_counts() -> Dictionary:
 	return result
 
 
+## ---- 仓库（阶段 3） ----
+
+func warehouse_capacity() -> int:
+	return BreedingDefs.WAREHOUSE_CAPACITY_BY_LEVEL[int(state["warehouse_level"]) - 1]
+
+
+func crop_slots_used() -> int:
+	return state["crop_batches"].size() + state["pending"]["crops"].size()
+
+
+func seed_slots_used() -> int:
+	return _seed_slots_for(state["seeds"])
+
+
+func _seed_slots_for(seeds: Array) -> int:
+	var groups: Dictionary = {}
+	for seed in seeds:
+		var signature: String = BreedingDefs.seed_signature(seed)
+		groups[signature] = groups.get(signature, 0) + 1
+	var slots := 0
+	for signature in groups:
+		slots += int(ceil(float(groups[signature]) / BreedingDefs.SEED_STACK_MAX))
+	return slots
+
+
+func seed_slots_after_adding(extra_seeds: Array) -> int:
+	return _seed_slots_for(state["seeds"] + extra_seeds)
+
+
+func seed_groups() -> Array:
+	## 返回仓库种子区的分组视图：[{signature, kind, traits, count, seed_ids: [..]}]，按品质降序。
+	var groups: Dictionary = {}
+	for seed in state["seeds"]:
+		var signature: String = BreedingDefs.seed_signature(seed)
+		if not groups.has(signature):
+			groups[signature] = {"signature": signature, "kind": seed["kind"], "traits": seed.get("traits", []), "count": 0, "seed_ids": []}
+		groups[signature]["count"] += 1
+		groups[signature]["seed_ids"].append(seed["id"])
+	var result: Array = groups.values()
+	result.sort_custom(func(a, b):
+		var quality_a: int = BreedingDefs.quality_score(a["traits"])
+		var quality_b: int = BreedingDefs.quality_score(b["traits"])
+		if quality_a != quality_b:
+			return quality_a > quality_b
+		return int(a["seed_ids"][0]) < int(b["seed_ids"][0]))
+	return result
+
+
+func claim_pending() -> Dictionary:
+	## 腾出空间后领取待领取结果；只搬当前放得下的部分，重复领取不会产生新物品。
+	var moved_crops := 0
+	while not state["pending"]["crops"].is_empty() and state["crop_batches"].size() < warehouse_capacity():
+		state["crop_batches"].append(state["pending"]["crops"].pop_front())
+		moved_crops += 1
+	var moved_seeds := 0
+	while not state["pending"]["seeds"].is_empty() and seed_slots_after_adding([state["pending"]["seeds"][0]]) <= warehouse_capacity():
+		state["seeds"].append(state["pending"]["seeds"].pop_front())
+		moved_seeds += 1
+	return {"crops": moved_crops, "seeds": moved_seeds}
+
+
+func recycle_seed(seed_id: int) -> Dictionary:
+	if int(state["breeder"]["template_seed_id"]) == seed_id:
+		return {"ok": false, "message": "这粒种子是育种机模板，先在育种机里解除模板。"}
+	for index in range(state["seeds"].size()):
+		if int(state["seeds"][index]["id"]) == seed_id:
+			state["seeds"].remove_at(index)
+			state["coins"] += BreedingDefs.SEED_RECYCLE_PRICE
+			return {"ok": true, "coins": BreedingDefs.SEED_RECYCLE_PRICE}
+	return {"ok": false, "message": "找不到这粒种子。"}
+
+
+func recycle_pending_seed(seed_id: int) -> Dictionary:
+	for index in range(state["pending"]["seeds"].size()):
+		if int(state["pending"]["seeds"][index]["id"]) == seed_id:
+			state["pending"]["seeds"].remove_at(index)
+			state["coins"] += BreedingDefs.SEED_RECYCLE_PRICE
+			return {"ok": true, "coins": BreedingDefs.SEED_RECYCLE_PRICE}
+	return {"ok": false, "message": "找不到这粒待领取种子。"}
+
+
+func sell_pending_crop(batch_id: int) -> Dictionary:
+	for index in range(state["pending"]["crops"].size()):
+		var batch: Dictionary = state["pending"]["crops"][index]
+		if int(batch["id"]) == batch_id:
+			var price := batch_sale_price(batch)
+			state["pending"]["crops"].remove_at(index)
+			state["coins"] += price
+			return {"ok": true, "coins": price}
+	return {"ok": false, "message": "找不到这批待领取作物。"}
+
+
+func upgrade_warehouse() -> String:
+	var target := int(state["warehouse_level"]) + 1
+	if not BreedingDefs.WAREHOUSE_UPGRADE_COSTS.has(target):
+		return "仓库已达到当前版本的最高等级。"
+	var cost: int = BreedingDefs.WAREHOUSE_UPGRADE_COSTS[target]
+	if state["coins"] < cost:
+		return "金币不足，升级仓库需要 %d 金币。" % cost
+	state["coins"] -= cost
+	state["warehouse_level"] = target
+	return ""
+
+
+## ---- 育种机（阶段 3） ----
+
+func buy_breeder(now: int) -> String:
+	if bool(state["breeder"]["owned"]):
+		return "已经拥有育种机了。"
+	if farming_level() < BreedingDefs.BREEDER_UNLOCK_FARMING_LEVEL:
+		return "育种机需要种地等级 %d 解锁（当前 %d）。" % [BreedingDefs.BREEDER_UNLOCK_FARMING_LEVEL, farming_level()]
+	if state["coins"] < BreedingDefs.BREEDER_BUY_COST:
+		return "金币不足，购买育种机需要 %d 金币。" % BreedingDefs.BREEDER_BUY_COST
+	state["coins"] -= BreedingDefs.BREEDER_BUY_COST
+	state["breeder"]["owned"] = true
+	state["breeder"]["level"] = 1
+	state["breeder"]["last_settled"] = now
+	return ""
+
+
+func upgrade_breeder() -> String:
+	if not bool(state["breeder"]["owned"]):
+		return "还没有育种机。"
+	var level := int(state["breeder"]["level"])
+	if level >= 3:
+		return "育种机已达到当前版本的最高等级。"
+	var cost: int = BreedingDefs.BREEDER_LEVELS[level]["upgrade_cost"]
+	if cost < 0:
+		return "这一级升级价格待定，暂未开放。"
+	if state["coins"] < cost:
+		return "金币不足，升级育种机需要 %d 金币。" % cost
+	state["coins"] -= cost
+	state["breeder"]["level"] = level + 1
+	return ""
+
+
+func set_breeder_template(seed_id: int, now: int) -> Dictionary:
+	breeder_settle(now)
+	if not bool(state["breeder"]["owned"]):
+		return {"ok": false, "message": "还没有育种机，请先到商店购买。"}
+	if int(state["breeder"]["template_seed_id"]) == seed_id:
+		return {"ok": false, "message": "这粒种子已经是模板了。"}
+	for seed in state["seeds"]:
+		if int(seed["id"]) == seed_id:
+			state["breeder"]["template_seed_id"] = seed_id
+			return {"ok": true}
+	return {"ok": false, "message": "找不到这粒种子。"}
+
+
+func clear_breeder_template(now: int) -> String:
+	breeder_settle(now)
+	if int(state["breeder"]["template_seed_id"]) == 0:
+		return "当前没有模板。"
+	state["breeder"]["template_seed_id"] = 0
+	return ""
+
+
+func breeder_settle(now: int) -> bool:
+	## 结算育种机计时（含离线）。跨多个周期只产到机内容量上限；满了就暂停，不积累进度。
+	var breeder: Dictionary = state["breeder"]
+	if not bool(breeder["owned"]):
+		breeder["last_settled"] = now
+		return false
+	var changed := false
+	var template_id := int(breeder["template_seed_id"])
+	var capacity := BreedingDefs.capacity(int(breeder["level"]))
+	var cycle := BreedingDefs.cycle_seconds(int(breeder["level"]))
+	var elapsed: int = maxi(0, now - int(breeder["last_settled"]))
+	if template_id != 0:
+		while elapsed > 0 and int(breeder["pending"]) < capacity:
+			var have: int = int(breeder["progress"].get(template_id, 0))
+			var need: int = cycle - have
+			if elapsed >= need:
+				breeder["pending"] = int(breeder["pending"]) + 1
+				breeder["progress"][template_id] = 0
+				elapsed -= need
+				changed = true
+			else:
+				breeder["progress"][template_id] = have + elapsed
+				elapsed = 0
+				changed = true
+	breeder["last_settled"] = now
+	return changed
+
+
+func breeder_status(now: int) -> Dictionary:
+	breeder_settle(now)
+	var breeder: Dictionary = state["breeder"]
+	var template_id := int(breeder["template_seed_id"])
+	var template: Dictionary = {}
+	if template_id != 0:
+		for seed in state["seeds"]:
+			if int(seed["id"]) == template_id:
+				template = seed
+				break
+	var cycle := BreedingDefs.cycle_seconds(int(breeder["level"]))
+	var progress: int = int(breeder["progress"].get(template_id, 0)) if template_id != 0 else 0
+	return {
+		"owned": bool(breeder["owned"]),
+		"level": int(breeder["level"]),
+		"capacity": BreedingDefs.capacity(int(breeder["level"])),
+		"pending": int(breeder["pending"]),
+		"template_id": template_id,
+		"template": template,
+		"cycle_seconds": cycle,
+		"progress_seconds": progress,
+		"running": template_id != 0 and int(breeder["pending"]) < BreedingDefs.capacity(int(breeder["level"])),
+	}
+
+
+func collect_breeder(now: int) -> Dictionary:
+	breeder_settle(now)
+	var breeder: Dictionary = state["breeder"]
+	var pending_count := int(breeder["pending"])
+	if not bool(breeder["owned"]) or pending_count == 0:
+		return {"ok": false, "message": "育种机里还没有副本。"}
+	var template_id := int(breeder["template_seed_id"])
+	var template: Dictionary = {}
+	for seed in state["seeds"]:
+		if int(seed["id"]) == template_id:
+			template = seed
+			break
+	if template.is_empty():
+		return {"ok": false, "message": "找不到模板种子，先重新设置模板。"}
+	var copies: Array = []
+	for copy_index in range(pending_count):
+		copies.append(_new_seed(template["kind"], template.get("traits", []).duplicate(true)))
+	if seed_slots_after_adding(copies) > warehouse_capacity():
+		return {"ok": false, "message": "种子区空间不足，副本继续留在育种机里，请先整理或回收种子。"}
+	for copy in copies:
+		state["seeds"].append(copy)
+	breeder["pending"] = 0
+	return {"ok": true, "count": pending_count}
+
+
+## ---- 育种规则（阶段 3） ----
+
+func _generate_child_traits(parent_traits: Array, preserve: bool, mutation: bool, randomizer: RandomNumberGenerator) -> Array:
+	## 判定顺序固定：亲本继承 → 保留后升档 → 按保留后条数判定一条全新词条。
+	var rate_key := "preserve" if preserve else "normal"
+	var kept: Array = []
+	for entry in parent_traits:
+		if randomizer.randf() < BreedingDefs.KEEP_RATE[rate_key]:
+			kept.append({"effect": str(entry["effect"]), "tier": int(entry["tier"])})
+	for entry in kept:
+		var defn: Dictionary = BreedingDefs.EFFECTS[entry["effect"]]
+		var max_tier: int = defn["tiers"].size() - 1
+		if entry["tier"] >= max_tier:
+			continue
+		var rate: float = BreedingDefs.UPGRADE_RATES[defn["kind"]][entry["tier"]][rate_key]
+		if randomizer.randf() < rate:
+			entry["tier"] += 1
+	var kept_count := kept.size()
+	if kept_count < BreedingDefs.TRAIT_LIMIT:
+		var new_rate: float = BreedingDefs.NEW_TRAIT_RATES[clampi(kept_count, 0, BreedingDefs.NEW_TRAIT_RATES.size() - 1)]
+		if mutation:
+			new_rate += BreedingDefs.NEW_TRAIT_RATE_BONUS_MUTATION
+		if randomizer.randf() < new_rate:
+			var owned: Dictionary = {}
+			for entry in kept:
+				owned[entry["effect"]] = true
+			var candidates: Array = []
+			for effect in BreedingDefs.EFFECTS:
+				if not owned.has(effect):
+					candidates.append(effect)
+			if not candidates.is_empty():
+				kept.append({"effect": candidates[randomizer.randi_range(0, candidates.size() - 1)], "tier": 0})
+	return kept
+
+
+func _allocate_attributes(plot: Dictionary, randomizer: RandomNumberGenerator) -> Dictionary:
+	## 基础总点数 = 播种时种地等级 + 植物等级；先满足保底词条（可超总点数），剩余按权重随机分配。
+	var snapshot: Dictionary = plot.get("snapshot", {"farming_level": 1, "plant_level": 1})
+	var total: int = int(snapshot["farming_level"]) + int(snapshot["plant_level"])
+	var attributes := {"water": 0, "fiber": 0, "color": 0}
+	var weights := {"water": BreedingDefs.ATTRIBUTE_BASE_WEIGHT, "fiber": BreedingDefs.ATTRIBUTE_BASE_WEIGHT, "color": BreedingDefs.ATTRIBUTE_BASE_WEIGHT}
+	var spent := 0
+	for entry in plot.get("parent_traits", []):
+		var defn: Dictionary = BreedingDefs.EFFECTS.get(str(entry.get("effect", "")), {})
+		if defn.is_empty():
+			continue
+		if defn["kind"] == "guarantee":
+			var points: int = defn["tiers"][int(entry.get("tier", 0))]
+			attributes[defn["attribute"]] += points
+			spent += points
+		else:
+			weights[defn["attribute"]] = BreedingDefs.ATTRIBUTE_BASE_WEIGHT * (1.0 + float(defn["tiers"][int(entry.get("tier", 0))]) / 100.0)
+	var remaining: int = maxi(0, total - spent)
+	for _point in range(remaining):
+		var total_weight: float = weights["water"] + weights["fiber"] + weights["color"]
+		var pick: float = randomizer.randf() * total_weight
+		if pick < weights["water"]:
+			attributes["water"] += 1
+		elif pick < weights["water"] + weights["fiber"]:
+			attributes["fiber"] += 1
+		else:
+			attributes["color"] += 1
+	return attributes
+
+
 func plant(plot_id: int, now: int, kind := "") -> String:
 	var plot := get_plot(plot_id)
 	if plot.is_empty():
@@ -166,13 +500,33 @@ func plant(plot_id: int, now: int, kind := "") -> String:
 			break
 	if seed_index < 0:
 		return "没有%s种子了。请到商店购买。" % PlantDefs.get_plant(planted_kind).get("display_name", planted_kind)
+	_plant_seed_at(plot, state["seeds"][seed_index], now)
+	return ""
+
+
+func plant_seed(plot_id: int, seed_id: int, now: int) -> String:
+	var plot := get_plot(plot_id)
+	if plot.is_empty():
+		return "找不到这块地。"
+	if plot["seed_id"] != 0:
+		return "这块地正在生长，成熟后才能收获。"
+	for index in range(state["seeds"].size()):
+		if int(state["seeds"][index]["id"]) == seed_id:
+			_plant_seed_at(plot, state["seeds"][index], now)
+			return ""
+	return "找不到这粒种子，它可能已被播种、回收或作为育种机模板。"
+
+
+func _plant_seed_at(plot: Dictionary, seed: Dictionary, now: int) -> void:
+	state["seeds"].erase(seed)
+	var planted_kind: String = seed["kind"]
 	var defn := PlantDefs.get_plant(planted_kind)
-	var seed: Dictionary = state["seeds"].pop_at(seed_index)
 	plot["seed_id"] = seed["id"]
 	plot["kind"] = planted_kind
 	plot["planted_at"] = now
 	plot["ready_at"] = now + defn["grow_seconds"]
 	plot["roll_seed"] = int(roll_randomizer.randi())
+	plot["parent_traits"] = seed.get("traits", []).duplicate(true)
 	plot["snapshot"] = {
 		"farming_level": farming_level(),
 		"plant_level": plant_level(planted_kind),
@@ -184,7 +538,6 @@ func plant(plot_id: int, now: int, kind := "") -> String:
 		"type": "plant",
 		"text": "播种了%s（预计 %d 分钟成熟）。" % [defn["display_name"], int(defn["grow_seconds"] / 60)],
 	}]
-	return ""
 
 
 func water(plot_id: int, now: int) -> Dictionary:
@@ -337,6 +690,16 @@ func harvest(plot_id: int, now: int) -> Dictionary:
 	var preroll: Dictionary = plot["preroll"]
 	var breakdown := _score_breakdown(plot)
 	var per_crop: int = breakdown["per_crop_score"]
+	var round_fertilizer := active_fertilizer_for_round(plot)
+	var child_randomizer := RandomNumberGenerator.new()
+	child_randomizer.seed = int(plot["roll_seed"]) ^ 0x5eed
+	var preserve := round_fertilizer == "preserve"
+	var mutation := round_fertilizer == "mutation"
+	var new_children: Array = []
+	for child_index in range(preroll["seed_count"]):
+		var traits := _generate_child_traits(plot.get("parent_traits", []), preserve, mutation, child_randomizer)
+		new_children.append(_new_seed(kind, traits))
+	var attributes := _allocate_attributes(plot, child_randomizer)
 	var batch := {
 		"id": _take_id(),
 		"plot_id": plot_id,
@@ -349,12 +712,24 @@ func harvest(plot_id: int, now: int) -> Dictionary:
 		"encounter_tiers": preroll["encounters"].map(func(entry): return entry["tier"]),
 		"fluctuation_pct": preroll["fluctuation_pct"],
 		"sale_multiplier_bonus": 0.2 if breakdown["fertilizer_kind"] == "golden" else 0.0,
+		"attributes": attributes,
 		"planted_at": plot["planted_at"],
 		"harvested_at": now,
 	}
-	state["crop_batches"].append(batch)
-	for seed_index in range(preroll["seed_count"]):
-		state["seeds"].append(_new_seed(kind))
+	var stored_crops := true
+	if state["crop_batches"].size() < warehouse_capacity():
+		state["crop_batches"].append(batch)
+	else:
+		state["pending"]["crops"].append(batch)
+		stored_crops = false
+	var stored_seeds := true
+	if seed_slots_after_adding(new_children) <= warehouse_capacity():
+		for child in new_children:
+			state["seeds"].append(child)
+	else:
+		for child in new_children:
+			state["pending"]["seeds"].append(child)
+		stored_seeds = false
 	var exp_gain: int = defn["harvest_exp"]
 	var farming_before := farming_level()
 	var plant_before := plant_level(kind)
@@ -370,6 +745,7 @@ func harvest(plot_id: int, now: int) -> Dictionary:
 	plot["watered_segments"] = []
 	plot["preroll"] = {}
 	plot["events"] = []
+	plot["parent_traits"] = []
 	return {
 		"ok": true,
 		"batch": batch.duplicate(true),
@@ -378,6 +754,9 @@ func harvest(plot_id: int, now: int) -> Dictionary:
 		"farming_level_up": farming_level() > farming_before,
 		"plant_level_up": plant_level(kind) > plant_before,
 		"events": events,
+		"stored_crops": stored_crops,
+		"stored_seeds": stored_seeds,
+		"child_traits": new_children.map(func(child): return child["traits"].duplicate(true)),
 	}
 
 
@@ -531,11 +910,30 @@ func _empty_plot(plot_id: int) -> Dictionary:
 		"fertilizer": {},
 		"preroll": {},
 		"events": [],
+		"parent_traits": [],
 	}
 
 
-func _new_seed(kind: String) -> Dictionary:
-	return {"id": _take_id(), "kind": kind, "traits": []}
+func _new_seed(kind: String, traits: Array = []) -> Dictionary:
+	return {"id": _take_id(), "kind": kind, "traits": traits}
+
+
+func _migrate_v2_to_v3(saved: Dictionary) -> Dictionary:
+	var migrated := saved.duplicate(true)
+	migrated["version"] = 3
+	migrated["warehouse_level"] = 1
+	migrated["breeder"] = _default_breeder()
+	migrated["pending"] = {"crops": [], "seeds": []}
+	for plot in migrated["plots"]:
+		if not plot.has("parent_traits"):
+			plot["parent_traits"] = []
+	for seed in migrated["seeds"]:
+		if not seed.has("traits"):
+			seed["traits"] = []
+	for batch in migrated["crop_batches"]:
+		if not batch.has("attributes"):
+			batch["attributes"] = {"water": 0, "fiber": 0, "color": 0}
+	return migrated
 
 
 func _take_id() -> int:
