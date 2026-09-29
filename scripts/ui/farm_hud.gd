@@ -2,7 +2,7 @@ class_name FarmHud
 extends Control
 
 signal buy_seed_requested(kind: String, quantity: int)
-signal buy_fertilizer_requested(kind: String)
+signal buy_fertilizer_requested(kind: String, quantity: int)
 signal upgrade_shop_requested
 signal plant_seed_requested(plot_id: int, seed_id: int)
 signal water_requested(plot_id: int)
@@ -20,6 +20,13 @@ signal upgrade_breeder_requested
 signal set_template_requested(seed_id: int)
 signal clear_template_requested
 signal collect_breeder_requested
+signal buy_plot_requested
+signal buy_can2_requested
+signal lock_guest_requested(guest_id: int)
+signal unlock_guest_requested
+signal lock_formula_requested(kind: String)
+signal unlock_formula_requested
+signal sell_batch_to_requested(batch_id: int, count: int, guest_id: int)
 signal debug_mature_requested
 
 const SHOP_ICON := preload("res://assets/sprites/facility_shop.png")
@@ -59,6 +66,7 @@ var picker_plot_id: int = 0
 var care_plot_id: int = 0
 var last_harvest_result: Dictionary = {}
 var last_harvest_all_result: Dictionary = {}
+var market_sell_counts: Dictionary = {}
 var coins_value: Label
 var seeds_value: Label
 var crops_value: Label
@@ -179,6 +187,13 @@ func open_breeder() -> void:
 	_render_modal()
 
 
+func open_market() -> void:
+	active_modal = "market"
+	_apply_modal_height(300)
+	modal_overlay.visible = true
+	_render_modal()
+
+
 func open_seed_picker(plot_id: int) -> void:
 	picker_plot_id = plot_id
 	active_modal = "seed_picker"
@@ -287,7 +302,7 @@ func _build_actions() -> void:
 	actions.anchor_right = 1.0
 	actions.anchor_top = 1.0
 	actions.anchor_bottom = 1.0
-	actions.offset_left = -424
+	actions.offset_left = -554
 	actions.offset_right = -20
 	actions.offset_top = -114
 	actions.offset_bottom = -18
@@ -298,13 +313,17 @@ func _build_actions() -> void:
 	harvest_all_entry.visible = false
 	harvest_all_entry.pressed.connect(func(): harvest_all_requested.emit())
 	actions.add_child(harvest_all_entry)
+	var market_button := _icon_action("今日集市", COIN_ICON, Color("#fff5df"), Color("#d5b87d"))
+	market_button.name = "OpenMarketButton"
+	market_button.pressed.connect(func(): view_now = 0; open_market())
+	actions.add_child(market_button)
 	var shop_button := _icon_action("种子商店", SHOP_ICON, Color("#fff5df"), Color("#d5b87d"))
 	shop_button.name = "OpenShopButton"
 	shop_button.pressed.connect(open_shop)
 	actions.add_child(shop_button)
 	var warehouse_button := _icon_action("作物仓库", WAREHOUSE_ICON, Color("#fff5df"), Color("#d5b87d"))
 	warehouse_button.name = "OpenWarehouseButton"
-	warehouse_button.pressed.connect(open_warehouse)
+	warehouse_button.pressed.connect(func(): open_warehouse())
 	actions.add_child(warehouse_button)
 
 
@@ -424,6 +443,9 @@ func _render_modal() -> void:
 		"plot_care":
 			sell_all_button.visible = false
 			_render_plot_care()
+		"market":
+			sell_all_button.visible = false
+			_render_market()
 
 
 func _render_harvest() -> void:
@@ -752,11 +774,11 @@ func _fertilizer_product_card(kind: String) -> PanelContainer:
 	details.add_child(_label(defn["display_name"], 18, TEXT_DARK))
 	var effect := "每次覆盖一块地 2 小时，本轮作物 +20% 基准分"
 	if kind == "mutation":
-		effect += "；还会提高新种子出现全新词条的机会（育种阶段接入）"
+		effect += "；提高新种子出现全新词条的机会（+10 个百分点）"
 	elif kind == "preserve":
-		effect += "；还会提高词条保留与升档的机会（育种阶段接入）"
+		effect += "；提高亲本词条的保留与升档机会（保留 80%，升档翻倍）"
 	elif kind == "golden":
-		effect += "；出售倍率 +0.2（报价阶段接入）"
+		effect += "；带金克拉效果的批次出售倍率 +0.2（默认与客人报价都生效）"
 	details.add_child(_label(effect, 13, TEXT_MUTED))
 	var owned: int = int(current_state["fertilizers"].get(kind, 0))
 	var required_level := PlantDefs.FERTILIZER_UNLOCK_FARMING_LEVEL
@@ -765,19 +787,30 @@ func _fertilizer_product_card(kind: String) -> PanelContainer:
 		required_level = PlantDefs.GOLDEN_FERTILIZER_UNLOCK_LEVEL_PLACEHOLDER
 		lock_note = "（解锁条件未定，暂用种地 %d 级占位）" % required_level
 	var farming_level := PlantDefs.level_from_exp(int(current_state["farming_exp"]))
-	var button := _solid_button("买一份 · %d 金币" % defn["price"], LEAF)
-	button.custom_minimum_size.x = 150
-	button.size_flags_horizontal = Control.SIZE_SHRINK_END
+	var shop_level := int(current_state["shop_level"])
+	var one_price := MarketDefs.discounted_total(defn["price"], shop_level)
+	var five_price := MarketDefs.discounted_total(5 * defn["price"], shop_level)
+	var buttons := HBoxContainer.new()
+	buttons.add_theme_constant_override("separation", 6)
+	var one := _solid_button("买 1 份 · %d 金币" % one_price, LEAF)
+	one.custom_minimum_size.x = 118
+	one.pressed.connect(func(): buy_fertilizer_requested.emit(kind, 1))
+	buttons.add_child(one)
+	var five := _solid_button("买 5 份 · %d 金币" % five_price, LEAF)
+	five.custom_minimum_size.x = 118
+	five.pressed.connect(func(): buy_fertilizer_requested.emit(kind, 5))
+	buttons.add_child(five)
 	if farming_level < required_level:
 		details.add_child(_label("🔒 需要种地 %d 级（当前 %d）%s" % [required_level, farming_level, lock_note], 13, LOCK_RED))
-		button.disabled = true
-		button.text = "未解锁"
+		one.disabled = true
+		five.disabled = true
+		one.text = "未解锁"
+		five.text = "未解锁"
 	elif owned > 0:
-		details.add_child(_label("已有剩余 %d 次使用 · %d 金币 / 份（10 次）" % [owned, defn["price"]], 14, ACCENT_GOLD))
+		details.add_child(_label("已有剩余 %d 次使用 · 标价 %d 金币/份（10 次），已按商店折扣" % [owned, defn["price"]], 14, ACCENT_GOLD))
 	else:
-		details.add_child(_label("%d 金币 / 份（10 次使用）" % defn["price"], 14, ACCENT_GOLD))
-	button.pressed.connect(func(): buy_fertilizer_requested.emit(kind))
-	row.add_child(button)
+		details.add_child(_label("标价 %d 金币/份（10 次使用），已按商店折扣" % defn["price"], 14, ACCENT_GOLD))
+	row.add_child(buttons)
 	return card
 
 
@@ -786,25 +819,66 @@ func _shop_upgrade_card() -> PanelContainer:
 	card.name = "ShopUpgradeCard"
 	var margin := _margin(12, 8)
 	card.add_child(margin)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	margin.add_child(row)
-	row.add_child(_image(SHOP_ICON, Vector2(58, 58)))
-	var details := VBoxContainer.new()
-	details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	details.add_theme_constant_override("separation", 2)
-	row.add_child(details)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 5)
+	margin.add_child(stack)
 	var level := int(current_state["shop_level"])
-	details.add_child(_label("当前商店等级：%d 级" % level, 18, TEXT_DARK))
-	if level >= 2:
-		details.add_child(_label("2 级商店已解锁第二种种子；更多升级在后续版本接入。", 14, TEXT_MUTED))
-		return card
-	details.add_child(_label("升级到 2 级后解锁第二种种子（还需种地 2 级）。", 14, TEXT_MUTED))
-	var button := _solid_button("升级到 2 级 · %d 金币" % PlantDefs.SHOP_UPGRADE_COSTS[2], Color("#8a6d3f"))
-	button.custom_minimum_size.x = 190
-	button.size_flags_horizontal = Control.SIZE_SHRINK_END
-	button.pressed.connect(func(): upgrade_shop_requested.emit())
-	row.add_child(button)
+	var shop_row := HBoxContainer.new()
+	shop_row.add_theme_constant_override("separation", 10)
+	stack.add_child(shop_row)
+	shop_row.add_child(_image(SHOP_ICON, Vector2(50, 50)))
+	var shop_details := VBoxContainer.new()
+	shop_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	shop_details.add_theme_constant_override("separation", 2)
+	shop_row.add_child(shop_details)
+	shop_details.add_child(_label("商店等级 %d 级 · 商品价格优惠 %d%%（整笔四舍五入）" % [level, int(MarketDefs.shop_discount(level) * 100)], 16, TEXT_DARK))
+	if level >= MarketDefs.MAX_SHOP_LEVEL:
+		shop_details.add_child(_label("已达当前版本最高等级。", 14, TEXT_MUTED))
+	else:
+		var next_cost: int = MarketDefs.SHOP_UPGRADE_COSTS[level + 1]
+		var perk := "解锁第二种种子" if level == 1 else ("解锁锁定客人" if level == 2 else "解锁锁定公式")
+		shop_details.add_child(_label("升到 %d 级：%s · %d 金币" % [level + 1, perk, next_cost], 14, TEXT_MUTED))
+		var button := _solid_button("升级到 %d 级 · %d 金币" % [level + 1, next_cost], Color("#8a6d3f"))
+		button.custom_minimum_size.x = 180
+		button.size_flags_horizontal = Control.SIZE_SHRINK_END
+		button.pressed.connect(func(): upgrade_shop_requested.emit())
+		shop_row.add_child(button)
+	var plot_row := HBoxContainer.new()
+	plot_row.add_theme_constant_override("separation", 10)
+	stack.add_child(plot_row)
+	plot_row.add_child(_image(CRATE_ICON, Vector2(44, 44)))
+	var plot_details := VBoxContainer.new()
+	plot_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	plot_details.add_theme_constant_override("separation", 2)
+	plot_row.add_child(plot_details)
+	var next_plot := game.next_buyable_plot_id()
+	if next_plot == 0:
+		plot_details.add_child(_label("扩地：十块地都已拥有。", 15, TEXT_DARK))
+	else:
+		var plot_price: int = MarketDefs.PLOT_PRICES.get(next_plot, 0)
+		plot_details.add_child(_label("扩地：第 %d 块地 · %d 金币（已拥有 %d/10 块）" % [next_plot, plot_price, game.owned_plot_ids().size()], 15, TEXT_DARK))
+		var plot_button := _solid_button("买下第 %d 块地" % next_plot, LEAF)
+		plot_button.custom_minimum_size.x = 150
+		plot_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+		plot_button.pressed.connect(func(): buy_plot_requested.emit())
+		plot_row.add_child(plot_button)
+	var can_row := HBoxContainer.new()
+	can_row.add_theme_constant_override("separation", 10)
+	stack.add_child(can_row)
+	can_row.add_child(_image(WATERING_CAN_ICON, Vector2(44, 44)))
+	var can_details := VBoxContainer.new()
+	can_details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	can_details.add_theme_constant_override("separation", 2)
+	can_row.add_child(can_details)
+	if int(current_state["can_level"]) >= 2:
+		can_details.add_child(_label("水壶 2 级：一次浇三块地，每时段 +20%。", 15, TEXT_DARK))
+	else:
+		can_details.add_child(_label("水壶 2 级：一次浇三块地、每时段加分翻倍 · %d 金币" % MarketDefs.CAN2_COST, 15, TEXT_DARK))
+		var can_button := _solid_button("升级水壶", Color("#3f6d8e"))
+		can_button.custom_minimum_size.x = 130
+		can_button.size_flags_horizontal = Control.SIZE_SHRINK_END
+		can_button.pressed.connect(func(): buy_can2_requested.emit())
+		can_row.add_child(can_button)
 	return card
 
 
@@ -1055,6 +1129,172 @@ func _render_breeder() -> void:
 			var upgrade_button := _solid_button("升级 %d 级 · %d 金币" % [level + 1, next_cost], Color("#8a6d3f"))
 			upgrade_button.pressed.connect(func(): upgrade_breeder_requested.emit())
 			actions.add_child(upgrade_button)
+
+
+func _attribute_name(key: String) -> String:
+	match key:
+		"water":
+			return "含水量"
+		"fiber":
+			return "纤维"
+		"color":
+			return "色泽"
+	return key
+
+
+func _formula_text(formula: Dictionary) -> String:
+	if formula.is_empty():
+		return "今日无公式"
+	if formula.get("type", "") == "dual":
+		return "主辅属性：%s ×%.2f + %s ×%.2f" % [
+			_attribute_name(formula["attribute"]), float(formula["coefficient"]),
+			_attribute_name(formula.get("sub_attribute", "")), float(formula.get("sub_coefficient", 0)),
+		]
+	return "单属性：%s ×%.2f" % [_attribute_name(formula["attribute"]), float(formula["coefficient"])]
+
+
+func _render_market() -> void:
+	modal_title.text = "今日集市"
+	modal_icon.texture = COIN_ICON
+	var market: Dictionary = current_state["market"]
+	modal_content.add_child(_label("第 %d 天 · 每天北京时间零点刷新三位客人与两种植物的收购公式" % int(market.get("day_index", 0)), 15, TEXT_MUTED))
+	var guest_row := HBoxContainer.new()
+	guest_row.name = "MarketGuestRow"
+	guest_row.add_theme_constant_override("separation", 8)
+	modal_content.add_child(guest_row)
+	var locked_guest := int(market.get("locked_guest_id", 0))
+	var pending_guest := int(market.get("lock_guest_pending", 0))
+	var shop_level := int(current_state["shop_level"])
+	for guest_id in market.get("guest_ids", []):
+		var guest: Dictionary = MarketDefs.GUESTS[int(guest_id)]
+		var card := _panel(Color("#f6ead0"), Color("#e3d1ac"), 12)
+		card.name = "GuestCard_%d" % int(guest_id)
+		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		guest_row.add_child(card)
+		var margin := _margin(10, 7)
+		card.add_child(margin)
+		var stack := VBoxContainer.new()
+		stack.add_theme_constant_override("separation", 3)
+		margin.add_child(stack)
+		var is_locked: bool = locked_guest == int(guest_id)
+		stack.add_child(_label(guest["display_name"] + ("  ★已锁定" if is_locked else ""), 16, TEXT_DARK))
+		stack.add_child(_label("长期收购：%s" % PlantDefs.get_plant(guest["preferred_kind"])["display_name"], 13, TEXT_MUTED))
+		if shop_level >= 2:
+			var lock_button: Button
+			if is_locked and pending_guest == int(guest_id):
+				lock_button = _solid_button("解除锁定（明日生效）", Color("#8a6d3f"))
+				lock_button.pressed.connect(func(): unlock_guest_requested.emit())
+			else:
+				lock_button = _solid_button("锁定这位客人", Color("#3f6d8e"))
+				lock_button.pressed.connect(_emit_lock_guest.bind(int(guest_id)))
+			stack.add_child(lock_button)
+		else:
+			stack.add_child(_label("🔒 锁定客人需商店 2 级", 12, LOCK_RED))
+	if pending_guest != locked_guest:
+		modal_content.add_child(_label("锁定变更已记录，明天零点生效。", 13, Color("#3f6d8e")))
+	modal_content.add_child(_section_label("今日收购公式（客人收偏好植物时公式倍率再 ×1.2）"))
+	var locked_formula: Dictionary = market.get("locked_formula", {})
+	for kind in ["cabbage", "carrot"]:
+		var formula: Dictionary = market["formulas"].get(kind, {})
+		var card := _panel(Color("#f2ecd9"), Color("#ddd0ae"), 12)
+		card.name = "FormulaCard_%s" % kind
+		modal_content.add_child(card)
+		var margin := _margin(12, 8)
+		card.add_child(margin)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 10)
+		margin.add_child(row)
+		var details := VBoxContainer.new()
+		details.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		details.add_theme_constant_override("separation", 2)
+		row.add_child(details)
+		details.add_child(_label("%s：%s" % [PlantDefs.get_plant(kind)["display_name"], _formula_text(formula)], 16, TEXT_DARK))
+		var formula_locked_here: bool = locked_formula.get("kind", "") == kind
+		details.add_child(_label("公式已锁定此类型（系数每日重抽）" if formula_locked_here else "公式类型与系数每日重抽", 13, TEXT_MUTED))
+		if shop_level >= 3 and locked_guest != 0 and MarketDefs.GUESTS[locked_guest]["preferred_kind"] == kind:
+			var button := _solid_button("解除公式锁" if formula_locked_here else "锁定此公式类型", Color("#8a6d3f"))
+			button.custom_minimum_size.x = 150
+			button.size_flags_horizontal = Control.SIZE_SHRINK_END
+			if formula_locked_here:
+				button.pressed.connect(func(): unlock_formula_requested.emit())
+			else:
+				button.pressed.connect(_emit_lock_formula.bind(kind))
+			row.add_child(button)
+		elif shop_level < 3:
+			details.add_child(_label("🔒 锁定公式需商店 3 级 + 已锁客人", 12, LOCK_RED))
+	modal_content.add_child(_section_label("卖菜（可整批卖给客人、按数量拆批，或默认 1.2 倍出售）"))
+	if current_state["crop_batches"].is_empty():
+		var empty := _panel(Color("#f6ead0"), Color("#e3d1ac"), 13)
+		modal_content.add_child(empty)
+		var margin := _margin(14, 12)
+		empty.add_child(margin)
+		margin.add_child(_label("仓库里没有作物。收获后到这里比价出售。", 17, TEXT_DARK))
+		return
+	for batch in current_state["crop_batches"]:
+		modal_content.add_child(_market_batch_card(batch, market))
+
+
+func _emit_lock_guest(guest_id: int) -> void:
+	lock_guest_requested.emit(guest_id)
+
+
+func _emit_lock_formula(kind: String) -> void:
+	lock_formula_requested.emit(kind)
+
+
+func _market_batch_card(batch: Dictionary, market: Dictionary) -> PanelContainer:
+	var card := _panel(Color("#f6ead0"), Color("#e3d1ac"), 12)
+	card.name = "MarketBatch_%d" % batch["id"]
+	var margin := _margin(12, 8)
+	card.add_child(margin)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 4)
+	margin.add_child(stack)
+	var attributes: Dictionary = batch.get("attributes", {})
+	stack.add_child(_label("第 %d 块地 · %s ×%d · 每作物 %d 分 · 属性 含水量 %d / 纤维 %d / 色泽 %d" % [
+		batch["plot_id"], PlantDefs.get_plant(batch.get("kind", "cabbage"))["display_name"], batch["count"],
+		int(batch.get("per_crop_score", batch["base_score"])),
+		int(attributes.get("water", 0)), int(attributes.get("fiber", 0)), int(attributes.get("color", 0)),
+	], 16, TEXT_DARK))
+	var controls := HBoxContainer.new()
+	controls.add_theme_constant_override("separation", 10)
+	stack.add_child(controls)
+	controls.add_child(_label("出售数量：", 15, TEXT_DARK))
+	var count_option := OptionButton.new()
+	count_option.name = "SellCountOption"
+	var selected_count: int = clampi(int(market_sell_counts.get(int(batch["id"]), batch["count"])), 1, batch["count"])
+	for count_value in range(1, batch["count"] + 1):
+		count_option.add_item("%d 个" % count_value)
+	count_option.selected = selected_count - 1
+	count_option.item_selected.connect(func(_index: int):
+		market_sell_counts[int(batch["id"])] = count_option.selected + 1
+		_render_modal())
+	controls.add_child(count_option)
+	var default_button := _solid_button("默认出售 %d 金币（整批）" % game.batch_sale_price(batch), Color("#9b713f"))
+	default_button.custom_minimum_size.x = 190
+	default_button.pressed.connect(_emit_batch_sale.bind(batch["id"]))
+	controls.add_child(default_button)
+	for guest_id in market.get("guest_ids", []):
+		var priced := game.quote(batch, selected_count, int(guest_id))
+		var guest: Dictionary = MarketDefs.GUESTS[int(guest_id)]
+		var quote_row := HBoxContainer.new()
+		quote_row.add_theme_constant_override("separation", 8)
+		stack.add_child(quote_row)
+		var quote_label := _label("%s%s：倍率 ×%.2f → %d 个 %d 金币" % [
+			guest["display_name"], "（偏好 ×1.2）" if priced["preferred"] else "",
+			priced["multiplier"], selected_count, priced["coins"],
+		], 14, ACCENT_GOLD if priced["preferred"] else TEXT_MUTED)
+		quote_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		quote_row.add_child(quote_label)
+		var sell_button := _solid_button("出售", LEAF if priced["preferred"] else Color("#7c6a3f"))
+		sell_button.custom_minimum_size.x = 76
+		sell_button.pressed.connect(_emit_sell_to.bind(int(batch["id"]), int(guest_id), count_option))
+		quote_row.add_child(sell_button)
+	return card
+
+
+func _emit_sell_to(batch_id: int, guest_id: int, count_option: OptionButton) -> void:
+	sell_batch_to_requested.emit(batch_id, count_option.selected + 1, guest_id)
 
 
 func _reward_card(texture: Texture2D, caption: String, count: String) -> PanelContainer:

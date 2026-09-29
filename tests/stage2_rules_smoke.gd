@@ -47,8 +47,8 @@ func _grant_carrot_seed(game: FarmGame, seed_id: int) -> void:
 
 func _test_new_game_defaults() -> void:
 	var game := _fresh_game()
-	_check(game.state["version"] == 3, "new game writes save version 3")
-	_check(game.state["plots"].size() == 6, "new game has six plots")
+	_check(game.state["version"] == 4, "new game writes save version 4")
+	_check(game.owned_plot_ids().size() == 6 and game.state["plots"].size() == 10, "new game owns six of ten plot slots")
 	_check(game.state["seeds"].size() == 6 and game.seed_counts()["cabbage"] == 6, "new game grants six cabbage seeds")
 	_check(game.state["shop_level"] == 1 and game.state["can_level"] == 1, "shop and can start at level 1")
 	_check(game.state["fertilizers"].size() == 4, "all four fertilizers start owned at zero uses")
@@ -77,7 +77,7 @@ func _test_v1_migration() -> void:
 			v1["plots"].append({"id": index + 1, "seed_id": 0, "planted_at": 0, "ready_at": 0, "roll_seed": 0})
 	var game := FarmGame.new()
 	_check(game.load_state(v1), "version 1 save must migrate and load")
-	_check(game.state["version"] == 3, "migrated save reports version 3")
+	_check(game.state["version"] == 4, "migrated save reports version 4")
 	_check(game.state["coins"] == 500, "migration keeps coins")
 	_check(game.state["seeds"].size() == 1 and game.state["seeds"][0]["id"] == 6, "migration keeps seeds")
 	_check(game.state["crop_batches"].size() == 1, "migration keeps crop batches")
@@ -126,7 +126,7 @@ func _test_score_breakdown_exact() -> void:
 	_check(breakdown["encounter_bonus"] == 50, "encounter tiers 40+10 sum to 50")
 	_check(breakdown["per_crop_score"] == 1994, "per-crop score sums to 1994")
 	_check(result["batch"]["count"] == 5 and result["batch"]["per_crop_score"] == 1994, "batch stores per-crop score")
-	_check(game.batch_sale_price(result["batch"]) == 119, "default price floors 9970*1.2/100 to 119")
+	_check(game.batch_sale_price(result["batch"]) == 139, "default price with golden +0.2 floors 9970*1.4/100 to 139 (stage-4 rule)")
 	_check(result["batch"]["sale_multiplier_bonus"] == 0.2, "golden batch keeps the +0.2 sale multiplier flag")
 	_check(result["exp_gain"] == 120 and int(game.state["plant_exp"]["carrot"]) == 120, "carrot grants 120 exp to farming and carrot")
 
@@ -143,7 +143,7 @@ func _test_watering_boundaries() -> void:
 	_check(result["ok"] and result["segment"] == 0, "carrot minute ~1 water lands in segment 1")
 	result = game.water(1, 5300)
 	_check(not result["ok"], "same segment twice is rejected")
-	_check(game.get_plot(1)["watered_segments"] == [0], "rejected water does not record")
+	_check(game.get_plot(1)["watered_segments"] == [{"segment": 0, "can_level": 1}], "rejected water does not record")
 	result = game.water(1, 8599)
 	_check(not result["ok"], "just before the boundary still counts as segment 1")
 	result = game.water(1, 8600)
@@ -152,7 +152,7 @@ func _test_watering_boundaries() -> void:
 	_check(not result["ok"], "second water in segment 2 is rejected")
 	result = game.water(1, 12200)
 	_check(not result["ok"], "watering at maturity is invalid")
-	_check(game.get_plot(1)["watered_segments"] == [0, 1], "carrot records both segments")
+	_check(game.get_plot(1)["watered_segments"] == [{"segment": 0, "can_level": 1}, {"segment": 1, "can_level": 1}], "carrot records both segments")
 	result = game.water(2, 5100)
 	_check(result["ok"] and result["segment"] == 0, "cabbage single segment water works")
 	result = game.water(2, 5600)
@@ -273,15 +273,15 @@ func _test_unlock_chain() -> void:
 	message = game.buy_seeds(1, "carrot")
 	_check(message != "" and message.contains("种地等级"), "carrot still locked below farming level 2")
 	game.state["farming_exp"] = 120
-	_check(game.buy_seeds(1, "carrot") == "" and game.state["coins"] == 480, "carrot seeds cost 20 coins once unlocked")
+	_check(game.buy_seeds(1, "carrot") == "" and game.state["coins"] == 481, "carrot seeds cost 19 coins at shop level 2 (5%% discount on 20)")
 	_check(game.seed_counts()["carrot"] == 1, "carrot seed is owned after purchase")
 	_check(game.plant(1, 7000, "carrot") == "", "carrot plants into an empty plot")
-	_check(game.buy_fertilizer("basic") == "" and game.state["coins"] == 470, "basic fertilizer is purchasable at farming level 2")
+	_check(game.buy_fertilizer("basic") == "" and game.state["coins"] == 471, "basic fertilizer costs 10 after rounding the 5%% discount")
 	_check(game.state["fertilizers"]["basic"] == 10, "one fertilizer pack holds ten uses")
 	var golden_message: String = game.buy_fertilizer("golden")
 	_check(golden_message != "" and golden_message.contains("种地等级 3"), "golden fertilizer stays locked behind the placeholder level")
 	game.state["farming_exp"] = 840
-	_check(game.buy_fertilizer("golden") == "" and game.state["coins"] == 320, "golden fertilizer unlocks at the placeholder farming level 3")
+	_check(game.buy_fertilizer("golden") == "" and game.state["coins"] == 471 - 143, "golden fertilizer costs 143 after the 5%% discount on 150")
 
 
 func _test_mid_round_save_roundtrip() -> void:
@@ -294,7 +294,7 @@ func _test_mid_round_save_roundtrip() -> void:
 	var reloaded := FarmGame.new()
 	_check(reloaded.load_state(SaveStore.load_state(TEST_SAVE)), "mid-round load works")
 	var plot := reloaded.get_plot(1)
-	_check(plot["watered_segments"] == [0], "watered segments persist")
+	_check(plot["watered_segments"] == [{"segment": 0, "can_level": 1}], "watered segments persist")
 	_check(plot["fertilizer"]["kind"] == "basic" and int(plot["fertilizer"]["expires_at"]) == 8130 + 7200, "active fertilizer persists")
 	_check(reloaded.state["fertilizers"]["basic"] == 1, "remaining fertilizer uses persist")
 	_check(not plot["events"].is_empty(), "round events persist")

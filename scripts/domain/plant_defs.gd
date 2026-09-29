@@ -80,8 +80,7 @@ const FERTILIZERS: Dictionary = {
 const FERTILIZER_UNLOCK_FARMING_LEVEL := 2
 const GOLDEN_FERTILIZER_UNLOCK_LEVEL_PLACEHOLDER := 3
 
-## 商店 1→2 级升级价（试玩初值）。后续等级与折扣是阶段 4 的内容。
-const SHOP_UPGRADE_COSTS := {2: 1500}
+## 商店升级价已移至 MarketDefs（阶段 4 统一经济配置）。
 
 const DEFAULT_SALE_MULTIPLIER := 1.2
 

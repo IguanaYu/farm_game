@@ -1,8 +1,9 @@
 class_name FarmGame
 extends RefCounted
 
-const SAVE_VERSION := 3
+const SAVE_VERSION := 4
 const PLOT_COUNT := 6
+const MAX_PLOTS := 10
 const ROUND_EVENT_LIMIT := 24
 
 
@@ -31,6 +32,8 @@ func new_game(now: int) -> void:
 		"fertilizers": {},
 		"breeder": _default_breeder(),
 		"pending": {"crops": [], "seeds": []},
+		"market": _default_market(),
+		"ledger": [],
 		"plots": [],
 		"seeds": [],
 		"crop_batches": [],
@@ -38,14 +41,38 @@ func new_game(now: int) -> void:
 	}
 	for kind in PlantDefs.FERTILIZERS:
 		state["fertilizers"][kind] = 0
-	for plot_index in range(PLOT_COUNT):
-		state["plots"].append(_empty_plot(plot_index + 1))
+	for plot_index in range(MAX_PLOTS):
+		var plot := _empty_plot(plot_index + 1)
+		plot["owned"] = plot_index < PLOT_COUNT
+		state["plots"].append(plot)
 	for seed_index in range(PLOT_COUNT):
 		state["seeds"].append(_new_seed("cabbage"))
+	refresh_market(now)
 
 
 func _default_breeder() -> Dictionary:
 	return {"owned": false, "level": 1, "template_seed_id": 0, "pending": 0, "progress": {}, "last_settled": 0}
+
+
+func _default_market() -> Dictionary:
+	return {
+		"day_index": -1,
+		"guest_ids": [],
+		"formulas": {"cabbage": {}, "carrot": {}},
+		"locked_guest_id": 0,
+		"lock_guest_pending": 0,
+		"locked_formula": {},
+		"lock_formula_pending": {},
+	}
+
+
+func _record_ledger(now: int, reason: String, amount: int) -> void:
+	## 经济记录：正数为收入，负数为支出。只记录，阶段 6 再分析平衡。
+	var ledger: Array = state.get("ledger", [])
+	ledger.append({"t": now, "day": MarketDefs.day_index(now), "reason": reason, "amount": amount})
+	while ledger.size() > 400:
+		ledger.pop_front()
+	state["ledger"] = ledger
 
 
 func load_state(saved: Dictionary) -> bool:
@@ -56,6 +83,8 @@ func load_state(saved: Dictionary) -> bool:
 		source = _migrate_v1_to_v2(saved)
 	if int(source.get("version", -1)) == 2:
 		source = _migrate_v2_to_v3(source)
+	if int(source.get("version", -1)) == 3:
+		source = _migrate_v3_to_v4(source)
 	if int(source.get("version", -1)) != SAVE_VERSION:
 		return false
 	# JSON 会把整数解析成浮点（3 → 3.0），而数组/字典的相等比较对类型严格；统一把整数值浮点归一化为 int。
@@ -63,7 +92,7 @@ func load_state(saved: Dictionary) -> bool:
 	for field in ["plots", "seeds", "crop_batches", "plant_exp", "fertilizers"]:
 		if not source.get(field) is Array and not source.get(field) is Dictionary:
 			return false
-	if source["plots"].size() != PLOT_COUNT:
+	if source["plots"].size() != MAX_PLOTS:
 		return false
 	if not _is_number(source.get("coins")) or not _is_number(source.get("next_id")):
 		return false
@@ -71,7 +100,7 @@ func load_state(saved: Dictionary) -> bool:
 		return false
 	if not _is_number(source.get("farming_exp")) or int(source["farming_exp"]) < 0:
 		return false
-	if int(source.get("shop_level", 0)) < 1 or int(source.get("shop_level", 0)) > 2:
+	if int(source.get("shop_level", 0)) < 1 or int(source.get("shop_level", 0)) > MarketDefs.MAX_SHOP_LEVEL:
 		return false
 	if int(source.get("can_level", 0)) < 1 or int(source.get("can_level", 0)) > PlantDefs.WATER_BONUS_BY_CAN.size():
 		return false
@@ -91,9 +120,15 @@ func load_state(saved: Dictionary) -> bool:
 				return false
 		if plot["seed_id"] != 0 and not PlantDefs.is_known_plant(str(plot.get("kind", ""))):
 			return false
+		for entry in plot.get("watered_segments", []):
+			if not entry is Dictionary or not _is_number(entry.get("segment")) or not _is_number(entry.get("can_level")):
+				return false
 		for event in plot.get("events", []):
 			if not event is Dictionary or not _is_number(event.get("t")):
 				return false
+	var market_state: Dictionary = source.get("market", {})
+	if not market_state is Dictionary or not market_state.get("guest_ids") is Array or not market_state.get("formulas") is Dictionary:
+		return false
 	for seed in source["seeds"]:
 		if not seed is Dictionary or not _is_number(seed.get("id")) or not PlantDefs.is_known_plant(str(seed.get("kind", ""))):
 			return false
@@ -148,9 +183,44 @@ func load_state(saved: Dictionary) -> bool:
 
 
 func get_plot(plot_id: int) -> Dictionary:
-	if plot_id < 1 or plot_id > PLOT_COUNT:
+	if plot_id < 1 or plot_id > MAX_PLOTS:
 		return {}
-	return state["plots"][plot_id - 1]
+	var plot: Dictionary = state["plots"][plot_id - 1]
+	if not bool(plot.get("owned", false)):
+		return {}
+	return plot
+
+
+func owned_plot_ids() -> Array:
+	var result: Array = []
+	for plot in state["plots"]:
+		if bool(plot.get("owned", false)):
+			result.append(plot["id"])
+	return result
+
+
+func next_buyable_plot_id() -> int:
+	## 已拥有的最大地块号 +1（逐块购买，不允许跳买）。
+	var highest := 0
+	for plot in state["plots"]:
+		if bool(plot.get("owned", false)):
+			highest = maxi(highest, int(plot["id"]))
+	if highest >= MAX_PLOTS:
+		return 0
+	return highest + 1
+
+
+func buy_plot() -> String:
+	var plot_id := next_buyable_plot_id()
+	if plot_id == 0:
+		return "十块地都已拥有。"
+	var price: int = MarketDefs.PLOT_PRICES.get(plot_id, 0)
+	if state["coins"] < price:
+		return "金币不足，第 %d 块地需要 %d 金币。" % [plot_id, price]
+	state["coins"] -= price
+	state["plots"][plot_id - 1]["owned"] = true
+	_record_ledger(int(Time.get_unix_time_from_system()), "buy_plot_%d" % plot_id, -price)
+	return ""
 
 
 func is_ready(plot_id: int, now: int) -> bool:
@@ -169,7 +239,7 @@ func plant_level(kind: String) -> int:
 func mature_plot_ids(now: int) -> Array:
 	var result: Array = []
 	for plot in state["plots"]:
-		if plot["seed_id"] != 0 and now >= plot["ready_at"]:
+		if bool(plot.get("owned", false)) and plot["seed_id"] != 0 and now >= plot["ready_at"]:
 			result.append(plot["id"])
 	return result
 
@@ -544,18 +614,60 @@ func water(plot_id: int, now: int) -> Dictionary:
 	var plot := get_plot(plot_id)
 	if plot.is_empty():
 		return {"ok": false, "message": "找不到这块地。"}
-	if plot["seed_id"] == 0:
-		return {"ok": false, "message": "空地不需要浇水，播种后再来。"}
-	if now >= plot["ready_at"]:
-		return {"ok": false, "message": "作物已经成熟，浇水已经无效了。"}
-	var segment := current_water_segment(plot_id, now)
-	if segment < 0:
-		return {"ok": false, "message": "现在不在有效浇水时段内。"}
-	if segment in plot["watered_segments"]:
-		return {"ok": false, "message": "这个时段已经浇过水了，效果只记一次。"}
-	plot["watered_segments"].append(segment)
-	_append_round_event(plot, now, "water", "完成第 %d 时段浇水。" % (segment + 1))
-	return {"ok": true, "segment": segment}
+	var targets: Array = [plot_id]
+	if int(state["can_level"]) >= 2:
+		# 水壶 2 级一次覆盖 3 块地：当前地块 + 顺延的下两块已拥有地块。
+		for following in owned_plot_ids():
+			if targets.size() >= 3:
+				break
+			if not (following in targets) and following > plot_id:
+				targets.append(following)
+		if targets.size() < 3:
+			for preceding in owned_plot_ids():
+				if targets.size() >= 3:
+					break
+				if not (preceding in targets):
+					targets.append(preceding)
+	var watered: Array = []
+	var skipped: Array = []
+	for target_id in targets:
+		var target := get_plot(target_id)
+		if target.is_empty() or target["seed_id"] == 0:
+			if target_id == plot_id:
+				return {"ok": false, "message": "空地不需要浇水，播种后再来。"}
+			skipped.append(target_id)
+			continue
+		if now >= target["ready_at"]:
+			if target_id == plot_id:
+				return {"ok": false, "message": "作物已经成熟，浇水已经无效了。"}
+			skipped.append(target_id)
+			continue
+		var segment := current_water_segment(target_id, now)
+		if segment < 0 or _segment_water_level(target, segment) > 0:
+			skipped.append(target_id)
+			continue
+		target["watered_segments"].append({"segment": segment, "can_level": int(state["can_level"])})
+		_append_round_event(target, now, "water", "完成第 %d 时段浇水（水壶 %d 级）。" % [segment + 1, int(state["can_level"])])
+		watered.append(target_id)
+	if watered.is_empty():
+		if not skipped.is_empty() and not (plot_id in skipped):
+			return {"ok": false, "message": "这个时段已经浇过水了，效果只记一次。"}
+		return {"ok": false, "message": "这次浇水没有产生任何效果。"}
+	var message := "第 %d 块地浇水完成。" % watered[0]
+	if watered.size() > 1:
+		message += " 水壶 2 级同时覆盖了第 %s 块地。" % "、".join(watered.slice(1).map(func(id): return str(id)))
+	if not skipped.is_empty():
+		message += "（第 %s 块地本次无效：时段已浇或状态不符）" % "、".join(skipped.map(func(id): return str(id)))
+	return {"ok": true, "watered": watered, "skipped": skipped}
+
+
+func _segment_water_level(plot: Dictionary, segment: int) -> int:
+	## 该时段已记录的最高水壶档位（0 = 未浇）。
+	var best := 0
+	for entry in plot.get("watered_segments", []):
+		if int(entry.get("segment", -1)) == segment:
+			best = maxi(best, int(entry.get("can_level", 1)))
+	return best
 
 
 func current_water_segment(plot_id: int, now: int) -> int:
@@ -584,7 +696,8 @@ func watering_status(plot_id: int, now: int) -> Dictionary:
 			"index": index,
 			"start_offset": index * segment_length,
 			"end_offset": (index + 1) * segment_length,
-			"watered": index in plot["watered_segments"],
+			"watered": _segment_water_level(plot, index) > 0,
+			"water_level": _segment_water_level(plot, index),
 		})
 	return {"current": current, "segments": segments, "mature": now >= plot["ready_at"]}
 
@@ -628,12 +741,13 @@ func buy_seeds(quantity: int, kind := "cabbage") -> String:
 	var lock_reason := seed_lock_reason(kind)
 	if lock_reason != "":
 		return lock_reason
-	var total_price: int = quantity * defn["seed_price"]
+	var total_price := MarketDefs.discounted_total(quantity * defn["seed_price"], int(state["shop_level"]))
 	if state["coins"] < total_price:
-		return "金币不足，需要 %d 金币。" % total_price
+		return "金币不足，需要 %d 金币（已按商店 %d 级折扣算）。" % [total_price, int(state["shop_level"])]
 	state["coins"] -= total_price
 	for seed_index in range(quantity):
 		state["seeds"].append(_new_seed(kind))
+	_record_ledger(int(Time.get_unix_time_from_system()), "buy_seeds_%s_x%d" % [kind, quantity], -total_price)
 	return ""
 
 
@@ -651,31 +765,47 @@ func seed_lock_reason(kind: String) -> String:
 	return "解锁%s还需要：" % defn["display_name"] + "、".join(missing) + "。"
 
 
-func buy_fertilizer(kind: String) -> String:
+func buy_fertilizer(kind: String, quantity := 1) -> String:
 	var defn: Dictionary = PlantDefs.FERTILIZERS.get(kind, {})
 	if defn.is_empty():
 		return "未知肥料。"
+	if quantity <= 0:
+		return "购买数量必须大于零。"
 	var required_level := PlantDefs.FERTILIZER_UNLOCK_FARMING_LEVEL
 	if kind == "golden":
 		required_level = PlantDefs.GOLDEN_FERTILIZER_UNLOCK_LEVEL_PLACEHOLDER
 	if farming_level() < required_level:
 		return "%s需要种地等级 %d 解锁（当前 %d）。" % [defn["display_name"], required_level, farming_level()]
-	if state["coins"] < defn["price"]:
-		return "金币不足，需要 %d 金币。" % defn["price"]
-	state["coins"] -= defn["price"]
-	state["fertilizers"][kind] = int(state["fertilizers"].get(kind, 0)) + defn["uses_per_pack"]
+	var total_price := MarketDefs.discounted_total(quantity * defn["price"], int(state["shop_level"]))
+	if state["coins"] < total_price:
+		return "金币不足，需要 %d 金币（已按商店 %d 级折扣算）。" % [total_price, int(state["shop_level"])]
+	state["coins"] -= total_price
+	state["fertilizers"][kind] = int(state["fertilizers"].get(kind, 0)) + quantity * defn["uses_per_pack"]
+	_record_ledger(int(Time.get_unix_time_from_system()), "buy_fertilizer_%s_x%d" % [kind, quantity], -total_price)
 	return ""
 
 
 func upgrade_shop() -> String:
 	var target := int(state["shop_level"]) + 1
-	if not PlantDefs.SHOP_UPGRADE_COSTS.has(target):
+	if not MarketDefs.SHOP_UPGRADE_COSTS.has(target):
 		return "商店已经达到当前版本的最高等级。"
-	var cost: int = PlantDefs.SHOP_UPGRADE_COSTS[target]
+	var cost: int = MarketDefs.SHOP_UPGRADE_COSTS[target]
 	if state["coins"] < cost:
 		return "金币不足，升级商店需要 %d 金币。" % cost
 	state["coins"] -= cost
 	state["shop_level"] = target
+	_record_ledger(int(Time.get_unix_time_from_system()), "upgrade_shop_%d" % target, -cost)
+	return ""
+
+
+func buy_can2() -> String:
+	if int(state["can_level"]) >= 2:
+		return "水壶已经是 2 级了。"
+	if state["coins"] < MarketDefs.CAN2_COST:
+		return "金币不足，水壶升到 2 级需要 %d 金币。" % MarketDefs.CAN2_COST
+	state["coins"] -= MarketDefs.CAN2_COST
+	state["can_level"] = 2
+	_record_ledger(int(Time.get_unix_time_from_system()), "buy_can2", -MarketDefs.CAN2_COST)
 	return ""
 
 
@@ -779,9 +909,10 @@ func harvest_all(now: int) -> Dictionary:
 
 
 func batch_sale_price(batch: Dictionary) -> int:
-	# 整笔计价额先合计，再除以 100 向下取整。金克拉倍率加成由阶段 4 报价算法使用，本阶段默认出售仍是 1.2 倍。
+	# 整笔计价额先合计，再除以 100 向下取整。默认出售 1.2 倍；金克拉批次最终倍率 +0.2。
 	var per_crop := int(batch.get("per_crop_score", batch["base_score"]))
-	return int(floor(float(batch["count"] * per_crop) * PlantDefs.DEFAULT_SALE_MULTIPLIER / 100.0))
+	var multiplier: float = PlantDefs.DEFAULT_SALE_MULTIPLIER + float(batch.get("sale_multiplier_bonus", 0.0))
+	return int(floor(float(batch["count"] * per_crop) * multiplier / 100.0))
 
 
 func sell_batch(batch_id: int) -> Dictionary:
@@ -791,18 +922,161 @@ func sell_batch(batch_id: int) -> Dictionary:
 			var price := batch_sale_price(batch)
 			state["crop_batches"].remove_at(index)
 			state["coins"] += price
+			_record_ledger(int(Time.get_unix_time_from_system()), "sell_default", price)
 			return {"ok": true, "coins": price}
 	return {"ok": false, "message": "找不到这批作物。"}
 
 
 func sell_all_batches() -> int:
 	var total_score := 0
+	var golden_bonus_value := 0.0
 	for batch in state["crop_batches"]:
 		total_score += batch["count"] * int(batch.get("per_crop_score", batch["base_score"]))
-	var earned := int(floor(float(total_score) * PlantDefs.DEFAULT_SALE_MULTIPLIER / 100.0))
+		if float(batch.get("sale_multiplier_bonus", 0.0)) > 0.0:
+			golden_bonus_value += float(batch["count"] * int(batch.get("per_crop_score", batch["base_score"]))) * float(batch["sale_multiplier_bonus"])
+	var earned := int(floor((float(total_score) * PlantDefs.DEFAULT_SALE_MULTIPLIER + golden_bonus_value) / 100.0))
 	state["crop_batches"].clear()
 	state["coins"] += earned
+	_record_ledger(int(Time.get_unix_time_from_system()), "sell_all", earned)
 	return earned
+
+
+## ---- 每日客人与报价（阶段 4） ----
+
+func refresh_market(now: int) -> bool:
+	## 以北京时间日期为键刷新当日客人与公式；同一天内重复调用不重抽。
+	var day := MarketDefs.day_index(now)
+	var market: Dictionary = state.get("market", _default_market())
+	state["market"] = market
+	if int(market.get("day_index", -1)) == day:
+		return false
+	market["day_index"] = day
+	market["locked_guest_id"] = int(market.get("lock_guest_pending", 0))
+	market["locked_formula"] = market.get("lock_formula_pending", {}).duplicate(true)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = day * 2654435761 + 12345
+	var locked := int(market["locked_guest_id"])
+	var pool: Array = []
+	for guest_id in MarketDefs.GUESTS.keys():
+		if guest_id != locked:
+			pool.append(guest_id)
+	var picked: Array = []
+	if locked != 0 and MarketDefs.GUESTS.has(locked):
+		picked.append(locked)
+	while picked.size() < MarketDefs.DAILY_GUEST_COUNT and not pool.is_empty():
+		var index := rng.randi_range(0, pool.size() - 1)
+		picked.append(pool[index])
+		pool.remove_at(index)
+	picked.sort()
+	market["guest_ids"] = picked
+	for kind in ["cabbage", "carrot"]:
+		var formula_rng := RandomNumberGenerator.new()
+		formula_rng.seed = day * 40503 + int(kind.hash()) % 65521
+		var formula := {}
+		var locked_formula: Dictionary = market.get("locked_formula", {})
+		if locked_formula.get("kind", "") == kind:
+			# 公式锁只固定类型与关注属性，系数每天仍从对应池重抽。
+			formula = {
+				"type": locked_formula["type"],
+				"attribute": locked_formula["attribute"],
+				"sub_attribute": locked_formula.get("sub_attribute", ""),
+			}
+		else:
+			var attributes: Array = ["water", "fiber", "color"]
+			if formula_rng.randf() < 0.5:
+				formula = {"type": "single", "attribute": attributes[formula_rng.randi_range(0, 2)]}
+			else:
+				var main_index := formula_rng.randi_range(0, 2)
+				var sub_index := (main_index + 1 + formula_rng.randi_range(0, 1)) % 3
+				formula = {"type": "dual", "attribute": attributes[main_index], "sub_attribute": attributes[sub_index]}
+		if formula["type"] == "dual":
+			formula["coefficient"] = MarketDefs.DUAL_MAIN_COEFFICIENTS[formula_rng.randi_range(0, MarketDefs.DUAL_MAIN_COEFFICIENTS.size() - 1)]
+			formula["sub_coefficient"] = MarketDefs.DUAL_SUB_COEFFICIENTS[formula_rng.randi_range(0, MarketDefs.DUAL_SUB_COEFFICIENTS.size() - 1)]
+		else:
+			formula["coefficient"] = MarketDefs.SINGLE_COEFFICIENTS[formula_rng.randi_range(0, MarketDefs.SINGLE_COEFFICIENTS.size() - 1)]
+		formula["kind"] = kind
+		market["formulas"][kind] = formula
+	return true
+
+
+func market_snapshot() -> Dictionary:
+	return state["market"].duplicate(true)
+
+
+func request_lock_guest(guest_id: int) -> String:
+	if int(state["shop_level"]) < 2:
+		return "锁定客人需要商店 2 级。"
+	if guest_id != 0 and not (guest_id in state["market"]["guest_ids"]):
+		return "只能锁定今天出现的客人。"
+	if guest_id == int(state["market"].get("locked_guest_id", 0)) and guest_id == int(state["market"].get("lock_guest_pending", 0)):
+		return "这位客人已经是当前锁定。"
+	state["market"]["lock_guest_pending"] = guest_id
+	return ""
+
+
+func request_lock_formula(kind: String) -> String:
+	if int(state["shop_level"]) < 3:
+		return "锁定公式需要商店 3 级。"
+	var locked_guest := int(state["market"].get("locked_guest_id", 0))
+	if locked_guest == 0:
+		return "先锁定一位客人，才能锁定其偏好植物的公式。"
+	if kind != MarketDefs.GUESTS[locked_guest]["preferred_kind"]:
+		return "只能锁定已锁客人偏好的植物（%s）。" % PlantDefs.get_plant(kind)["display_name"]
+	var formula: Dictionary = state["market"]["formulas"].get(kind, {})
+	if formula.is_empty():
+		return "今天没有出现这种植物的公式。"
+	state["market"]["lock_formula_pending"] = {
+		"kind": kind,
+		"type": formula["type"],
+		"attribute": formula["attribute"],
+		"sub_attribute": formula.get("sub_attribute", ""),
+	}
+	return ""
+
+
+func request_unlock_formula() -> String:
+	if int(state["shop_level"]) < 3:
+		return "锁定公式需要商店 3 级。"
+	if state["market"].get("lock_formula_pending", {}).is_empty():
+		return "当前没有待生效的公式锁。"
+	state["market"]["lock_formula_pending"] = {}
+	return ""
+
+
+func quote(batch: Dictionary, count: int, guest_id: int) -> Dictionary:
+	## 客人报价：计价额 = 每作物分 × 数量 ×（公式倍率 × 偏好 1.2 + 金克拉 0.2）；金币 = ⌊合计 ÷ 100⌋。
+	var formula: Dictionary = state["market"]["formulas"].get(batch.get("kind", "cabbage"), {})
+	var formula_multiplier := MarketDefs.formula_multiplier(formula, batch.get("attributes", {}))
+	var preferred: bool = MarketDefs.GUESTS.get(guest_id, {}).get("preferred_kind", "") == batch.get("kind", "")
+	var multiplier := formula_multiplier * (MarketDefs.PREFERENCE_MULTIPLIER if preferred else 1.0)
+	multiplier += float(batch.get("sale_multiplier_bonus", 0.0))
+	var per_crop := int(batch.get("per_crop_score", batch.get("base_score", 0)))
+	var total_value: float = float(per_crop * count) * multiplier
+	return {
+		"guest_id": guest_id,
+		"preferred": preferred,
+		"multiplier": multiplier,
+		"total_value": total_value,
+		"coins": int(floor(total_value / 100.0)),
+	}
+
+
+func sell_batch_to(batch_id: int, count: int, guest_id: int, now: int) -> Dictionary:
+	## 拆批卖给客人：扣库存与加金币在同一次操作内完成，重复调用不可能重复获利。
+	for index in range(state["crop_batches"].size()):
+		var batch: Dictionary = state["crop_batches"][index]
+		if int(batch["id"]) == batch_id:
+			if count <= 0 or count > int(batch["count"]):
+				return {"ok": false, "message": "出售数量必须在 1 到 %d 之间。" % batch["count"]}
+			var priced := quote(batch, count, guest_id)
+			if count == int(batch["count"]):
+				state["crop_batches"].remove_at(index)
+			else:
+				batch["count"] = int(batch["count"]) - count
+			state["coins"] += priced["coins"]
+			_record_ledger(now, "sell_guest_%d" % guest_id, priced["coins"])
+			return {"ok": true, "coins": priced["coins"], "sold_count": count}
+	return {"ok": false, "message": "找不到这批作物。"}
 
 
 func _score_breakdown(plot: Dictionary) -> Dictionary:
@@ -815,9 +1089,12 @@ func _score_breakdown(plot: Dictionary) -> Dictionary:
 	var level_bonus := _percent_of(base, farming_units + plant_units)
 	var fluctuation_pct: int = plot["preroll"]["fluctuation_pct"]
 	var fluctuation_bonus := _percent_of(base, fluctuation_pct)
-	var segments_done: int = plot["watered_segments"].size()
-	var can_pct: int = PlantDefs.WATER_BONUS_BY_CAN[int(state["can_level"])]
-	var water_bonus := _percent_of(base, can_pct * segments_done)
+	var water_entries: Array = plot.get("watered_segments", [])
+	var water_bonus := 0
+	for entry in water_entries:
+		# 每个有效时段采用该时段浇水中的最高水壶档位（单人版每时段只浇一次）。
+		water_bonus += _percent_of(base, PlantDefs.WATER_BONUS_BY_CAN[int(entry.get("can_level", 1))])
+	var segments_done: int = water_entries.size()
 	var fertilizer_kind := active_fertilizer_for_round(plot)
 	var fertilizer_bonus := 0
 	if fertilizer_kind != "":
@@ -900,6 +1177,7 @@ func _append_round_event(plot: Dictionary, now: int, type: String, text: String)
 func _empty_plot(plot_id: int) -> Dictionary:
 	return {
 		"id": plot_id,
+		"owned": true,
 		"seed_id": 0,
 		"planted_at": 0,
 		"ready_at": 0,
@@ -933,6 +1211,30 @@ func _migrate_v2_to_v3(saved: Dictionary) -> Dictionary:
 	for batch in migrated["crop_batches"]:
 		if not batch.has("attributes"):
 			batch["attributes"] = {"water": 0, "fiber": 0, "color": 0}
+	return migrated
+
+
+func _migrate_v3_to_v4(saved: Dictionary) -> Dictionary:
+	var migrated := saved.duplicate(true)
+	migrated["version"] = 4
+	# 地块扩展到 10 块：旧档已有的标记为已拥有，新地块未拥有（不自动赠送）。
+	for plot in migrated["plots"]:
+		if not plot.has("owned"):
+			plot["owned"] = true
+		# 浇水记录升级：时段序号 → {时段, 水壶档位}（旧档全部按水壶 1 级）。
+		var converted: Array = []
+		for segment in plot.get("watered_segments", []):
+			if segment is Dictionary:
+				converted.append(segment)
+			else:
+				converted.append({"segment": int(segment), "can_level": 1})
+		plot["watered_segments"] = converted
+	while migrated["plots"].size() < MAX_PLOTS:
+		var plot := _empty_plot(migrated["plots"].size() + 1)
+		plot["owned"] = false
+		migrated["plots"].append(plot)
+	migrated["market"] = _default_market()
+	migrated["ledger"] = []
 	return migrated
 
 

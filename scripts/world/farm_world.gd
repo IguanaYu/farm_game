@@ -8,6 +8,14 @@ const TREE_MODEL := preload("res://assets/models/deco_tree.glb")
 const FENCE_MODEL := preload("res://assets/models/deco_fence.glb")
 const FLOWER_MODEL := preload("res://assets/models/deco_flower.glb")
 const BREEDER_MODEL := preload("res://assets/models/facility_breeder.glb")
+const GUEST_MODELS := {
+	1: preload("res://assets/models/guest_01.glb"),
+	2: preload("res://assets/models/guest_02.glb"),
+	3: preload("res://assets/models/guest_03.glb"),
+	4: preload("res://assets/models/guest_04.glb"),
+	5: preload("res://assets/models/guest_05.glb"),
+	6: preload("res://assets/models/guest_06.glb"),
+}
 
 const STAGE_MODELS := {
 	"cabbage": {
@@ -27,6 +35,7 @@ var hud: FarmHud
 var plot_holders: Dictionary = {}
 var plot_models: Dictionary = {}
 var plot_model_keys: Dictionary = {}
+var guest_slots: Array = []
 var hovered_plot_id: int = 0
 
 
@@ -40,7 +49,8 @@ func _ready() -> void:
 	if not loaded:
 		game.new_game(_now())
 		_save()
-	if game.breeder_settle(_now()):
+	var market_changed := game.refresh_market(_now())
+	if game.breeder_settle(_now()) or market_changed:
 		_save()
 	_build_farm()
 	_build_hud()
@@ -82,33 +92,36 @@ func _build_farm() -> void:
 	var camera := Camera3D.new()
 	camera.name = "FarmCamera"
 	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	camera.size = 12.2
-	camera.position = Vector3(8.8, 11.0, 14.0)
+	camera.size = 14.6
+	camera.position = Vector3(9.4, 12.0, 15.2)
 	camera.current = true
 	add_child(camera)
 	camera.look_at(Vector3(0, 0, 0))
-	_add_ground("EarthBase", Vector3(15.2, 0.45, 10.4), Vector3(0, -0.38, 0), Color("#a7794f"))
-	_add_ground("GrassTop", Vector3(15.0, 0.18, 10.2), Vector3(0, -0.08, 0), Color("#77a75a"))
-	_add_ground("FarmPath", Vector3(9.4, 0.035, 0.45), Vector3(0, 0.035, 0), Color("#c8a772"))
-	for column in range(3):
+	_add_ground("EarthBase", Vector3(17.6, 0.45, 11.8), Vector3(0, -0.38, 0), Color("#a7794f"))
+	_add_ground("GrassTop", Vector3(17.4, 0.18, 11.6), Vector3(0, -0.08, 0), Color("#77a75a"))
+	_add_ground("FarmPath", Vector3(11.0, 0.035, 0.45), Vector3(0, 0.035, 0), Color("#c8a772"))
+	# 十块地：5 列 × 2 行；未拥有的地块隐藏，购地后出现。
+	for column in range(5):
 		for row in range(2):
-			var plot_id: int = row * 3 + column + 1
-			var x: float = (column - 1) * 2.85
+			var plot_id: int = row * 5 + column + 1
+			var x: float = (column - 2) * 2.85
 			var z: float = (row - 0.5) * 2.85
 			_add_plot(plot_id, Vector3(x, 0.08, z))
-	_add_building("ShopBuilding", SHOP_MODEL, Vector3(-5.75, 0.08, -0.6), "shop")
-	_add_building("WarehouseBuilding", WAREHOUSE_MODEL, Vector3(5.85, 0.08, -2.6), "warehouse")
-	_add_building("BreederBuilding", BREEDER_MODEL, Vector3(-5.75, 0.08, 3.1), "breeder")
-	for position in [Vector3(-6.35, 0.08, -3.7), Vector3(6.45, 0.08, 3.65)]:
+	_add_building("ShopBuilding", SHOP_MODEL, Vector3(-4.6, 0.08, -4.35), "shop")
+	_add_building("BreederBuilding", BREEDER_MODEL, Vector3(0.0, 0.08, -4.35), "breeder")
+	_add_building("WarehouseBuilding", WAREHOUSE_MODEL, Vector3(4.6, 0.08, -4.35), "warehouse")
+	for position in [Vector3(-3.0, 0.08, 4.1), Vector3(0.0, 0.08, 4.1), Vector3(3.0, 0.08, 4.1)]:
+		_add_guest_slot(position)
+	for position in [Vector3(-6.9, 0.08, 3.6), Vector3(6.9, 0.08, 3.6)]:
 		_add_decoration(TREE_MODEL, position)
-	for position in [Vector3(-4.6, 0.08, 3.8), Vector3(-1.3, 0.08, 3.8), Vector3(2.0, 0.08, 3.8), Vector3(4.5, 0.08, -3.7)]:
+	for position in [Vector3(-6.6, 0.08, 1.9), Vector3(6.6, 0.08, 1.9), Vector3(-6.6, 0.08, -0.9), Vector3(6.6, 0.08, -0.9)]:
 		_add_decoration(FLOWER_MODEL, position)
 	for x in [-4.2, -1.6, 1.0, 3.6]:
-		_add_decoration(FENCE_MODEL, Vector3(x, 0.08, -4.75))
-		_add_decoration(FENCE_MODEL, Vector3(x, 0.08, 4.75))
+		_add_decoration(FENCE_MODEL, Vector3(x, 0.08, -4.9))
+		_add_decoration(FENCE_MODEL, Vector3(x, 0.08, 4.9))
 	for z in [-2.7, -0.1, 2.5]:
-		_add_decoration(FENCE_MODEL, Vector3(-7.1, 0.08, z), 90.0)
-		_add_decoration(FENCE_MODEL, Vector3(7.1, 0.08, z), 90.0)
+		_add_decoration(FENCE_MODEL, Vector3(-7.5, 0.08, z), 90.0)
+		_add_decoration(FENCE_MODEL, Vector3(7.5, 0.08, z), 90.0)
 
 
 func _add_ground(node_name: String, dimensions: Vector3, location: Vector3, color: Color) -> void:
@@ -168,6 +181,45 @@ func _add_building(node_name: String, model: PackedScene, location: Vector3, kin
 	add_child(body)
 
 
+func _add_guest_slot(location: Vector3) -> void:
+	## 门口的三个客人站位：模型按当日出现的客人切换，点击打开今日集市。
+	var slot_index := guest_slots.size()
+	var body := StaticBody3D.new()
+	body.name = "GuestSlot_%d" % (slot_index + 1)
+	body.position = location
+	body.input_ray_pickable = true
+	var hitbox := CollisionShape3D.new()
+	hitbox.name = "GuestHitbox"
+	var box := BoxShape3D.new()
+	box.size = Vector3(1.5, 1.9, 1.2)
+	hitbox.shape = box
+	hitbox.position.y = 0.85
+	body.add_child(hitbox)
+	body.input_event.connect(_on_guest_input.bind(slot_index))
+	add_child(body)
+	guest_slots.append(body)
+
+
+func _refresh_guest_models() -> void:
+	var guest_ids: Array = game.state["market"].get("guest_ids", [])
+	for slot_index in range(guest_slots.size()):
+		var body: StaticBody3D = guest_slots[slot_index]
+		var holder: Node = body.get_node_or_null("GuestAppearance")
+		if holder != null:
+			body.remove_child(holder)
+			holder.queue_free()
+		if slot_index < guest_ids.size() and GUEST_MODELS.has(int(guest_ids[slot_index])):
+			var appearance: Node = GUEST_MODELS[int(guest_ids[slot_index])].instantiate()
+			appearance.name = "GuestAppearance"
+			body.add_child(appearance)
+
+
+func _on_guest_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int, _slot_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		hud.view_now = _now()
+		hud.open_market()
+
+
 func _add_decoration(model: PackedScene, location: Vector3, rotation_y: float = 0.0) -> void:
 	var appearance := model.instantiate()
 	appearance.position = location
@@ -202,19 +254,40 @@ func _build_hud() -> void:
 	hud.set_template_requested.connect(_on_set_template_requested)
 	hud.clear_template_requested.connect(_on_clear_template_requested)
 	hud.collect_breeder_requested.connect(_on_collect_breeder_requested)
+	hud.buy_plot_requested.connect(_on_buy_plot_requested)
+	hud.buy_can2_requested.connect(_on_buy_can2_requested)
+	hud.lock_guest_requested.connect(_on_lock_guest_requested)
+	hud.unlock_guest_requested.connect(_on_unlock_guest_requested)
+	hud.lock_formula_requested.connect(_on_lock_formula_requested)
+	hud.unlock_formula_requested.connect(_on_unlock_formula_requested)
+	hud.sell_batch_to_requested.connect(_on_sell_batch_to_requested)
 	hud.debug_mature_requested.connect(_debug_mature_all)
 
 
 func _refresh_all() -> void:
 	hud.view_now = _now()
-	for plot_id in range(1, FarmGame.PLOT_COUNT + 1):
+	for plot_id in range(1, FarmGame.MAX_PLOTS + 1):
+		_refresh_plot_visibility(plot_id)
 		_refresh_plot_model(plot_id)
+	_refresh_guest_models()
 	hud.refresh(game.state)
 	_refresh_hover_hint()
 
 
+func _refresh_plot_visibility(plot_id: int) -> void:
+	var holder: Node3D = plot_holders.get(plot_id)
+	if holder == null:
+		return
+	var body: StaticBody3D = holder.get_parent()
+	var owned: bool = plot_id in game.owned_plot_ids()
+	body.visible = owned
+	body.input_ray_pickable = owned
+
+
 func _refresh_plot_model(plot_id: int) -> void:
 	var plot := game.get_plot(plot_id)
+	if plot.is_empty():
+		return
 	var model_key := "empty"
 	var model: PackedScene = PLOT_EMPTY
 	if plot["seed_id"] != 0:
@@ -244,7 +317,10 @@ func _refresh_plot_model(plot_id: int) -> void:
 
 func _on_clock_tick() -> void:
 	hud.view_now = _now()
-	for plot_id in range(1, FarmGame.PLOT_COUNT + 1):
+	if game.refresh_market(_now()):
+		_save()
+		_refresh_guest_models()
+	for plot_id in range(1, FarmGame.MAX_PLOTS + 1):
 		_refresh_plot_model(plot_id)
 	_refresh_hover_hint()
 	hud.update_harvest_entry()
@@ -274,6 +350,8 @@ func _refresh_hover_hint() -> void:
 
 func _on_plot_action(plot_id: int) -> void:
 	var plot := game.get_plot(plot_id)
+	if plot.is_empty():
+		return
 	if plot["seed_id"] == 0:
 		hud.open_seed_picker(plot_id)
 		return
@@ -361,8 +439,8 @@ func _on_buy_seed_requested(kind: String, quantity: int) -> void:
 	hud.show_status("购买了 %d 粒%s种子，花费 %d 金币。" % [quantity, defn["display_name"], quantity * defn["seed_price"]])
 
 
-func _on_buy_fertilizer_requested(kind: String) -> void:
-	var result := game.buy_fertilizer(kind)
+func _on_buy_fertilizer_requested(kind: String, quantity: int) -> void:
+	var result := game.buy_fertilizer(kind, quantity)
 	if result != "":
 		hud.show_status(result)
 		return
@@ -370,7 +448,8 @@ func _on_buy_fertilizer_requested(kind: String) -> void:
 		hud.show_status("存档写入失败，本次购买可能没有保存！")
 	_refresh_all()
 	var defn: Dictionary = PlantDefs.FERTILIZERS[kind]
-	hud.show_status("购买了一份%s（%d 次使用），花费 %d 金币。" % [defn["display_name"], defn["uses_per_pack"], defn["price"]])
+	var total := MarketDefs.discounted_total(quantity * defn["price"], int(game.state["shop_level"]))
+	hud.show_status("购买了 %d 份%s（%d 次使用），花费 %d 金币。" % [quantity, defn["display_name"], quantity * defn["uses_per_pack"], total])
 
 
 func _on_upgrade_shop_requested() -> void:
@@ -521,6 +600,74 @@ func _on_collect_breeder_requested() -> void:
 		hud.show_status("存档写入失败，采摘可能没有保存！")
 	_refresh_all()
 	hud.show_status("采摘了 %d 粒模板副本，已放入种子区。" % result["count"])
+
+
+func _on_buy_plot_requested() -> void:
+	var result := game.buy_plot()
+	if result != "":
+		hud.show_status(result)
+		_refresh_all()
+		return
+	if not _save():
+		hud.show_status("存档写入失败，购地可能没有保存！")
+	_refresh_all()
+	hud.show_status("新地块已解锁，去种点什么吧！")
+
+
+func _on_buy_can2_requested() -> void:
+	var result := game.buy_can2()
+	if result != "":
+		hud.show_status(result)
+		_refresh_all()
+		return
+	if not _save():
+		hud.show_status("存档写入失败，水壶升级可能没有保存！")
+	_refresh_all()
+	hud.show_status("水壶升到 2 级：一次浇三块地，每时段加分翻倍。")
+
+
+func _on_lock_guest_requested(guest_id: int) -> void:
+	var result := game.request_lock_guest(guest_id)
+	hud.show_status(result if result != "" else "锁定请求已记录，明天零点生效。")
+	if result == "" and not _save():
+		hud.show_status("存档写入失败，锁定可能没有保存！")
+	_refresh_all()
+
+
+func _on_unlock_guest_requested() -> void:
+	var result := game.request_lock_guest(0)
+	hud.show_status(result if result != "" else "解锁请求已记录，明天零点生效。")
+	if result == "" and not _save():
+		hud.show_status("存档写入失败，解锁可能没有保存！")
+	_refresh_all()
+
+
+func _on_lock_formula_requested(kind: String) -> void:
+	var result := game.request_lock_formula(kind)
+	hud.show_status(result if result != "" else "公式锁定已记录，明天零点生效（系数仍每日重抽）。")
+	if result == "" and not _save():
+		hud.show_status("存档写入失败，公式锁定可能没有保存！")
+	_refresh_all()
+
+
+func _on_unlock_formula_requested() -> void:
+	var result := game.request_unlock_formula()
+	hud.show_status(result if result != "" else "公式解锁已记录，明天零点生效。")
+	if result == "" and not _save():
+		hud.show_status("存档写入失败，公式解锁可能没有保存！")
+	_refresh_all()
+
+
+func _on_sell_batch_to_requested(batch_id: int, count: int, guest_id: int) -> void:
+	var result := game.sell_batch_to(batch_id, count, guest_id, _now())
+	if not result["ok"]:
+		hud.show_status(result["message"])
+		_refresh_all()
+		return
+	if not _save():
+		hud.show_status("存档写入失败，出售可能没有保存！")
+	_refresh_all()
+	hud.show_status("卖给%s %d 个作物，获得 %d 金币。" % [MarketDefs.GUESTS[guest_id]["display_name"], result["sold_count"], result["coins"]])
 
 
 func _debug_mature_all() -> void:

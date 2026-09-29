@@ -16,7 +16,13 @@
     "deco_tree",
     "deco_fence",
     "deco_flower",
-    "facility_breeder"
+    "facility_breeder",
+    "guest_01",
+    "guest_02",
+    "guest_03",
+    "guest_04",
+    "guest_05",
+    "guest_06"
   ],
   "panel_icons": [
     "facility_shop",
@@ -50,11 +56,21 @@
     ],
     "notes": "plot_wet / plot_fertilized / facility_breeder / guest_* 尚未接入，留给阶段 3~5。"
   },
-  "status": "stage 3 adds breeder facility model; pending external asset audit",
+  "status": "stage 4 adds guest models for the daily market; pending external asset audit",
   "stage3_additions": {
     "models": [
       "facility_breeder"
     ],
     "notes": "guest_* / plot_wet / plot_fertilized 仍未接入，留给阶段 4~5。"
+  },
+  "stage4_additions": {
+    "models": [
+      "guest_01",
+      "guest_02",
+      "guest_03",
+      "guest_04",
+      "guest_05",
+      "guest_06"
+    ]
   }
 }
