@@ -63,6 +63,20 @@ func _ready() -> void:
 	clock.start()
 
 
+func _process(delta: float) -> void:
+	# 成熟标记上下浮动 + 缓慢旋转，让"可收获"一目了然。
+	var time := float(Time.get_ticks_msec()) / 1000.0
+	for plot_id in plot_holders.keys():
+		var holder: Node3D = plot_holders[plot_id]
+		if holder == null:
+			continue
+		var body: StaticBody3D = holder.get_parent()
+		var marker: MeshInstance3D = body.get_node_or_null("PlotMatureMarker")
+		if marker != null and marker.visible:
+			marker.position.y = 1.55 + sin(time * 3.0 + plot_id) * 0.12
+			marker.rotation_degrees.y += delta * 90.0
+
+
 func _unhandled_key_input(event: InputEvent) -> void:
 	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F9:
 		_debug_mature_all()
@@ -155,6 +169,38 @@ func _add_plot(plot_id: int, location: Vector3) -> void:
 	var model_holder := Node3D.new()
 	model_holder.name = "PlotModelHolder"
 	body.add_child(model_holder)
+	var hover_ring := MeshInstance3D.new()
+	hover_ring.name = "PlotHoverRing"
+	var ring_mesh := TorusMesh.new()
+	ring_mesh.inner_radius = 1.18
+	ring_mesh.outer_radius = 1.38
+	hover_ring.mesh = ring_mesh
+	var ring_material := StandardMaterial3D.new()
+	ring_material.albedo_color = Color("#ffe28a")
+	ring_material.emission_enabled = true
+	ring_material.emission = Color("#ffd257")
+	ring_material.emission_energy_multiplier = 0.8
+	ring_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	ring_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	hover_ring.material_override = ring_material
+	hover_ring.position.y = 0.06
+	hover_ring.visible = false
+	body.add_child(hover_ring)
+	var mature_marker := MeshInstance3D.new()
+	mature_marker.name = "PlotMatureMarker"
+	var marker_mesh := BoxMesh.new()
+	marker_mesh.size = Vector3(0.3, 0.3, 0.3)
+	mature_marker.mesh = marker_mesh
+	mature_marker.rotation_degrees.z = 45.0
+	var marker_material := StandardMaterial3D.new()
+	marker_material.albedo_color = Color("#ffd257")
+	marker_material.emission_enabled = true
+	marker_material.emission = Color("#ffc93c")
+	marker_material.emission_energy_multiplier = 1.2
+	mature_marker.material_override = marker_material
+	mature_marker.position.y = 1.55
+	mature_marker.visible = false
+	body.add_child(mature_marker)
 	body.input_event.connect(_on_plot_input.bind(plot_id))
 	body.mouse_entered.connect(_on_plot_hover.bind(plot_id))
 	body.mouse_exited.connect(_on_plot_exit.bind(plot_id))
@@ -301,6 +347,7 @@ func _refresh_plot_model(plot_id: int) -> void:
 			stage = "growing"
 		model_key = "%s_%s" % [kind, stage]
 		model = STAGE_MODELS[kind][stage]
+	_set_mature_marker(plot_id, model_key.ends_with("_mature"))
 	if plot_model_keys.get(plot_id, "") == model_key:
 		return
 	var holder: Node3D = plot_holders[plot_id]
@@ -324,6 +371,7 @@ func _on_clock_tick() -> void:
 		_refresh_plot_model(plot_id)
 	_refresh_hover_hint()
 	hud.update_harvest_entry()
+	hud.tick_update(_now())
 
 
 func _on_plot_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int, plot_id: int) -> void:
@@ -333,13 +381,35 @@ func _on_plot_input(_camera: Node, event: InputEvent, _position: Vector3, _norma
 
 func _on_plot_hover(plot_id: int) -> void:
 	hovered_plot_id = plot_id
+	_set_hover_ring_visible(plot_id, true)
 	_refresh_hover_hint()
 
 
 func _on_plot_exit(plot_id: int) -> void:
+	_set_hover_ring_visible(plot_id, false)
 	if hovered_plot_id == plot_id:
 		hovered_plot_id = 0
 		hud.show_plot_hint(0, {}, _now())
+
+
+func _set_hover_ring_visible(plot_id: int, visible_on: bool) -> void:
+	var holder: Node3D = plot_holders.get(plot_id)
+	if holder == null:
+		return
+	var body: StaticBody3D = holder.get_parent()
+	var ring: MeshInstance3D = body.get_node_or_null("PlotHoverRing")
+	if ring != null:
+		ring.visible = visible_on
+
+
+func _set_mature_marker(plot_id: int, visible_on: bool) -> void:
+	var holder: Node3D = plot_holders.get(plot_id)
+	if holder == null:
+		return
+	var body: StaticBody3D = holder.get_parent()
+	var marker: MeshInstance3D = body.get_node_or_null("PlotMatureMarker")
+	if marker != null:
+		marker.visible = visible_on
 
 
 func _refresh_hover_hint() -> void:
@@ -366,6 +436,7 @@ func _do_harvest(plot_id: int) -> void:
 	if not result["ok"]:
 		hud.show_status(result["message"])
 		return
+	_advance_tutorial(2)
 	if not _save():
 		hud.show_status("存档写入失败，本次收获结果可能没有保存！")
 	_refresh_all()
@@ -402,6 +473,10 @@ func _on_plant_seed_requested(plot_id: int, seed_id: int) -> void:
 	_refresh_all()
 	var plot := game.get_plot(plot_id)
 	var defn := PlantDefs.get_plant(plot["kind"])
+	if int(game.state.get("tutorial_step", 99)) == 0:
+		_advance_tutorial(0)
+	elif int(game.state.get("tutorial_step", 99)) == 4:
+		_advance_tutorial(4)
 	hud.show_status("第 %d 块地已播种%s（品质 %d 分），约 %d 分钟后成熟。" % [plot_id, defn["display_name"], BreedingDefs.quality_score(plot["parent_traits"]), int(defn["grow_seconds"] / 60)])
 	hud.close_modal_after_action()
 
@@ -410,6 +485,7 @@ func _on_water_requested(plot_id: int) -> void:
 	var result := game.water(plot_id, _now())
 	hud.show_status(result["message"] if not result["ok"] else "第 %d 块地浇水完成，本时段加分已记录。" % plot_id)
 	if result["ok"]:
+		_advance_tutorial(1)
 		if not _save():
 			hud.show_status("存档写入失败，本次浇水可能没有保存！")
 	_refresh_all()
@@ -468,6 +544,7 @@ func _on_harvest_all_requested() -> void:
 	if not summary["ok"]:
 		hud.show_status("现在没有成熟的地块。")
 		return
+	_advance_tutorial(2)
 	if not _save():
 		hud.show_status("存档写入失败，本次收获结果可能没有保存！")
 	_refresh_all()
@@ -480,6 +557,7 @@ func _on_sell_batch_requested(batch_id: int) -> void:
 	if not result["ok"]:
 		hud.show_status(result["message"])
 		return
+	_advance_tutorial(3)
 	if not _save():
 		hud.show_status("存档写入失败，本次出售可能没有保存！")
 	_refresh_all()
@@ -491,6 +569,7 @@ func _on_sell_all_requested() -> void:
 		hud.show_status("仓库里没有可出售的作物。")
 		return
 	var earned := game.sell_all_batches()
+	_advance_tutorial(3)
 	if not _save():
 		hud.show_status("存档写入失败，本次出售可能没有保存！")
 	_refresh_all()
@@ -664,6 +743,7 @@ func _on_sell_batch_to_requested(batch_id: int, count: int, guest_id: int) -> vo
 		hud.show_status(result["message"])
 		_refresh_all()
 		return
+	_advance_tutorial(3)
 	if not _save():
 		hud.show_status("存档写入失败，出售可能没有保存！")
 	_refresh_all()
@@ -682,6 +762,13 @@ func _debug_mature_all() -> void:
 		_save()
 	_refresh_all()
 	hud.show_status("调试：作物已成熟，可点击收获。" if changed else "没有正在生长的作物。")
+
+
+func _advance_tutorial(completed_step: int) -> void:
+	## 首轮引导：动作成功且正处在对应步骤时推进；最后一步完成或跳过后不再打扰。
+	if int(game.state.get("tutorial_step", 99)) != completed_step:
+		return
+	game.state["tutorial_step"] = 99 if completed_step >= 4 else completed_step + 1
 
 
 func _now() -> int:

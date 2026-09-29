@@ -10,7 +10,7 @@ func _initialize() -> void:
 	game.set_debug_random_seed(20260928)
 	game.new_game(1000)
 	_check(game.state["seeds"].size() == 6, "new game must start with six seeds")
-	_check(game.state["version"] == 4, "new game must use save version 4")
+	_check(game.state["version"] == 5, "new game must use save version 5")
 	for plot_id in range(1, 7):
 		_check(game.plant(plot_id, 1000) == "", "plant should succeed")
 	_check(game.state["seeds"].is_empty(), "planting six plots must consume six seeds")

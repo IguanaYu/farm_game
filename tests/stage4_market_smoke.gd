@@ -274,7 +274,7 @@ func _test_v3_to_v4_migration() -> void:
 		})
 	var game := FarmGame.new()
 	_check(game.load_state(v3), "version 3 save migrates to version 4")
-	_check(game.state["version"] == 4, "migrated save reports version 4")
+	_check(game.state["version"] == 5, "v3 save migrates through to the current version 5")
 	_check(game.state["plots"].size() == 10 and game.owned_plot_ids().size() == 6, "six-plot save stays at six owned plots of ten slots")
 	_check(game.get_plot(7).is_empty() and game.get_plot(6).is_empty() == false, "unowned new plots are locked, old plots stay usable")
 	_check(game.get_plot(1)["watered_segments"] == [{"segment": 0, "can_level": 1}], "int watered segments convert to can-1 records")

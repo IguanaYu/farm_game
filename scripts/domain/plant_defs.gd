@@ -32,6 +32,12 @@ const PLANTS: Dictionary = {
 }
 
 const ENCOUNTER_TIERS := [10, 40, 70]
+## 正式遭遇文案：与 +10/+40/+70 档位一一对应，强弱有可感知差异。
+const ENCOUNTER_TEXTS := {
+	10: "一阵细雨轻抚过叶片",
+	40: "暖阳与微风恰好同时到来",
+	70: "罕见的完美天气，整块地都在发光",
+}
 const FLUCTUATION_MAX_PCT := 10
 
 ## 升级门槛：1→2、2→3、3→4、4→5、5→6 各需新增经验。种地与植物等级首版用同一张表。

@@ -4,12 +4,12 @@ extends RefCounted
 ## 阶段 4 经济规则配置：每日客人、收购公式、折扣、扩地与升级价格。均为试玩可调初值。
 
 const GUESTS := {
-	1: {"display_name": "阿禾（占位形象）", "preferred_kind": "cabbage"},
-	2: {"display_name": "小满（占位形象）", "preferred_kind": "cabbage"},
-	3: {"display_name": "阿泽（占位形象）", "preferred_kind": "cabbage"},
-	4: {"display_name": "阿棉（占位形象）", "preferred_kind": "carrot"},
-	5: {"display_name": "小翠（占位形象）", "preferred_kind": "carrot"},
-	6: {"display_name": "阿棠（占位形象）", "preferred_kind": "carrot"},
+	1: {"display_name": "阿禾", "preferred_kind": "cabbage"},
+	2: {"display_name": "小满", "preferred_kind": "cabbage"},
+	3: {"display_name": "阿泽", "preferred_kind": "cabbage"},
+	4: {"display_name": "阿棉", "preferred_kind": "carrot"},
+	5: {"display_name": "小翠", "preferred_kind": "carrot"},
+	6: {"display_name": "阿棠", "preferred_kind": "carrot"},
 }
 
 const DAILY_GUEST_COUNT := 3

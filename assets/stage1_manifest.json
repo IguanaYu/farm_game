@@ -56,7 +56,7 @@
     ],
     "notes": "plot_wet / plot_fertilized / facility_breeder / guest_* 尚未接入，留给阶段 3~5。"
   },
-  "status": "stage 4 adds guest models for the daily market; pending external asset audit",
+  "status": "stage 5: asset inventory annotated; core loop visuals complete with documented placeholders",
   "stage3_additions": {
     "models": [
       "facility_breeder"
@@ -71,6 +71,22 @@
       "guest_04",
       "guest_05",
       "guest_06"
+    ]
+  },
+  "inventory": {
+    "license": "项目自制（art/lowpoly 由本项目 Blender 资产库生成，无外部授权争议）",
+    "in_use": "models+panel_icons 全部已接入游戏",
+    "needs_revision": [
+      "胡萝卜正式名称未定（文档约定 carrot 仅为临时美术 ID）",
+      "guest_01..06 为造型草案，正式身份未定"
+    ],
+    "missing_but_placeholder_ok": [
+      "plot_wet / plot_fertilized（浇水、施肥的地面状态模型）暂用悬停环与文字反馈代替",
+      "遭遇无专属插画，使用文字文案"
+    ],
+    "unused_yet": [
+      "plot_seeded",
+      "crop_cabbage/crop_carrot 独立作物模型（地块阶段模型已覆盖）"
     ]
   }
 }

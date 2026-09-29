@@ -67,6 +67,10 @@ var care_plot_id: int = 0
 var last_harvest_result: Dictionary = {}
 var last_harvest_all_result: Dictionary = {}
 var market_sell_counts: Dictionary = {}
+var seed_filter: String = "all"
+var tutorial_label: Label
+var tutorial_panel: PanelContainer
+var care_remaining_label: Label
 var coins_value: Label
 var seeds_value: Label
 var crops_value: Label
@@ -96,6 +100,7 @@ func _ready() -> void:
 	_build_context()
 	_build_actions()
 	_build_modal()
+	_build_tutorial_banner()
 
 
 func refresh(state: Dictionary) -> void:
@@ -112,8 +117,18 @@ func refresh(state: Dictionary) -> void:
 	else:
 		level_value.text = "种地 Lv.%d · 经验 %d/%d" % [progress["level"], progress["into_level"], progress["next_need"]]
 	update_harvest_entry()
+	_update_tutorial_banner()
 	if modal_overlay.visible:
 		_render_modal()
+
+
+func tick_update(now: int) -> void:
+	## 每秒调用：只更新照料面板的倒计时文字，不重建按钮，避免吃掉点击。
+	if active_modal == "plot_care" and care_plot_id > 0 and is_instance_valid(care_remaining_label):
+		var plot := game.get_plot(care_plot_id)
+		if not plot.is_empty() and plot["seed_id"] != 0 and now < plot["ready_at"]:
+			var remaining: int = plot["ready_at"] - now
+			care_remaining_label.text = "生长中，还剩 %02d:%02d。基准 %d 分/作物，照料可提高分数。" % [int(remaining / 60), remaining % 60, PlantDefs.get_plant(plot["kind"])["base_score"]]
 
 
 func update_harvest_entry() -> void:
@@ -236,6 +251,54 @@ func _build_brand() -> void:
 	titles.add_child(_label("慢慢生长，认真收获", 14, Color("#c9dfc3")))
 	level_value = _label("种地 Lv.1 · 经验 0/120", 15, Color("#ffd98a"))
 	titles.add_child(level_value)
+
+
+const TUTORIAL_STEPS := [
+	"第一步：点击一块空地，选一组白菜种子播种",
+	"第二步：点击生长中的地块，在照料面板里浇一次水（免费加分）",
+	"第三步：等作物成熟（约 20 分钟），点击地块收获——面板会讲清每一分是怎么来的",
+	"第四步：点击门口的客人或右下角「今日集市」，比价后把作物卖掉",
+	"第五步：到商店补几粒种子再播种，第二轮开始就全靠自己啦",
+]
+
+
+func _build_tutorial_banner() -> void:
+	tutorial_panel = _panel(Color("#33492ef2"), Color("#7fa876"), 14)
+	tutorial_panel.name = "TutorialBanner"
+	tutorial_panel.anchor_left = 0.5
+	tutorial_panel.anchor_right = 0.5
+	tutorial_panel.offset_left = -370
+	tutorial_panel.offset_right = 370
+	tutorial_panel.offset_top = 22
+	tutorial_panel.offset_bottom = 74
+	tutorial_panel.visible = false
+	add_child(tutorial_panel)
+	var margin := _margin(14, 6)
+	tutorial_panel.add_child(margin)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	margin.add_child(row)
+	tutorial_label = _label("", 16, Color("#e8f5df"))
+	tutorial_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	tutorial_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	row.add_child(tutorial_label)
+	var skip_button := _plain_button("跳过引导", Color("#ffd98a"))
+	skip_button.custom_minimum_size.x = 88
+	skip_button.pressed.connect(func():
+		current_state["tutorial_step"] = 99
+		tutorial_panel.visible = false)
+	row.add_child(skip_button)
+
+
+func _update_tutorial_banner() -> void:
+	if tutorial_panel == null:
+		return
+	var step := int(current_state.get("tutorial_step", 99))
+	if step < 0 or step >= TUTORIAL_STEPS.size():
+		tutorial_panel.visible = false
+		return
+	tutorial_panel.visible = true
+	tutorial_label.text = "【新手引导】%s" % TUTORIAL_STEPS[step]
 
 
 func _build_counters() -> void:
@@ -414,6 +477,7 @@ func _build_modal() -> void:
 
 
 func _render_modal() -> void:
+	care_remaining_label = null
 	for child in modal_content.get_children():
 		modal_content.remove_child(child)
 		child.queue_free()
@@ -484,6 +548,15 @@ func _render_harvest() -> void:
 	story_stack.add_child(_label("这一轮的经历", 17, TEXT_DARK))
 	for event in result["events"]:
 		story_stack.add_child(_label("· %s" % event["text"], 14, TEXT_MUTED))
+	if not bool(result.get("stored_crops", true)) or not bool(result.get("stored_seeds", true)):
+		var pending_row := HBoxContainer.new()
+		pending_row.add_theme_constant_override("separation", 10)
+		modal_content.add_child(pending_row)
+		pending_row.add_child(_label("仓库已满：这部分产出进入待领取，不会丢失。", 15, LOCK_RED))
+		var pending_button := _solid_button("去整理/出售/回收", Color("#9b713f"))
+		pending_button.custom_minimum_size.x = 150
+		pending_button.pressed.connect(func(): open_warehouse())
+		pending_row.add_child(pending_button)
 	var exp_line := _label("经验 +%d（种地与%s各一份）" % [result["exp_gain"], defn["display_name"]], 16, Color("#3f6d8e"))
 	if result["farming_level_up"]:
 		exp_line.text += "  ·  种地升级了！"
@@ -606,7 +679,8 @@ func _render_plot_care() -> void:
 		status_stack.add_child(_label("已经成熟，关闭后点击地块即可收获。", 18, TEXT_DARK))
 	else:
 		var remaining: int = plot["ready_at"] - view_now
-		status_stack.add_child(_label("生长中，还剩 %02d:%02d。基准 %d 分/作物，照料可提高分数。" % [int(remaining / 60), remaining % 60, defn["base_score"]], 17, TEXT_DARK))
+		care_remaining_label = _label("生长中，还剩 %02d:%02d。基准 %d 分/作物，照料可提高分数。" % [int(remaining / 60), remaining % 60, defn["base_score"]], 17, TEXT_DARK)
+		status_stack.add_child(care_remaining_label)
 		var watering := game.watering_status(care_plot_id, view_now)
 		for segment in watering["segments"]:
 			var start_minute := int(segment["start_offset"] / 60)
@@ -986,7 +1060,23 @@ func _render_warehouse_seeds() -> void:
 	modal_icon.texture = SEED_ICONS["cabbage"]
 	modal_content.add_child(_warehouse_tabs("seeds"))
 	_render_pending_section()
+	var filter_row := HBoxContainer.new()
+	filter_row.name = "SeedFilterRow"
+	filter_row.add_theme_constant_override("separation", 6)
+	modal_content.add_child(filter_row)
+	for filter_value in [["all", "全部"], ["cabbage", "白菜"], ["carrot", "胡萝卜"], ["traits", "有词条"], ["quality", "品质 ≥3"]]:
+		var button := _solid_button(filter_value[1], LEAF if seed_filter == filter_value[0] else Color("#9aa392"))
+		button.custom_minimum_size.x = 86
+		button.pressed.connect(_change_seed_filter.bind(filter_value[0]))
+		filter_row.add_child(button)
 	var groups := game.seed_groups()
+	match seed_filter:
+		"cabbage", "carrot":
+			groups = groups.filter(func(group): return group["kind"] == seed_filter)
+		"traits":
+			groups = groups.filter(func(group): return not group["traits"].is_empty())
+		"quality":
+			groups = groups.filter(func(group): return BreedingDefs.quality_score(group["traits"]) >= 3)
 	if groups.is_empty():
 		var empty := _panel(Color("#f6ead0"), Color("#e3d1ac"), 13)
 		modal_content.add_child(empty)
@@ -1032,6 +1122,11 @@ func _render_warehouse_seeds() -> void:
 		recycle_button.pressed.connect(_emit_recycle.bind(int(group["seed_ids"][0])))
 		buttons.add_child(recycle_button)
 	_render_warehouse_upgrade()
+
+
+func _change_seed_filter(value: String) -> void:
+	seed_filter = value
+	_render_modal()
 
 
 func _emit_template_toggle(seed_id: int, is_template: bool) -> void:

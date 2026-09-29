@@ -1,7 +1,7 @@
 class_name FarmGame
 extends RefCounted
 
-const SAVE_VERSION := 4
+const SAVE_VERSION := 5
 const PLOT_COUNT := 6
 const MAX_PLOTS := 10
 const ROUND_EVENT_LIMIT := 24
@@ -34,6 +34,7 @@ func new_game(now: int) -> void:
 		"pending": {"crops": [], "seeds": []},
 		"market": _default_market(),
 		"ledger": [],
+		"tutorial_step": 0,
 		"plots": [],
 		"seeds": [],
 		"crop_batches": [],
@@ -85,6 +86,8 @@ func load_state(saved: Dictionary) -> bool:
 		source = _migrate_v2_to_v3(source)
 	if int(source.get("version", -1)) == 3:
 		source = _migrate_v3_to_v4(source)
+	if int(source.get("version", -1)) == 4:
+		source = _migrate_v4_to_v5(source)
 	if int(source.get("version", -1)) != SAVE_VERSION:
 		return false
 	# JSON 会把整数解析成浮点（3 → 3.0），而数组/字典的相等比较对类型严格；统一把整数值浮点归一化为 int。
@@ -128,6 +131,8 @@ func load_state(saved: Dictionary) -> bool:
 				return false
 	var market_state: Dictionary = source.get("market", {})
 	if not market_state is Dictionary or not market_state.get("guest_ids") is Array or not market_state.get("formulas") is Dictionary:
+		return false
+	if not _is_number(source.get("tutorial_step", 99)):
 		return false
 	for seed in source["seeds"]:
 		if not seed is Dictionary or not _is_number(seed.get("id")) or not PlantDefs.is_known_plant(str(seed.get("kind", ""))):
@@ -1138,7 +1143,7 @@ func _round_story(plot: Dictionary, breakdown: Dictionary, harvested_at: int, ba
 		events.append({
 			"t": plot["planted_at"] + entry["offset"],
 			"type": "encounter",
-			"text": "正向遭遇：每个作物 +%d 分。" % entry["tier"],
+			"text": "正向遭遇：%s（每个作物 +%d 分）。" % [PlantDefs.ENCOUNTER_TEXTS.get(entry["tier"], "风调雨顺"), entry["tier"]],
 		})
 	events.append({
 		"t": harvested_at,
@@ -1211,6 +1216,14 @@ func _migrate_v2_to_v3(saved: Dictionary) -> Dictionary:
 	for batch in migrated["crop_batches"]:
 		if not batch.has("attributes"):
 			batch["attributes"] = {"water": 0, "fiber": 0, "color": 0}
+	return migrated
+
+
+func _migrate_v4_to_v5(saved: Dictionary) -> Dictionary:
+	var migrated := saved.duplicate(true)
+	migrated["version"] = 5
+	# 老玩家不再需要首轮引导；只有新档从第 0 步开始。
+	migrated["tutorial_step"] = 99
 	return migrated
 
 
