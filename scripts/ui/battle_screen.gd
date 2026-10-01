@@ -4,6 +4,7 @@ extends Control
 ## 展示状态与轻量反馈（浮动数字），不做第二次结算。长动画不阻塞操作（本版无长动画）。
 
 signal battle_closed
+signal inventory_mutated
 
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
@@ -15,6 +16,8 @@ const WARN_GOLD := Color("#9b713a")
 const CARD_BACK := Color("#f4e9cf")
 
 var combat: CombatGame
+var game: FarmGame
+var carried_hp := -1  # 两场之间生命延续（2.3 设计 §5：各场战斗生命延续，首场按出发状态）
 var selected_uid := -1
 var status_label: Label
 var detail_label: Label
@@ -45,8 +48,10 @@ func _ready() -> void:
 	_build()
 
 
-func open_demo() -> void:
-	## 2.2 演示入口：遭遇选择 → 固定基础套装开打（不影响库存与存档）。
+func open_demo(target_game: FarmGame = null) -> void:
+	## 演示入口（2.2 起）：有真实库存时按当前布局构建牌组（2.3 D2.3-04），
+	## 否则退回固定基础套装；不影响存档，但战后搜刮领取会写入内存库存（关闭战备时保存）。
+	game = target_game
 	combat = null
 	selected_uid = -1
 	played_count = 0
@@ -54,7 +59,7 @@ func open_demo() -> void:
 	chooser_column.visible = true
 	battle_column.visible = false
 	overlay_panel.visible = false
-	status_label.text = "演示战斗：使用基础套装 8 张牌，不影响库存与存档。"
+	status_label.text = "演示战斗：牌组按当前战备布局生成；胜利后可搜刮（2.3 样例奖励）。"
 
 
 func _build() -> void:
@@ -150,13 +155,28 @@ func _build() -> void:
 
 
 func _on_choose_encounter(encounter_id: String) -> void:
-	combat = CombatGame.create(
-		[{"key": "p1", "name": "农夫", "max_hp": ExpeditionBaseline.MAX_HP, "deck": CombatGame.basic_kit_demo_deck()}],
-		encounter_id, 20261002)
+	var deck: Array = []
+	var inventory := _inventory()
+	if inventory != null:
+		deck = DeckBuilder.build(inventory)["entries"]
+	if deck.is_empty():
+		deck = CombatGame.basic_kit_demo_deck()
+	var start_hp := carried_hp if carried_hp > 0 else ExpeditionBaseline.MAX_HP
+	var player := {"key": "p1", "name": "农夫", "max_hp": ExpeditionBaseline.MAX_HP, "hp": start_hp, "deck": deck}
+	combat = CombatGame.create([player], encounter_id, 20261002, inventory)
+	combat.state["players"]["p1"]["hp"] = start_hp
 	combat.start()
 	chooser_column.visible = false
 	battle_column.visible = true
 	_refresh()
+
+
+func _inventory() -> InventoryGame:
+	if game == null:
+		return null
+	var inventory := InventoryGame.new()
+	inventory.bind(game.state["expedition"])
+	return inventory
 
 
 func _on_close() -> void:
@@ -233,6 +253,10 @@ func _refresh() -> void:
 	_refresh_detail()
 	if combat.is_over():
 		_show_outcome()
+		if combat.state["outcome"] == "won":
+			carried_hp = int(combat.state["players"]["p1"]["hp"])
+		else:
+			carried_hp = -1
 
 
 func _refresh_enemies() -> void:
@@ -271,7 +295,11 @@ func _refresh_hand() -> void:
 		var button := Button.new()
 		button.custom_minimum_size = Vector2(128, 108)
 		button.text = "%s\n费用 %d\n%s" % [def["name"], int(def["cost"]), _target_display(str(def["target"]))]
-		button.tooltip_text = def["desc"]
+		var source_text := ""
+		if game != null and int(card.get("source_instance_id", 0)) > 0:
+			source_text = "
+" + DeckBuilder.source_summary(_inventory(), int(card["source_instance_id"]))
+		button.tooltip_text = def["desc"] + source_text
 		button.add_theme_font_size_override("font_size", 13)
 		var fill := CARD_BACK if int(card["uid"]) != selected_uid else Color("#ffe9b0")
 		var style := _style(fill, Color("#c9a86a") if int(card["uid"]) != selected_uid else Color("#9b713a"), 10)

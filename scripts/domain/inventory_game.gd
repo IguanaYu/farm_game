@@ -114,7 +114,9 @@ func move_to_loadout(instance_id: int, container: String) -> Dictionary:
 		return _fail("保险箱只允许存放小型材料与稀有种子，%s 放不进去" % def["name"])
 	var fit = find_first_fit(container, def["size"])
 	if fit == null:
-		return _fail("%s 已放不下%s" % [ExpeditionBaseline.CONTAINER_DISPLAY[container], def["name"]])
+		var free := ExpeditionBaseline.largest_free_rect(container, _inventory()["loadout"].get(container, []))
+		return _fail("%s 已放不下%s（最大连续空位 %d×%d，需要 %d×%d）" % [
+			ExpeditionBaseline.CONTAINER_DISPLAY[container], def["name"], free.x, free.y, def["size"].x, def["size"].y])
 	_remove_from_current(instance)
 	instance["container"] = container
 	instance["cell"] = [int(fit[0]), int(fit[1])]
@@ -135,6 +137,126 @@ func move_to_warehouse(instance_id: int) -> Dictionary:
 	instance["rotated"] = false
 	_inventory()["warehouse"].append(instance)
 	return {"ok": true, "reason": ""}
+
+
+## —— 格子交互（2.3 D2.3-02/03）———————————————————————————————
+
+
+## 拖放的精确放置：整块占格合法才接受；不挤走旧物品。
+func place_at(instance_id: int, container: String, cell: Vector2i, rotated: bool) -> Dictionary:
+	var instance := find_instance(instance_id)
+	if instance.is_empty():
+		return _fail("物品不存在")
+	if is_run_occupied():
+		return _fail("物品正在探险中，不能调整战备")
+	if not ExpeditionBaseline.JOIN_ROUND.has(container):
+		return _fail("未知容器：%s" % container)
+	var def := ItemDefs.get_item(str(instance["def_id"]))
+	if container == "safe" and not bool(def.get("safe_allowed", false)):
+		return _fail("保险箱只允许存放白名单物品，%s 放不进去" % def["name"])
+	var occupied := ExpeditionBaseline.occupancy_map(_inventory()["loadout"].get(container, []), container)
+	if not ExpeditionBaseline.can_place(container, def["size"], cell, rotated, occupied, int(instance["instance_id"])):
+		var free := ExpeditionBaseline.largest_free_rect(container, _inventory()["loadout"].get(container, []))
+		return _fail("放不下：%s 的最大连续空位是 %d×%d，需要 %d×%d" % [
+			ExpeditionBaseline.CONTAINER_DISPLAY[container], free.x, free.y,
+			def["size"].x if not rotated else def["size"].y,
+			def["size"].y if not rotated else def["size"].x])
+	_remove_from_current(instance)
+	instance["container"] = container
+	instance["cell"] = [cell.x, cell.y]
+	instance["rotated"] = rotated
+	_inventory()["loadout"][container].append(instance)
+	return {"ok": true, "reason": ""}
+
+
+## 原位旋转（占格与牌数不变）；放不下时失败并给原因。
+func rotate_instance(instance_id: int) -> Dictionary:
+	var instance := find_instance(instance_id)
+	if instance.is_empty():
+		return _fail("物品不存在")
+	if not ExpeditionBaseline.JOIN_ROUND.has(str(instance.get("container", ""))):
+		return _fail("仓库中的物品放入容器时再旋转")
+	if is_run_occupied():
+		return _fail("物品正在探险中，不能调整战备")
+	var cell := Vector2i(int(instance["cell"][0]), int(instance["cell"][1]))
+	var rotated := not bool(instance.get("rotated", false))
+	var def := ItemDefs.get_item(str(instance["def_id"]))
+	var container := str(instance["container"])
+	var occupied := ExpeditionBaseline.occupancy_map(_inventory()["loadout"].get(container, []), container)
+	if not ExpeditionBaseline.can_place(container, def["size"], cell, rotated, occupied, int(instance["instance_id"])):
+		return _fail("旋转后放不下（会越界或重叠）")
+	instance["rotated"] = rotated
+	return {"ok": true, "reason": ""}
+
+
+## 自动整理：只重排同一容器内部（可旋转），容器归属不变；失败整体恢复原布局。
+func auto_tidy(container: String) -> Dictionary:
+	if not ExpeditionBaseline.CONTAINER_SIZE.has(container):
+		return _fail("未知容器")
+	if is_run_occupied():
+		return _fail("物品正在探险中，不能调整战备")
+	var original: Array = _inventory()["loadout"].get(container, []).duplicate(true)
+	var items: Array = original.duplicate(true)
+	# 按面积从大到小放置，减少碎片。
+	items.sort_custom(func(a, b):
+		var da := ItemDefs.get_item(str(a["def_id"]))
+		var db := ItemDefs.get_item(str(b["def_id"]))
+		return da["size"].x * da["size"].y > db["size"].x * db["size"].y)
+	_inventory()["loadout"][container] = []
+	for instance in items:
+		var def := ItemDefs.get_item(str(instance["def_id"]))
+		var fit = find_first_fit(container, def["size"])
+		if fit == null:
+			_inventory()["loadout"][container] = original
+			return _fail("自动整理找不到可行布局，已恢复原布局")
+		var placed: Dictionary = instance
+		placed["container"] = container
+		placed["cell"] = [int(fit[0]), int(fit[1])]
+		placed["rotated"] = bool(fit[2])
+		_inventory()["loadout"][container].append(placed)
+	var problems: Array = ExpeditionBaseline.layout_integrity(_inventory()["loadout"])
+	if not problems.is_empty():
+		_inventory()["loadout"][container] = original
+		return _fail("自动整理结果异常，已恢复原布局")
+	return {"ok": true, "reason": "", "moved": original.size()}
+
+
+## 非战斗丢弃：实体离开库存进入节点公共区（2.3 用内存列表承接；2.4 接入地图节点）。
+## 已打过的伤害或治疗不回滚；丢弃受保护物品即失去保护。
+var public_drops: Array = []
+
+
+func discard_instance(instance_id: int) -> Dictionary:
+	var instance := find_instance(instance_id)
+	if instance.is_empty():
+		return _fail("物品不存在")
+	if is_run_occupied():
+		return _fail("物品正在探险中，不能丢弃")
+	_remove_from_current(instance)
+	public_drops.append(instance)
+	return {"ok": true, "reason": ""}
+
+
+## 战后奖励领取事务：奖励区 → 指定容器（只找合法空位，不替玩家丢装备、不自动占保险箱）。
+func claim_reward(def_id: String, container: String) -> Dictionary:
+	if is_run_occupied():
+		return _fail("物品正在探险中")
+	var def := ItemDefs.get_item(def_id)
+	if def.is_empty():
+		return _fail("未知物品：%s" % def_id)
+	if container == "safe" and not bool(def.get("safe_allowed", false)):
+		return _fail("%s 不在保险箱白名单内" % def["name"])
+	var added := add_instance(def_id, "loot")
+	if not added["ok"]:
+		return added
+	var moved := move_to_loadout(int(added["instance_id"]), container)
+	if not moved["ok"]:
+		# 放不下就退回：奖励留在奖励区，不产生半领取状态（ID 作废不复用，无害）。
+		var stale := find_instance(int(added["instance_id"]))
+		if not stale.is_empty():
+			_inventory()["warehouse"].erase(stale)
+		return _fail(moved["reason"])
+	return {"ok": true, "reason": "", "instance_id": added["instance_id"]}
 
 
 func clear_loadout() -> Dictionary:
@@ -251,6 +373,8 @@ func loadout_check() -> Dictionary:
 		advises.append("首回合没有攻击牌，遇到敌人会非常被动")
 	if defense_cards < 2:
 		advises.append("缺少可重复使用的防御手段（格挡牌少于 2 张）")
+	if preview["rounds"][1].size() in range(1, 5):
+		advises.append("首回合牌只有 %d 张，第一回合抽不满 5 张（背包／保险箱的牌第 2／3 回合才加入）" % int(preview["totals"][1]))
 	return {"hard_blocks": hard_blocks, "advises": advises}
 
 

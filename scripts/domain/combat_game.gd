@@ -104,7 +104,7 @@ static func create(players: Array, encounter_id: String, seed_value: int, player
 				pending[str(join_round)].append(card)
 		player_map[key] = {
 			"name": str(player.get("name", "农夫")),
-			"hp": int(player.get("max_hp", ExpeditionBaseline.MAX_HP)),
+			"hp": int(player.get("hp", player.get("max_hp", ExpeditionBaseline.MAX_HP))),
 			"max_hp": int(player.get("max_hp", ExpeditionBaseline.MAX_HP)),
 			"block": 0,
 			"energy": 0,
@@ -180,6 +180,8 @@ func play_card(owner_key: String, uid: int, target_key: String) -> Dictionary:
 		var consume := _consume_source(int(card["source_instance_id"]))
 		if not consume["ok"]:
 			return _deny(consume["reason"], events)
+		if int(consume.get("uses_left", 1)) <= 0:
+			_purge_source_cards(owner_key, int(card["source_instance_id"]), events)
 	player["energy"] = int(player["energy"]) - int(def["cost"])
 	_remove_from_hand(owner_key, uid)
 	events.append({"type": "card_played", "owner": owner_key, "card": str(def["name"]), "cost": int(def["cost"]), "target": target_key})
@@ -579,6 +581,22 @@ func _shuffle(cards: Array) -> void:
 		var temp: Dictionary = cards[index]
 		cards[index] = cards[swap]
 		cards[swap] = temp
+
+
+## 物品耗尽：该物品剩余手牌、抽牌堆与弃牌堆中的关联牌全部移除（设计 §5）。
+func _purge_source_cards(owner_key: String, source_instance_id: int, events: Array) -> void:
+	var player: Dictionary = state["players"][owner_key]
+	for pile_name in ["hand", "draw_pile", "discard_pile"]:
+		var pile: Array = player[pile_name]
+		var kept: Array = []
+		for card in pile:
+			if int(card.get("source_instance_id", 0)) == source_instance_id:
+				player["exhaust_pile"].append(card)
+			else:
+				kept.append(card)
+		player[pile_name] = kept
+	events.append({"type": "source_depleted", "source_instance_id": source_instance_id})
+	state["log"].append("来源物品耗尽：其关联牌全部失效移除")
 
 
 func _consume_source(instance_id: int) -> Dictionary:

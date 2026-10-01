@@ -8,6 +8,27 @@ signal close_requested
 signal save_requested
 signal demo_battle_requested
 
+
+## 拖放支持（2.3 D2.3-02）：仓库行与已放置物品可拖，容器盒为放置目标。
+class DragButton extends Button:
+	var payload: Dictionary = {}
+
+	func _get_drag_data(_pos: Vector2) -> Variant:
+		var preview := Label.new()
+		preview.text = text
+		set_drag_preview(preview)
+		return payload
+
+
+class DropBox extends VBoxContainer:
+	signal dropped(data: Dictionary)
+
+	func _can_drop_data(_pos: Vector2, data: Variant) -> bool:
+		return typeof(data) == TYPE_DICTIONARY and data.has("instance_id")
+
+	func _drop_data(_pos: Vector2, data: Variant) -> void:
+		dropped.emit(data)
+
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
@@ -40,12 +61,14 @@ var check_column: VBoxContainer
 var container_boxes: Dictionary = {}
 var status_label: Label
 var put_back_button: Button
+var rotate_button: Button
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
+	set_process_unhandled_key_input(true)
 	var theme_root := Theme.new()
 	var font := SystemFont.new()
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
@@ -152,6 +175,10 @@ func _build() -> void:
 	put_back_button.visible = false
 	put_back_button.pressed.connect(_on_put_back)
 	bottom.add_child(put_back_button)
+	rotate_button = _button("旋转（R）", Color("#fff5df"), Color("#d5b87d"))
+	rotate_button.visible = false
+	rotate_button.pressed.connect(_on_rotate)
+	bottom.add_child(rotate_button)
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bottom.add_child(spacer)
@@ -169,8 +196,9 @@ func _build() -> void:
 
 
 func _build_container_box(container: String) -> VBoxContainer:
-	var box := VBoxContainer.new()
+	var box := DropBox.new()
 	box.add_theme_constant_override("separation", 4)
+	box.dropped.connect(_on_drop_into_container.bind(container))
 	var header := HBoxContainer.new()
 	box.add_child(header)
 	var display: String = ExpeditionBaseline.CONTAINER_DISPLAY[container]
@@ -178,6 +206,12 @@ func _build_container_box(container: String) -> VBoxContainer:
 	var join_round: int = ExpeditionBaseline.JOIN_ROUND[container]
 	var round_note := "第 1 回合加入牌库" if join_round == 1 else "第 %d 回合加入牌库" % join_round
 	header.add_child(_label("%s（%d×%d，%s）" % [display, size.x, size.y, round_note], 15, FOREST))
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	header.add_child(spacer)
+	var tidy_button := _small_button("自动整理", Color("#fff5df"), Color("#d5b87d"))
+	tidy_button.pressed.connect(_on_auto_tidy.bind(container))
+	header.add_child(tidy_button)
 	var grid := GridContainer.new()
 	grid.columns = size.x
 	grid.add_theme_constant_override("h_separation", 2)
@@ -185,6 +219,26 @@ func _build_container_box(container: String) -> VBoxContainer:
 	box.add_child(grid)
 	box.set_meta("grid", grid)
 	return box
+
+
+func _on_drop_into_container(data: Dictionary, container: String) -> void:
+	var result := inventory.move_to_loadout(int(data["instance_id"]), container)
+	if result["ok"]:
+		dirty = true
+		_flash("已放入%s（拖放）。" % ExpeditionBaseline.CONTAINER_DISPLAY[container])
+	else:
+		_flash(result["reason"])
+	_refresh()
+
+
+func _on_auto_tidy(container: String) -> void:
+	var result := inventory.auto_tidy(container)
+	if result["ok"]:
+		dirty = true
+		_flash("已整理%s（容器归属不变）。" % ExpeditionBaseline.CONTAINER_DISPLAY[container])
+	else:
+		_flash(result["reason"])
+	_refresh()
 
 
 func _section(parent: VBoxContainer, title: String) -> VBoxContainer:
@@ -228,6 +282,18 @@ func _on_clear_loadout() -> void:
 	_refresh()
 
 
+func _on_rotate() -> void:
+	if selected_instance_id < 0:
+		return
+	var result := inventory.rotate_instance(selected_instance_id)
+	if result["ok"]:
+		dirty = true
+		_flash("已旋转（占格与牌数不变）。")
+	else:
+		_flash(result["reason"])
+	_refresh()
+
+
 func _on_put_back() -> void:
 	if selected_instance_id < 0:
 		return
@@ -262,6 +328,11 @@ func _on_container_clicked(container: String) -> void:
 func _on_filter(kind: String) -> void:
 	filter = kind
 	_refresh()
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if visible and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
+		_on_rotate()
 
 
 func _on_close() -> void:
@@ -326,7 +397,8 @@ func _refresh_warehouse() -> void:
 		if filter != "all" and str(def["category"]) != filter:
 			continue
 		shown += 1
-		var row := Button.new()
+		var row := DragButton.new()
+		row.payload = {"instance_id": int(instance["instance_id"])}
 		var demo_mark := "［演示］" if bool(instance.get("demo", false)) else ""
 		row.text = "%s%s  %d×%d → %d 张牌" % [demo_mark, def["name"], def["size"].x, def["size"].y, def["cards"].size()]
 		row.add_theme_font_size_override("font_size", 14)
@@ -386,6 +458,7 @@ func _refresh_detail() -> void:
 		detail_column.remove_child(child)
 		child.queue_free()
 	put_back_button.visible = false
+	rotate_button.visible = false
 	var instance := inventory.find_instance(selected_instance_id)
 	if instance.is_empty():
 		detail_column.add_child(_label("（选中一件物品查看详情）", 13, TEXT_MUTED))
@@ -419,6 +492,7 @@ func _refresh_detail() -> void:
 	detail_column.add_child(desc)
 	if ExpeditionBaseline.JOIN_ROUND.has(str(instance["container"])):
 		put_back_button.visible = true
+		rotate_button.visible = true
 
 
 func _refresh_deck() -> void:

@@ -42,6 +42,79 @@ const ITEMS := {
 		"safe_allowed": true, "cards": ["drink_potion"], "uses": 2,
 		"desc": "演示用：消耗品，同一瓶的牌共享剩余次数。",
 	},
+	# —— 正式物品池（2.3 设计 §4）：12~16 种预算内新增 12 种。
+	"copper_shortsword": {
+		"name": "铜短剑", "category": "weapon", "size": Vector2i(1, 3), "quality": 1,
+		"base_value": 40, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["slash", "slash", "heavy_strike"],
+		"desc": "普通攻击装备：占 3 格，切击×2＋重击。",
+	},
+	"reinforced_shield": {
+		"name": "加固盾", "category": "armor", "size": Vector2i(2, 2), "quality": 2,
+		"base_value": 50, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["shield_up", "shield_up", "cover", "brace"],
+		"desc": "品质版防御：牌构成与木盾相同（后续品质提升改数值，不改占格规则）。",
+	},
+	"leather_bracer": {
+		"name": "皮护腕", "category": "armor", "size": Vector2i(1, 2), "quality": 1,
+		"base_value": 25, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["brace", "shield_up"],
+		"desc": "小体积防御补充：占 2 格，稳住＋架盾。",
+	},
+	"scout_whistle": {
+		"name": "侦察哨", "category": "tool", "size": Vector2i(1, 2), "quality": 1,
+		"base_value": 30, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["observe", "deep_breath"],
+		"desc": "抽牌工具：观察＋调整呼吸。",
+	},
+	"small_potion": {
+		"name": "小药水", "category": "supply", "size": Vector2i(1, 1), "quality": 1,
+		"base_value": 6, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["drink_potion"], "uses": 1,
+		"desc": "一次恢复补给：使用一次后实体消耗、关联牌清除。",
+	},
+	"bandage": {
+		"name": "绷带", "category": "supply", "size": Vector2i(1, 1), "quality": 1,
+		"base_value": 5, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["first_aid"], "uses": 1,
+		"desc": "一次恢复补给：给自己或队友包扎。",
+	},
+	"copper_scrap": {
+		"name": "铜片", "category": "material", "size": Vector2i(1, 1), "quality": 1,
+		"base_value": 8, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": true, "cards": ["heavy_cargo"],
+		"desc": "基础制作材料，可放保险箱；携带时是一张笨重货物。",
+	},
+	"fiber_clump": {
+		"name": "纤维团", "category": "material", "size": Vector2i(1, 1), "quality": 1,
+		"base_value": 6, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["heavy_cargo"],
+		"desc": "护具制作材料；不能放保险箱。",
+	},
+	"iron_ore": {
+		"name": "铁矿", "category": "material", "size": Vector2i(1, 2), "quality": 1,
+		"base_value": 18, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": true, "cards": ["heavy_cargo", "heavy_cargo"],
+		"desc": "深层装备材料，可放保险箱；占 2 格＝2 张笨重货物。",
+	},
+	"rock_sprout_seed": {
+		"name": "岩芽菜种子", "category": "rare_seed", "size": Vector2i(1, 1), "quality": 1,
+		"base_value": 2, "sellable": false, "basic_kit": false, "demo": false,
+		"safe_allowed": true, "cards": ["heavy_cargo"],
+		"desc": "新植物的种子（暂名）：保险箱可保护；回家按种子回收规则处理（2.5 接入）。",
+	},
+	"antique_ornament": {
+		"name": "古旧摆件", "category": "cargo", "size": Vector2i(2, 2), "quality": 1,
+		"base_value": 90, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["heavy_cargo", "heavy_cargo", "heavy_cargo", "heavy_cargo"],
+		"desc": "高价值出售货物：值 90 金币，但 4 张笨重货物会拖累战斗；不可保护。",
+	},
+	"glow_crystal": {
+		"name": "微光晶石", "category": "material", "size": Vector2i(1, 2), "quality": 2,
+		"base_value": 60, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["brace", "observe"],
+		"desc": "小型高价值资源：值钱也能打（稳住＋观察）；不可保护。",
+	},
 }
 
 

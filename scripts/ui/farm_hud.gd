@@ -1442,17 +1442,24 @@ func _build_expedition_panels() -> void:
 	add_child(loadout_panel)
 	battle_screen = preload("res://scenes/battle_screen.tscn").instantiate()
 	battle_screen.name = "BattleScreen"
+	battle_screen.inventory_mutated.connect(_on_battle_inventory_mutated)
 	add_child(battle_screen)
 
 
 func open_battle_demo() -> void:
-	## 2.2 演示战斗入口：从战备面板进入（固定基础套装，不动库存）。
+	## 演示战斗入口：从战备面板进入；牌组按当前布局生成（2.3），不动存档。
 	_close_modal()
 	if expedition_hub_panel != null:
 		expedition_hub_panel.close()
 	if loadout_panel != null:
 		loadout_panel.visible = false
-	battle_screen.open_demo()
+	battle_screen.open_demo(game)
+
+
+func _on_battle_inventory_mutated() -> void:
+	## 战后搜刮领取写入了内存库存：标记战备面板有改动，关闭战备时统一保存。
+	if loadout_panel != null:
+		loadout_panel.dirty = true
 
 
 func open_expedition_hub() -> void:
@@ -1472,10 +1479,12 @@ func close_expedition_panels() -> void:
 
 
 func _on_loadout_close() -> void:
-	## 关闭战备：剔除演示物品；真实改动通过信号交给组合根保存。
+	## 关闭战备：剔除演示物品；真实改动通过信号交给组合根保存；重置演示连战的生命延续。
 	loadout_panel.close()
 	var dirty: bool = loadout_panel.dirty
 	loadout_panel.mark_saved()
+	if battle_screen != null:
+		battle_screen.carried_hp = -1
 	expedition_save_requested.emit(dirty)
 
 

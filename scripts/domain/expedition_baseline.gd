@@ -104,6 +104,42 @@ static func layout_integrity(loadout: Dictionary) -> Array:
 	return problems
 
 
+## 容器内最大连续空闲矩形（宽×高）。用于满包提示"还差 2×2 连续空间"，而非只报总格数。
+static func largest_free_rect(container: String, instances: Array) -> Vector2i:
+	var bounds: Vector2i = CONTAINER_SIZE[container]
+	var occupied := {}
+	for instance in instances:
+		if str(instance.get("container", "")) != container:
+			continue
+		for covered in cells_of(_size_of(instance), Vector2i(int(instance["cell"][0]), int(instance["cell"][1])), bool(instance.get("rotated", false))):
+			occupied[cell_key(covered)] = true
+	var best := Vector2i(0, 0)
+	for y in range(bounds.y):
+		for x in range(bounds.x):
+			if occupied.has(cell_key(Vector2i(x, y))):
+				continue
+			var max_w := 0
+			for dx in range(bounds.x - x):
+				if occupied.has(cell_key(Vector2i(x + dx, y))):
+					break
+				max_w += 1
+			var height_limit := bounds.y - y
+			for width in range(1, max_w + 1):
+				var h := 0
+				while h < height_limit:
+					var blocked := false
+					for dx in range(width):
+						if occupied.has(cell_key(Vector2i(x + dx, y + h))):
+							blocked = true
+							break
+					if blocked:
+						break
+					h += 1
+				if width * h > best.x * best.y:
+					best = Vector2i(width, h)
+	return best
+
+
 static func _size_of(instance: Dictionary) -> Vector2i:
 	var def: Dictionary = ItemDefs.get_item(str(instance.get("def_id", "")))
 	return def.get("size", Vector2i(1, 1))
