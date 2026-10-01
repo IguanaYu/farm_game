@@ -247,6 +247,11 @@ func end_turn(owner_key: String) -> Dictionary:
 # —— 查询 ————————————————————————————————————————————————————————
 
 
+## 休整"检查装备"等效果：额外抽牌（2.4 休整二选一）。
+func draw_extra(count: int) -> void:
+	_draw_cards(state["players"]["p1"], count)
+
+
 func enemy_intents() -> Array:
 	var result: Array = []
 	for enemy in state["enemies"]:

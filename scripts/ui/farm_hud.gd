@@ -88,6 +88,8 @@ var harvest_all_entry: Button
 var expedition_hub_panel: ExpeditionHubPanel
 var loadout_panel: LoadoutPanel
 var battle_screen: BattleScreen
+var map_panel: ExpeditionMapPanel
+var active_expedition: ExpeditionGame
 
 
 func _ready() -> void:
@@ -1434,6 +1436,8 @@ func _build_expedition_panels() -> void:
 	expedition_hub_panel.name = "ExpeditionHubPanel"
 	expedition_hub_panel.close_requested.connect(close_expedition_panels)
 	expedition_hub_panel.open_loadout_requested.connect(open_loadout)
+	expedition_hub_panel.depart_requested.connect(_on_depart_requested)
+	expedition_hub_panel.resume_requested.connect(_on_resume_requested)
 	add_child(expedition_hub_panel)
 	loadout_panel = LoadoutPanel.new()
 	loadout_panel.name = "LoadoutPanel"
@@ -1443,7 +1447,14 @@ func _build_expedition_panels() -> void:
 	battle_screen = preload("res://scenes/battle_screen.tscn").instantiate()
 	battle_screen.name = "BattleScreen"
 	battle_screen.inventory_mutated.connect(_on_battle_inventory_mutated)
+	battle_screen.battle_closed.connect(_on_battle_screen_closed)
 	add_child(battle_screen)
+	map_panel = ExpeditionMapPanel.new()
+	map_panel.name = "ExpeditionMapPanel"
+	map_panel.battle_start_requested.connect(_on_run_battle_start)
+	map_panel.farm_save_requested.connect(_on_expedition_farm_save)
+	map_panel.run_finished.connect(_on_run_finished)
+	add_child(map_panel)
 
 
 func open_battle_demo() -> void:
@@ -1460,6 +1471,65 @@ func _on_battle_inventory_mutated() -> void:
 	## 战后搜刮领取写入了内存库存：标记战备面板有改动，关闭战备时统一保存。
 	if loadout_panel != null:
 		loadout_panel.dirty = true
+
+
+## —— 探险局编排（2.4）：出发/继续、局内战斗路由、结算收尾 ——
+
+func _on_depart_requested() -> void:
+	var result := ExpeditionGame.depart(game, int(Time.get_unix_time_from_system()))
+	if not result["ok"]:
+		if expedition_hub_panel != null:
+			expedition_hub_panel.status_label.text = result["reason"]
+		return
+	active_expedition = result["game"]
+	expedition_save_requested.emit(true)
+	_close_modal()
+	if expedition_hub_panel != null:
+		expedition_hub_panel.close()
+	map_panel.open(active_expedition)
+
+
+func _on_resume_requested() -> void:
+	var result := ExpeditionGame.resume(game)
+	if not result["ok"]:
+		if expedition_hub_panel != null:
+			expedition_hub_panel.status_label.text = result["reason"]
+		return
+	active_expedition = result["game"]
+	_close_modal()
+	if expedition_hub_panel != null:
+		expedition_hub_panel.close()
+	map_panel.open(active_expedition)
+	if str(active_expedition.run.get("phase", "")) == "battle":
+		var combat := active_expedition.restore_battle()
+		if combat != null:
+			map_panel.visible = false
+			battle_screen.open_run(combat)
+
+
+func _on_run_battle_start(combat: CombatGame) -> void:
+	map_panel.visible = false
+	battle_screen.open_run(combat)
+
+
+func _on_battle_screen_closed() -> void:
+	if not battle_screen.run_mode:
+		return
+	battle_screen.run_mode = false
+	var finished := battle_screen.last_combat
+	if active_expedition == null or finished == null:
+		return
+	map_panel.visible = true
+	map_panel.report_battle_result(finished)
+	map_panel.battle_finished()
+
+
+func _on_expedition_farm_save() -> void:
+	expedition_save_requested.emit(true)
+
+
+func _on_run_finished() -> void:
+	active_expedition = null
 
 
 func open_expedition_hub() -> void:

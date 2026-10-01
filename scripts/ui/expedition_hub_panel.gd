@@ -5,6 +5,8 @@ extends Control
 
 signal close_requested
 signal open_loadout_requested
+signal depart_requested
+signal resume_requested
 
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
@@ -18,6 +20,7 @@ var inventory: InventoryGame
 var intro_label: Label
 var intro_panel: PanelContainer
 var status_label: Label
+var depart_button: Button
 
 
 func _ready() -> void:
@@ -39,7 +42,16 @@ func open(target_game: FarmGame) -> void:
 	inventory.bind(game.state["expedition"])
 	intro_panel.visible = not inventory.basic_kit_missing().is_empty()
 	status_label.text = ""
+	var has_run := str(game.state["expedition"].get("active_run_ref", "")) != ""
+	depart_button.text = "继续探险" if has_run else "出发（单人）"
 	visible = true
+
+
+func _on_depart_clicked() -> void:
+	if str(game.state["expedition"].get("active_run_ref", "")) != "":
+		resume_requested.emit()
+	else:
+		depart_requested.emit()
 
 
 func close() -> void:
@@ -90,9 +102,8 @@ func _build() -> void:
 		open_loadout_requested.emit()
 	)
 	buttons.add_child(loadout_button)
-	var depart_button := _button("单人出发", Color("#f0efe6"), Color("#b9b9a6"))
-	depart_button.disabled = true
-	depart_button.tooltip_text = "洞窟探索将在后续阶段开放（2.4 起接入真实出发）。"
+	depart_button = _button("出发（单人）", Color("#eaf4df"), Color("#87b06f"))
+	depart_button.pressed.connect(_on_depart_clicked)
 	buttons.add_child(depart_button)
 	var team_button := _button("好友组队", Color("#f0efe6"), Color("#b9b9a6"))
 	team_button.disabled = true

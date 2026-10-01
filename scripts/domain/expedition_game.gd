@@ -1,0 +1,567 @@
+class_name ExpeditionGame
+extends RefCounted
+## 单人洞窟局（2.4）：出发事务、地图推进、节点裁定（奖励首裁后固定）、撤离／死亡结算。
+## 局内背包是农场战备的深拷贝快照（InventoryGame 绑定局 state 的 inventory 块），
+## 2.3 的领取/丢弃/整理逻辑全部复用。存档：局档 user://expeditions/run_<id>.json；
+## 结算档 settlement_<id>.json；农场档只存占用与已应用结算（总计划 §9.3）。
+
+
+const SETTLEMENT_FMT := 1
+
+var run: Dictionary = {}
+var game: FarmGame
+var rng := RandomNumberGenerator.new()
+
+
+func bind(farm_game: FarmGame) -> void:
+	game = farm_game
+
+
+# —— 出发事务（总计划 §9.3：生成局 ID → 写占用 → 写局初始快照 → 开始）——————
+
+static func depart(farm_game: FarmGame, now: int) -> Dictionary:
+	var inventory := InventoryGame.new()
+	inventory.bind(farm_game.state["expedition"])
+	var check := inventory.loadout_check()
+	if not check["hard_blocks"].is_empty():
+		return {"ok": false, "reason": "、".join(check["hard_blocks"])}
+	if inventory.is_run_occupied():
+		return {"ok": false, "reason": "已有活动局"}
+	var preview := inventory.deck_preview()
+	if int(preview["totals"][1]) <= 0:
+		return {"ok": false, "reason": "首回合牌库为空，先在胸挂放入装备"}
+	var run_id := ExpeditionStore.new_run_id(int(Time.get_unix_time_from_system() * 1000.0))
+	if not inventory.set_run_occupied(run_id)["ok"]:
+		return {"ok": false, "reason": "写入占用失败"}
+	var expedition: Dictionary = farm_game.state["expedition"]
+	var seed_value := run_id.hash() + int(Time.get_unix_time_from_system())
+	var instance := ExpeditionGame.new()
+	instance.game = farm_game
+	instance.run = {
+		"fmt": 1,
+		"run_id": run_id,
+		"rules_version": ExpeditionBaseline.PROTO_RULES_VERSION,
+		"layer_id": "moss_stone_shallow",
+		"rng_seed": seed_value,
+		"rng_state": str(seed_value),
+		"created_at": now,
+		"player": {"hp": ExpeditionBaseline.MAX_HP, "max_hp": ExpeditionBaseline.MAX_HP, "extra_draw_next": false},
+		"inventory": _snapshot_loadout(farm_game),
+		"next_instance_id": int(expedition.get("next_instance_id", 1000)),
+		"map": _build_map("moss_stone_shallow"),
+		"current": {"row": 0, "col": 0},
+		"resolved": {},
+		"node_drops": [],
+		"battle": {},
+		"phase": "map",
+		"outcome": "",
+		"settlement_id": "",
+		"carried_from_farm": _carried_ids(farm_game),
+		"consumed": [],
+		"log": ["出发：生命 %d/%d，携带牌 %d 张" % [ExpeditionBaseline.MAX_HP, ExpeditionBaseline.MAX_HP, preview["totals"][1] + preview["totals"][2] + preview["totals"][3]]],
+	}
+	expedition["active_run_ref"] = run_id
+	if not ExpeditionStore.save_run(run_id, instance.run):
+		inventory.clear_run_occupied(run_id)
+		expedition["active_run_ref"] = ""
+		return {"ok": false, "reason": "局档写入失败，已恢复出发前状态"}
+	instance.rng.seed = seed_value
+	return {"ok": true, "reason": "", "run": instance.run, "game": instance}
+
+
+static func _snapshot_loadout(farm_game: FarmGame) -> Dictionary:
+	## 局内背包＝农场战备三容器深拷贝＋空仓库；实例 ID 与农场一致（结算时按 ID 对账）。
+	var loadout: Dictionary = farm_game.state["expedition"]["inventory"]["loadout"]
+	return {
+		"warehouse": [],
+		"loadout": loadout.duplicate(true),
+		"occupied_by_run": "",
+	}
+
+
+static func _carried_ids(farm_game: FarmGame) -> Array:
+	var ids: Array = []
+	var loadout: Dictionary = farm_game.state["expedition"]["inventory"]["loadout"]
+	for container in ExpeditionBaseline.CONTAINERS:
+		for instance in loadout.get(container, []):
+			ids.append(int(instance["instance_id"]))
+	return ids
+
+
+## 把定义表展开成局内地图（节点带列号；行/列即坐标，node_id 为 r<行>c<列>）。
+static func _build_map(layer_id: String) -> Dictionary:
+	var layer := ExpeditionDefs.layer(layer_id)
+	var rows: Array = []
+	for row_index in range(int(layer.get("rows", 9))):
+		var cols: Array = []
+		for col_index in range(int(layer["map"][row_index].size())):
+			var node: Dictionary = layer["map"][row_index][col_index].duplicate()
+			node["col"] = col_index
+			cols.append(node)
+		rows.append(cols)
+	return {"rows": rows}
+
+
+## 恢复已有活动局（启动／重开时）。
+static func resume(farm_game: FarmGame) -> Dictionary:
+	var run_id := str(farm_game.state["expedition"].get("active_run_ref", ""))
+	if run_id == "":
+		return {"ok": false, "reason": "没有活动局"}
+	var saved := ExpeditionStore.load_run(run_id)
+	if saved.is_empty():
+		return {"ok": false, "reason": "局档不可达：%s（保持占用，不自动返还装备）" % run_id}
+	var instance := ExpeditionGame.new()
+	instance.game = farm_game
+	instance.run = saved
+	instance.rng.seed = int(saved.get("rng_seed", 0))
+	instance.rng.state = int(saved.get("rng_state", "0"))
+	return {"ok": true, "reason": "", "run": saved, "game": instance}
+
+
+# —— 局内工具 ——————————————————————————————————————————————————————
+
+
+func run_inventory() -> InventoryGame:
+	var inventory := InventoryGame.new()
+	inventory.bind({"inventory": run["inventory"], "next_instance_id": run["next_instance_id"]})
+	return inventory
+
+
+func save() -> bool:
+	run["rng_state"] = str(rng.state)
+	return ExpeditionStore.save_run(str(run["run_id"]), run)
+
+
+func current_node() -> Dictionary:
+	var rows: Array = run["map"]["rows"]
+	var row: int = int(run["current"]["row"])
+	var col: int = int(run["current"]["col"])
+	if row < 0 or row >= rows.size() or col < 0 or col >= rows[row].size():
+		return {}
+	return rows[row][col]
+
+
+func node_id(row: int, col: int) -> String:
+	return "r%dc%d" % [row, col]
+
+
+# —— 地图推进 ————————————————————————————————————————————————
+
+
+## 选择下一排的节点（不回头）；进入即裁定并固定该节点内容（奖励/事件结果种子）。
+func move_to(row: int, col: int) -> Dictionary:
+	if run["phase"] != "map":
+		return {"ok": false, "reason": "当前不在地图阶段"}
+	var rows: Array = run["map"]["rows"]
+	if row != int(run["current"]["row"]) + 1 or row >= rows.size():
+		return {"ok": false, "reason": "只能进入相邻的下一排"}
+	if col < 0 or col >= rows[row].size():
+		return {"ok": false, "reason": "该排没有这个位置"}
+	run["current"] = {"row": row, "col": col}
+	run["phase"] = "node"
+	var node := current_node()
+	_resolve_node(node)
+	run["log"].append("进入第 %d 排：%s（%s）" % [row, ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node["type"]), "?"), str(node.get("hint", ""))])
+	save()
+	return {"ok": true, "reason": ""}
+
+
+func _resolve_node(node: Dictionary) -> void:
+	## 首次进入裁定节点内容并固定：恢复同一局不重新生成（设计 §6 / 总计划 §6.1）。
+	var key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
+	if run["resolved"].has(key):
+		return
+	var resolved: Dictionary = {"type": str(node["type"]), "rewards": [], "public": [], "event_id": "", "event_rolls": {}, "rest_taken": false, "completed": false}
+	match str(node["type"]):
+		"battle":
+			resolved["rewards"] = _pick_no_repeat(ExpeditionDefs.BATTLE_PERSONAL_POOL, 2)
+			resolved["public"] = [_pick(ExpeditionDefs.BATTLE_PUBLIC_POOL)]
+		"elite":
+			resolved["rewards"] = _pick_no_repeat(ExpeditionDefs.ELITE_POOL, 2)
+			resolved["public"] = [_pick(ExpeditionDefs.ELITE_POOL)]
+		"gather":
+			resolved["rewards"] = _pick_no_repeat(ExpeditionDefs.GATHER_POOL, 3)
+		"chest":
+			resolved["rewards"] = _pick_no_repeat(ExpeditionDefs.CHEST_POOL, 3)
+		"event":
+			var events: Array = ExpeditionDefs.events_for_node(int(run["current"]["row"]))
+			resolved["event_id"] = str(events[col_to_event_index(int(run["current"]["col"]), events.size())])
+			resolved["event_rolls"] = {"dig_outcome": _roll_dig_outcome()}
+		"gate":
+			resolved["rewards"] = ExpeditionDefs.GATE_REWARDS.duplicate()
+	run["resolved"][key] = resolved
+
+
+func col_to_event_index(col: int, count: int) -> int:
+	return clampi(col, 0, maxi(0, count - 1))
+
+
+func _pick(pool: Array) -> String:
+	return str(pool[rng.randi_range(0, pool.size() - 1)])
+
+
+func _pick_no_repeat(pool: Array, count: int) -> Array:
+	var bag := pool.duplicate()
+	var result: Array = []
+	for attempt in range(mini(count, bag.size())):
+		var index := rng.randi_range(0, bag.size() - 1)
+		result.append(str(bag[index]))
+		bag.remove_at(index)
+	return result
+
+
+## 洞壁幼芽"挖掘根部"的 60/40 预抽（进入节点时固定，不随后续重抽）。
+func _roll_dig_outcome() -> String:
+	return "trait_seed" if rng.randf() < 0.6 else "fiber"
+
+
+# —— 节点交互 ————————————————————————————————————————————————
+
+
+## 战斗节点：生成战斗（牌组来自局内布局，生命延续）。
+func start_battle() -> Dictionary:
+	var node := current_node()
+	if str(node.get("type", "")) not in ["battle", "elite", "gate"]:
+		return {"ok": false, "reason": "这里没有战斗"}
+	if not run["battle"].is_empty():
+		return {"ok": false, "reason": "战斗已在进行"}
+	var inventory := run_inventory()
+	var build := DeckBuilder.build(inventory)
+	var encounter_id := _encounter_id(node)
+	var player := {"key": "p1", "name": "农夫", "max_hp": int(run["player"]["max_hp"]), "hp": int(run["player"]["hp"]), "deck": build["entries"]}
+	var combat := CombatGame.create([player], encounter_id, int(run["rng_seed"]) + int(run["current"]["row"]) * 31 + int(run["current"]["col"]), inventory)
+	if bool(run["player"].get("extra_draw_next", false)):
+		combat.draw_extra(1)
+		run["player"]["extra_draw_next"] = false
+		run["log"].append("检查装备生效：本场首回合多抽 1 张")
+	run["phase"] = "battle"
+	run["battle"] = combat.to_dict()
+	save()
+	return {"ok": true, "reason": "", "combat": combat}
+
+
+func _encounter_id(node: Dictionary) -> String:
+	var table_key := ExpeditionDefs.encounter_for(node)
+	if CombatGame.ENCOUNTERS.has(table_key):
+		return table_key
+	return str(node.get("encounter", "tutorial"))
+
+
+## 恢复进行中的战斗（重开/崩溃后从局档快照重建）。
+func restore_battle() -> CombatGame:
+	if run["battle"].is_empty():
+		return null
+	var combat := CombatGame.new()
+	if not combat.load_dict(run["battle"]):
+		return null
+	combat.inventory = run_inventory()
+	return combat
+
+
+## 休整二选一（第 4 排）：恢复 8 或下一场首回合多抽 1。确认后不能切换。
+func take_rest(option: String) -> Dictionary:
+	var node := current_node()
+	if str(node.get("type", "")) != "rest_exit":
+		return {"ok": false, "reason": "这里不是休整点"}
+	var key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
+	var resolved: Dictionary = run["resolved"][key]
+	if bool(resolved.get("rest_taken", false)):
+		return {"ok": false, "reason": "本休整点的选择已确认，不能刷两份"}
+	match option:
+		"heal":
+			run["player"]["hp"] = mini(int(run["player"]["hp"]) + 8, int(run["player"]["max_hp"]))
+			run["log"].append("休整：恢复 8 生命（→ %d）" % int(run["player"]["hp"]))
+		"prepare":
+			run["player"]["extra_draw_next"] = true
+			run["log"].append("休整：检查装备，下一场首回合多抽 1 张")
+		_:
+			return {"ok": false, "reason": "未知休整选项"}
+	resolved["rest_taken"] = true
+	run["resolved"][key] = resolved
+	save()
+	return {"ok": true, "reason": ""}
+
+
+## 事件选项：一次选择后完成（不可重选）；生命代价至少留 1。
+func choose_event(option_id: String) -> Dictionary:
+	var node := current_node()
+	if str(node.get("type", "")) != "event":
+		return {"ok": false, "reason": "这里没有事件"}
+	var key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
+	var resolved: Dictionary = run["resolved"][key]
+	if bool(resolved.get("completed", false)):
+		return {"ok": false, "reason": "事件已完成，不能重选"}
+	var event: Dictionary = ExpeditionDefs.EVENTS.get(str(resolved.get("event_id", "")), {})
+	var chosen: Dictionary = {}
+	for option in event.get("options", []):
+		if str(option["id"]) == option_id:
+			chosen = option
+	if chosen.is_empty():
+		return {"ok": false, "reason": "未知事件选项"}
+	var hp := int(run["player"]["hp"])
+	if int(chosen.get("hp_cost", 0)) > 0 and hp - int(chosen["hp_cost"]) < 1:
+		return {"ok": false, "reason": "生命不足（事件代价至少留下 1 点生命）"}
+	if int(chosen.get("hp_cost", 0)) > 0:
+		run["player"]["hp"] = hp - int(chosen["hp_cost"])
+	var grants: Array = chosen.get("grants", []).duplicate()
+	## 洞壁幼芽·挖掘：按进入节点时固定的预抽结果给奖励。
+	if option_id == "dig":
+		var outcome := str(resolved.get("event_rolls", {}).get("dig_outcome", "fiber"))
+		grants = ["rock_sprout_seed"] if outcome == "trait_seed" else ["fiber_clump", "fiber_clump"]
+	for def_id in grants:
+		_add_run_reward(str(def_id))
+	resolved["completed"] = true
+	resolved["chosen_option"] = option_id
+	run["resolved"][key] = resolved
+	run["log"].append("事件「%s」：%s" % [event.get("name", "?"), str(chosen.get("label", option_id))])
+	save()
+	return {"ok": true, "reason": "", "grants": grants}
+
+
+## 战斗胜利后进入搜刮（节点奖励区由出发裁定的 resolved 提供）。
+func finish_battle(combat: CombatGame) -> Dictionary:
+	if run["phase"] != "battle":
+		return {"ok": false, "reason": "没有进行中的战斗"}
+	var outcome := str(combat.state.get("outcome", ""))
+	run["player"]["hp"] = int(combat.state["players"]["p1"]["hp"])
+	run["battle"] = {}
+	if outcome == "won":
+		run["phase"] = "node"
+		var node := current_node()
+		var key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
+		var resolved: Dictionary = run["resolved"][key]
+		resolved["battle_won"] = true
+		run["resolved"][key] = resolved
+		run["log"].append("战斗胜利（第 %d 回合，剩余生命 %d）" % [int(combat.state["round"]), int(run["player"]["hp"])])
+		_record_consumed()
+		save()
+		return {"ok": true, "reason": "", "outcome": "won"}
+	return _settle_run("death", combat.state["round"])
+
+
+## 完成搜刮/节点处理：离开当前节点（未领取奖励与节点公共区物品全部放弃）。
+func leave_node() -> Dictionary:
+	if run["phase"] != "node":
+		return {"ok": false, "reason": "当前不在节点内"}
+	var node := current_node()
+	var key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
+	var resolved: Dictionary = run["resolved"][key]
+	if str(node["type"]) in ["battle", "elite", "gate"] and not bool(resolved.get("battle_won", false)):
+		return {"ok": false, "reason": "先处理这里的战斗"}
+	resolved["completed"] = true
+	run["resolved"][key] = resolved
+	if not run["node_drops"].is_empty():
+		run["log"].append("离开节点：公共区 %d 件物品被放弃" % run["node_drops"].size())
+		run["node_drops"] = []
+	if int(run["current"]["row"]) == ExpeditionDefs.GATE_ROW:
+		return _settle_run("gate_clear", int(run["player"]["hp"]))
+	run["phase"] = "map"
+	save()
+	return {"ok": true, "reason": ""}
+
+
+## 撤离：撤离站确认后结算。
+func extract() -> Dictionary:
+	var node := current_node()
+	if str(node.get("type", "")) not in ["rest_exit", "exit"]:
+		return {"ok": false, "reason": "当前不在撤离点"}
+	return _settle_run("extract", int(run["player"]["hp"]))
+
+
+## 主动放弃（暂停菜单）：损失规则与死亡一致。
+func abandon() -> Dictionary:
+	return _settle_run("abandon", int(run["player"]["hp"]))
+
+
+func _add_run_reward(def_id: String) -> void:
+	## 奖励先进入当前节点奖励区（pending 奖励，由领取事务入包）。
+	var key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
+	var resolved: Dictionary = run["resolved"].get(key, {})
+	resolved["rewards"] = resolved.get("rewards", []) + [def_id]
+	run["resolved"][key] = resolved
+
+
+func _record_consumed() -> void:
+	## 记录本节点战斗中耗尽的补给（结算报告用；uses 在实体上已扣）。
+	for container in ExpeditionBaseline.CONTAINERS:
+		for instance in run["inventory"]["loadout"][container]:
+			if int(instance.get("uses_remaining", 1)) == 0 and int(instance["instance_id"]) > 0:
+				if not run["consumed"].has(int(instance["instance_id"])):
+					run["consumed"].append(int(instance["instance_id"]))
+
+
+# —— 结算事务（总计划 §9.3：唯一结算 ID → 结算档 → 农场单次保存应用并登记 → 重复只回执）——
+
+
+func _settle_run(kind: String, detail: int) -> Dictionary:
+	var settlement_id := ExpeditionStore.new_settlement_id(int(Time.get_unix_time_from_system() * 1000.0))
+	var inventory := run_inventory()
+	var carried: Array = run["carried_from_farm"]
+	var returned_items: Array = []
+	var gained_items: Array = []
+	var lost_items: Array = []
+	var protected_items: Array = []
+	var kept_ids := {}
+	var all_instances: Array = inventory.all_instances()
+	## 已耗尽的补给（uses 0）实体不存在：不列入返还/获得/损失，并入消耗记录。
+	var held: Array = []
+	for instance in all_instances:
+		if int(instance.get("uses_remaining", 1)) > 0:
+			held.append(instance)
+		elif not (run["consumed"] as Array).has(int(instance.get("instance_id", 0))):
+			run["consumed"].append(int(instance.get("instance_id", 0)))
+	if kind == "extract" or kind == "gate_clear":
+		## 撤离/通关：全部仍持有的物品返还（带入＝返还，新增＝获得）。
+		for instance in held:
+			var entry := _settle_entry(instance)
+			if int(instance["instance_id"]) in carried:
+				returned_items.append(entry)
+				kept_ids[int(instance["instance_id"])] = true
+			else:
+				gained_items.append(entry)
+				kept_ids[int(instance["instance_id"])] = true
+	else:
+		## 死亡/放弃：未保护携带物损失，保险箱白名单保留。
+		for instance in held:
+			var entry := _settle_entry(instance)
+			if str(instance.get("container", "")) == "safe":
+				protected_items.append(entry)
+				kept_ids[int(instance["instance_id"])] = true
+			else:
+				lost_items.append(entry)
+	var settlement := {
+		"fmt": SETTLEMENT_FMT,
+		"settlement_id": settlement_id,
+		"run_id": str(run["run_id"]),
+		"kind": kind,
+		"detail": detail,
+		"created_at": int(Time.get_unix_time_from_system()),
+		"player_id": str(game.state["expedition"].get("player_id", "")),
+		"returned": returned_items,
+		"gained": gained_items,
+		"lost": lost_items,
+		"protected": protected_items,
+		"consumed": (run["consumed"] as Array).duplicate(),
+		"next_instance_id": int(run.get("next_instance_id", 1000)),
+		"applied": false,
+	}
+	if not ExpeditionStore.save_settlement(settlement_id, settlement):
+		return {"ok": false, "reason": "结算档写入失败（本局保持未决，可重试）"}
+	run["outcome"] = kind
+	run["phase"] = "over"
+	run["settlement_id"] = settlement_id
+	save()
+	var apply := apply_settlement(game, settlement)
+	if not apply["ok"]:
+		return {"ok": false, "reason": apply["reason"], "settlement": settlement}
+	return {"ok": true, "reason": "", "settlement": settlement}
+
+
+static func _settle_entry(instance: Dictionary) -> Dictionary:
+	var def := ItemDefs.get_item(str(instance.get("def_id", "")))
+	return {
+		"instance_id": int(instance.get("instance_id", 0)),
+		"def_id": str(instance.get("def_id", "")),
+		"name": str(def.get("name", instance.get("def_id", "?"))),
+		"container": str(instance.get("container", "")),
+		"uses_remaining": int(instance.get("uses_remaining", 1)),
+		"sell_value": int(def.get("base_value", 0)) if bool(def.get("sellable", false)) else 0,
+	}
+
+
+## 幂等应用结算到农场档（重复应用只回执；同一次保存内完成应用与登记）。
+static func apply_settlement(farm_game: FarmGame, settlement: Dictionary) -> Dictionary:
+	if int(settlement.get("fmt", -1)) != SETTLEMENT_FMT:
+		return {"ok": false, "reason": "结算档版本不认识"}
+	var settlement_id := str(settlement.get("settlement_id", ""))
+	var expedition: Dictionary = farm_game.state["expedition"]
+	var applied: Array = expedition.get("applied_settlements", [])
+	if settlement_id == "" or applied.has(settlement_id):
+		return {"ok": true, "reason": "already-applied", "duplicate": true}
+	var run_id := str(settlement.get("run_id", ""))
+	if str(expedition.get("active_run_ref", "")) == run_id:
+		var inventory := InventoryGame.new()
+		inventory.bind(expedition)
+		var clear := inventory.clear_run_occupied(run_id)
+		if not clear["ok"]:
+			return {"ok": false, "reason": clear["reason"]}
+		expedition["active_run_ref"] = ""
+	## 返还与获得：实例按原 ID 重建进仓库（跳过已存在的，防重复）。
+	var restored := 0
+	for group in ["returned", "gained", "protected"]:
+		for entry in settlement.get(group, []):
+			var instance_id := int(entry.get("instance_id", 0))
+			var already := false
+			for container in ExpeditionBaseline.CONTAINERS:
+				for existing in expedition["inventory"]["loadout"][container]:
+					if int(existing["instance_id"]) == instance_id:
+						already = true
+				if already:
+					break
+			for existing in expedition["inventory"]["warehouse"]:
+				if int(existing["instance_id"]) == instance_id:
+					already = true
+			if already:
+				continue
+			## 新物品（带入清单之外的获得物）在农场侧重新登记：入仓库。
+			var def := ItemDefs.get_item(str(entry.get("def_id", "")))
+			if def.is_empty():
+				continue
+			var fresh := {
+				"instance_id": instance_id,
+				"def_id": str(entry.get("def_id", "")),
+				"quality": int(def.get("quality", 1)),
+				"container": "warehouse",
+				"cell": [0, 0],
+				"rotated": false,
+				"demo": false,
+				"source": "settlement",
+				"uses_remaining": int(entry.get("uses_remaining", def.get("uses", 1))),
+			}
+			expedition["inventory"]["warehouse"].append(fresh)
+			restored += 1
+	## 损失：从农场侧清除对应带入实例（带入时它们仍在农场 loadout 里）。
+	var removed := 0
+	for entry in settlement.get("lost", []):
+		var instance_id := int(entry.get("instance_id", 0))
+		var target := {}
+		for container in ExpeditionBaseline.CONTAINERS:
+			for existing in expedition["inventory"]["loadout"][container]:
+				if int(existing["instance_id"]) == instance_id:
+					target = existing
+		if target.is_empty():
+			for existing in expedition["inventory"]["warehouse"]:
+				if int(existing["instance_id"]) == instance_id:
+					target = existing
+		if not target.is_empty():
+			expedition["inventory"]["warehouse"].erase(target)
+			for container in ExpeditionBaseline.CONTAINERS:
+				expedition["inventory"]["loadout"][container].erase(target)
+			removed += 1
+	expedition["next_instance_id"] = maxi(int(expedition.get("next_instance_id", 1000)), int(settlement.get("next_instance_id", 0)))
+	## 已消耗的带入补给：实体不存在，农场侧移除（含数值型 consumed 记录）。
+	for entry in settlement.get("consumed", []):
+		var consumed_id := int(entry) if typeof(entry) != TYPE_DICTIONARY else int(entry.get("instance_id", 0))
+		var target := {}
+		for container in ExpeditionBaseline.CONTAINERS:
+			for existing in expedition["inventory"]["loadout"][container]:
+				if int(existing["instance_id"]) == consumed_id:
+					target = existing
+		if not target.is_empty():
+			for container in ExpeditionBaseline.CONTAINERS:
+				expedition["inventory"]["loadout"][container].erase(target)
+			expedition["inventory"]["warehouse"].erase(target)
+			removed += 1
+	applied.append(settlement_id)
+	expedition["applied_settlements"] = applied
+	settlement["applied"] = true
+	ExpeditionStore.save_settlement(settlement_id, settlement)
+	return {"ok": true, "reason": "", "restored": restored, "removed": removed}
+
+
+static func _carried_ids_of(expedition: Dictionary) -> Array:
+	var ids: Array = []
+	for container in ExpeditionBaseline.CONTAINERS:
+		for instance in expedition["inventory"]["loadout"].get(container, []):
+			ids.append(int(instance["instance_id"]))
+	return ids

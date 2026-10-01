@@ -16,6 +16,8 @@ const WARN_GOLD := Color("#9b713a")
 const CARD_BACK := Color("#f4e9cf")
 
 var combat: CombatGame
+var last_combat: CombatGame
+var run_mode := false
 var game: FarmGame
 var carried_hp := -1  # 两场之间生命延续（2.3 设计 §5：各场战斗生命延续，首场按出发状态）
 var selected_uid := -1
@@ -48,7 +50,22 @@ func _ready() -> void:
 	_build()
 
 
+## 探险局内战斗（2.4）：由地图面板发起；必须打到出胜负才能离开，结果回传结算。
+func open_run(combat: CombatGame) -> void:
+	run_mode = true
+	self.combat = combat
+	selected_uid = -1
+	played_count = 0
+	visible = true
+	chooser_column.visible = false
+	battle_column.visible = true
+	overlay_panel.visible = false
+	status_label.text = "洞窟内的战斗——必须分出胜负。"
+	_refresh()
+
+
 func open_demo(target_game: FarmGame = null) -> void:
+	run_mode = false
 	## 演示入口（2.2 起）：有真实库存时按当前布局构建牌组（2.3 D2.3-04），
 	## 否则退回固定基础套装；不影响存档，但战后搜刮领取会写入内存库存（关闭战备时保存）。
 	game = target_game
@@ -181,6 +198,7 @@ func _inventory() -> InventoryGame:
 
 func _on_close() -> void:
 	visible = false
+	last_combat = combat
 	combat = null
 	battle_closed.emit()
 
