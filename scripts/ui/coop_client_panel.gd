@@ -90,6 +90,14 @@ func _build() -> void:
 	abandon_button.pressed.connect(func() -> void:
 		client.send_action("abandon_member", {}))
 	row.add_child(abandon_button)
+	## 快捷信号（2.6 设计 §3：表达意图，不做语音）。
+	var signal_row := HBoxContainer.new()
+	signal_row.add_theme_constant_override("separation", 8)
+	column.add_child(signal_row)
+	for entry in [["我来挡", "我来挡"], ["先集火", "先集火这个"], ["我能救你", "我能救你"], ["建议撤离", "建议撤离"]]:
+		var signal_button := _small(str(entry[0]), Color("#e8f0d8"), Color("#87b06f"))
+		signal_button.pressed.connect(client.send_action.bind("signal", {"text": str(entry[1])}))
+		signal_row.add_child(signal_button)
 	status_label = _label("", 13, WARN_GOLD)
 	column.add_child(status_label)
 	log_label = RichTextLabel.new()
@@ -190,6 +198,12 @@ func _label(content: String, size: int, color: Color) -> Label:
 	label.add_theme_color_override("font_color", color)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return label
+
+
+func _small(content: String, fill: Color, border: Color) -> Button:
+	var button := _button(content, fill, border)
+	button.add_theme_font_size_override("font_size", 13)
+	return button
 
 
 func _button(content: String, fill: Color, border: Color) -> Button:

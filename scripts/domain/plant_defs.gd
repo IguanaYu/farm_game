@@ -16,6 +16,19 @@ const PLANTS: Dictionary = {
 		"unlock_farming_level": 1,
 		"unlock_shop_level": 1,
 	},
+	# 深层稀有植物（2.8）：120 分钟档位、高价值作物。
+	"glow_berry": {
+		"display_name": "萤果",
+		"grow_seconds": 7200,
+		"base_score": 1200,
+		"crop_count": 4,
+		"seed_price": 60,
+		"water_segments": 2,
+		"encounter_count": 2,
+		"harvest_exp": 150,
+		"unlock_farming_level": 2,
+		"unlock_shop_level": 3,
+	},
 	# 洞窟稀有植物（2.5）：60 分钟档位、更好的恢复补给来源。
 	"rock_sprout": {
 		"display_name": "岩芽菜",

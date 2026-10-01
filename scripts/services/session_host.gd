@@ -367,6 +367,10 @@ func _execute_action(member_key: String, kind: String, args: Dictionary) -> Dict
 			var r := expedition.share_cancel()
 			r["run_changed"] = true
 			return r
+		"signal":
+			expedition.run["log"].append("%s：%s" % [expedition.member(member_key)["name"], str(args.get("text", ""))])
+			expedition.save()
+			return {"ok": true, "run_changed": true}
 		"abandon_member":
 			var r := expedition.abandon_member(member_key)
 			if r.has("settlement") and member_key == "p2":

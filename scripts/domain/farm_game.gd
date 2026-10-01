@@ -822,6 +822,16 @@ func buy_seeds(quantity: int, kind := "cabbage") -> String:
 
 
 ## 2.5：洞窟种子转换入种子区（沿用现有种子结构与容量口径）。
+## 洞窟种子物品 → 植物种类映射（2.5 岩芽菜／2.8 萤果）。
+static func seed_item_to_plant(def_id: String) -> String:
+	match def_id:
+		"rock_sprout_seed":
+			return "rock_sprout"
+		"glow_berry_seed":
+			return "glow_berry"
+	return ""
+
+
 func add_seed_with_traits(kind: String, traits: Array) -> bool:
 	if not PlantDefs.is_known_plant(kind):
 		return false
@@ -1056,9 +1066,10 @@ func refresh_market(now: int) -> bool:
 	picked.sort()
 	market["guest_ids"] = picked
 	var market_kinds: Array = ["cabbage", "carrot"]
-	# 2.5：解锁岩芽菜后进入植物市场（偏好倍率 1.0，公式沿用现有池）。
-	if state.get("expedition", {}).get("crafting", {}).get("plant_unlocks", []).has("rock_sprout"):
-		market_kinds.append("rock_sprout")
+	# 2.5/2.8：解锁的洞窟植物进入市场（偏好倍率 1.0，公式沿用现有池）。
+	for cave_kind in ["rock_sprout", "glow_berry"]:
+		if state.get("expedition", {}).get("crafting", {}).get("plant_unlocks", []).has(cave_kind):
+			market_kinds.append(cave_kind)
 	for kind in market_kinds:
 		var formula_rng := RandomNumberGenerator.new()
 		formula_rng.seed = day * 40503 + int(kind.hash()) % 65521

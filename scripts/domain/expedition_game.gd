@@ -389,24 +389,27 @@ func _resolve_node(node: Dictionary) -> void:
 	var key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
 	if run["resolved"].has(key):
 		return
+	if str(run["layer_id"]) == "iron_root_deeps":
+		node["deep"] = true
 	var resolved: Dictionary = {"type": str(node["type"]), "rewards": [], "public": [], "event_id": "", "event_rolls": {}, "rest_taken": false, "completed": false}
+	var pools: Array = ExpeditionDefs.battle_pools(str(run["layer_id"]))
 	match str(node["type"]):
 		"battle":
-			resolved["rewards"] = _pick_no_repeat(ExpeditionDefs.BATTLE_PERSONAL_POOL, 2)
-			resolved["public"] = [_pick(ExpeditionDefs.BATTLE_PUBLIC_POOL)]
+			resolved["rewards"] = _pick_no_repeat(pools[0], 2)
+			resolved["public"] = [_pick(pools[1])]
 		"elite":
-			resolved["rewards"] = _pick_no_repeat(ExpeditionDefs.ELITE_POOL, 2)
-			resolved["public"] = [_pick(ExpeditionDefs.ELITE_POOL)]
+			resolved["rewards"] = _pick_no_repeat(pools[2], 2)
+			resolved["public"] = [_pick(pools[2])]
 		"gather":
-			resolved["rewards"] = _pick_no_repeat(ExpeditionDefs.GATHER_POOL, 3)
+			resolved["rewards"] = _pick_no_repeat(pools[3], 3)
 		"chest":
-			resolved["rewards"] = _pick_no_repeat(ExpeditionDefs.CHEST_POOL, 3)
+			resolved["rewards"] = _pick_no_repeat(pools[4], 3)
 		"event":
-			var events: Array = ExpeditionDefs.events_for_node(int(run["current"]["row"]))
+			var events: Array = ExpeditionDefs.events_for_node(int(run["current"]["row"]), str(run["layer_id"]))
 			resolved["event_id"] = str(events[col_to_event_index(int(run["current"]["col"]), events.size())])
 			resolved["event_rolls"] = {"dig_outcome": _roll_dig_outcome()}
 		"gate":
-			resolved["rewards"] = ExpeditionDefs.GATE_REWARDS.duplicate()
+			resolved["rewards"] = (ExpeditionDefs.DEEP_GATE_REWARDS if str(run["layer_id"]) == "iron_root_deeps" else ExpeditionDefs.GATE_REWARDS).duplicate()
 	run["resolved"][key] = resolved
 
 
@@ -591,6 +594,16 @@ func leave_node() -> Dictionary:
 		run["log"].append("离开节点：公共区 %d 件物品被放弃" % run["node_drops"].size())
 		run["node_drops"] = []
 	if int(run["current"]["row"]) == ExpeditionDefs.GATE_ROW:
+		if str(run["layer_id"]) == "moss_stone_shallow":
+			## 层间衔接（2.8）：第一层守门战胜利 → 进入第二层，同一局继续。
+			run["layer_id"] = "iron_root_deeps"
+			run["map"] = _build_map("iron_root_deeps")
+			run["current"] = {"row": 0, "col": 0}
+			run["resolved"] = {}
+			run["phase"] = "map"
+			run["log"].append("击败守门战：进入第二层「铁根矿窟」（携带与生命延续）")
+			save()
+			return {"ok": true, "reason": "", "layer_changed": "iron_root_deeps"}
 		return _settle_run("gate_clear", int(run["player"]["hp"]))
 	run["phase"] = "map"
 	save()
@@ -914,11 +927,12 @@ static func apply_settlement(farm_game: FarmGame, settlement: Dictionary) -> Dic
 	seed_tool.bind(expedition)
 	for group in ["gained", "protected"]:
 		for entry in settlement.get(group, []):
-			if str(entry.get("def_id", "")) != "rock_sprout_seed":
+			var plant_kind := FarmGame.seed_item_to_plant(str(entry.get("def_id", "")))
+			if plant_kind == "":
 				continue
 			var instance := seed_tool.find_instance(int(entry.get("instance_id", 0)))
 			var traits: Array = instance.get("seed_traits", []) if not instance.is_empty() else []
-			farm_game.add_seed_with_traits("rock_sprout", traits)
+			farm_game.add_seed_with_traits(plant_kind, traits)
 			if not instance.is_empty():
 				expedition["inventory"]["warehouse"].erase(instance)
 	## 成长统计与目标钩子（2.5）。
@@ -933,6 +947,10 @@ static func apply_settlement(farm_game: FarmGame, settlement: Dictionary) -> Dic
 	for group in ["gained", "protected"]:
 		for entry in settlement.get(group, []):
 			var def_id := str(entry.get("def_id", ""))
+			if FarmGame.seed_item_to_plant(def_id) != "":
+				## 种子已转种植体系：成长目标按"带回"口径仍计一次。
+				brought_now[def_id] = int(brought_now.get(def_id, 0)) + 1
+				continue
 			brought_now[def_id] = int(brought_now.get(def_id, 0)) + 1
 	for def_id in brought_now:
 		crafting.record_event("brought", {"id": def_id, "count": int(brought_now[def_id])})

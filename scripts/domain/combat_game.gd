@@ -22,6 +22,38 @@ const ENEMIES := {
 			{"kind": "attack", "value": 4, "status": "weak", "status_stacks": 1},
 		],
 	},
+	"deep_bat": {
+		"name": "深层蝠", "hp": 20,
+		"cycle": [
+			{"kind": "attack", "value": 4, "times": 2},
+			{"kind": "attack", "value": 6},
+			{"kind": "block", "value": 5},
+		],
+	},
+	"ore_golem": {
+		"name": "矿偶", "hp": 32,
+		"cycle": [
+			{"kind": "block", "value": 8},
+			{"kind": "attack", "value": 11},
+			{"kind": "attack", "value": 11},
+		],
+	},
+	"crystal_spider": {
+		"name": "晶蛛", "hp": 22,
+		"cycle": [
+			{"kind": "attack", "value": 5, "status": "weak", "status_stacks": 1},
+			{"kind": "attack", "value": 8},
+		],
+	},
+	"root_guardian": {
+		"name": "根须守卫（首领）", "hp": 60,
+		"cycle": [
+			{"kind": "attack", "value": 6, "times": 2},
+			{"kind": "block", "value": 10},
+			{"kind": "attack", "value": 14},
+			{"kind": "attack", "value": 5, "status": "vulnerable", "status_stacks": 1},
+		],
+	},
 	"rock_crab": {
 		"name": "碎石蟹", "hp": 26,
 		"cycle": [
@@ -38,6 +70,11 @@ const ENCOUNTERS := {
 	"tutorial": {"name": "教学场（单只小泥团）", "enemies": ["slime"]},
 	"normal": {"name": "普通验证场（泥团＋蝠）", "enemies": ["slime", "cave_bat"]},
 	"defensive": {"name": "防御验证场（碎石蟹）", "enemies": ["rock_crab"]},
+	"gate_keeper": {"name": "第一层守门战", "enemies": ["rock_crab", "slime", "cave_bat"]},
+	"deep_pair": {"name": "深层巡逻（蝠＋晶蛛）", "enemies": ["deep_bat", "crystal_spider"]},
+	"deep_hard": {"name": "深层硬仗（矿偶＋蝠）", "enemies": ["ore_golem", "deep_bat"]},
+	"layer2_elite": {"name": "深层精英（矿偶＋晶蛛）", "enemies": ["ore_golem", "crystal_spider"]},
+	"layer2_guardian": {"name": "首领：根须守卫", "enemies": ["root_guardian"]},
 }
 
 

@@ -109,6 +109,12 @@ const ITEMS := {
 		"safe_allowed": false, "cards": ["heavy_cargo", "heavy_cargo", "heavy_cargo", "heavy_cargo"],
 		"desc": "高价值出售货物：值 90 金币，但 4 张笨重货物会拖累战斗；不可保护。",
 	},
+	"glow_berry_seed": {
+		"name": "萤果种子", "category": "rare_seed", "size": Vector2i(1, 1), "quality": 1,
+		"base_value": 5, "sellable": false, "basic_kit": false, "demo": false,
+		"safe_allowed": true, "cards": ["heavy_cargo"],
+		"desc": "深层植物的种子（第二层带回）：保险箱可保护；回家转为种子（2.8 接入种植）。",
+	},
 	"glow_crystal": {
 		"name": "微光晶石", "category": "material", "size": Vector2i(1, 2), "quality": 2,
 		"base_value": 60, "sellable": true, "basic_kit": false, "demo": false,
