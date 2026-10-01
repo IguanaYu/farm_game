@@ -124,6 +124,11 @@ func _build_farm() -> void:
 	_add_building("ShopBuilding", SHOP_MODEL, Vector3(-4.6, 0.08, -4.35), "shop")
 	_add_building("BreederBuilding", BREEDER_MODEL, Vector3(0.0, 0.08, -4.35), "breeder")
 	_add_building("WarehouseBuilding", WAREHOUSE_MODEL, Vector3(4.6, 0.08, -4.35), "warehouse")
+	# 第二大阶段占位入口（2.1 计划 W5）：纯色方盒＋发光顶边，正式素材 2.8 替换。
+	# 位置在东南侧草坪，避开地块、建筑、客人站位与栅栏的点击区。
+	_add_prop("CaveEntrance", Vector3(6.3, 0.08, 4.1), Vector3(2.0, 2.6, 1.8), Color("#4a4358"), Color("#b79ae8"), "cave")
+	_add_prop("LoadoutBench", Vector3(4.6, 0.08, 4.2), Vector3(1.2, 0.9, 0.9), Color("#8a5a33"), Color("#ffd257"), "loadout")
+	_add_prop("CraftTable", Vector3(4.6, 0.08, 3.1), Vector3(1.2, 0.9, 0.9), Color("#7d8a8f"), Color("#9fd0d8"), "craft")
 	for position in [Vector3(-3.0, 0.08, 4.1), Vector3(0.0, 0.08, 4.1), Vector3(3.0, 0.08, 4.1)]:
 		_add_guest_slot(position)
 	for position in [Vector3(-6.9, 0.08, 3.6), Vector3(6.9, 0.08, 3.6)]:
@@ -227,6 +232,47 @@ func _add_building(node_name: String, model: PackedScene, location: Vector3, kin
 	add_child(body)
 
 
+## 第二大阶段占位道具（2.1 计划 W5）：纯色方盒＋发光顶边，点击走建筑分发。
+func _add_prop(node_name: String, location: Vector3, dimensions: Vector3, fill: Color, edge: Color, kind: String) -> void:
+	var body := StaticBody3D.new()
+	body.name = node_name
+	body.position = location
+	body.input_ray_pickable = true
+	var hitbox := CollisionShape3D.new()
+	hitbox.name = "PropHitbox"
+	var box := BoxShape3D.new()
+	box.size = dimensions
+	hitbox.shape = box
+	hitbox.position.y = dimensions.y / 2.0
+	body.add_child(hitbox)
+	var mesh := MeshInstance3D.new()
+	mesh.name = "PropMesh"
+	var box_mesh := BoxMesh.new()
+	box_mesh.size = dimensions
+	mesh.mesh = box_mesh
+	mesh.position = hitbox.position
+	var material := StandardMaterial3D.new()
+	material.albedo_color = fill
+	material.roughness = 0.9
+	mesh.material_override = material
+	body.add_child(mesh)
+	var trim := MeshInstance3D.new()
+	trim.name = "PropTrim"
+	var trim_mesh := BoxMesh.new()
+	trim_mesh.size = Vector3(dimensions.x * 1.02, 0.12, dimensions.z * 1.02)
+	trim.mesh = trim_mesh
+	trim.position = Vector3(0, dimensions.y + 0.02, 0)
+	var trim_material := StandardMaterial3D.new()
+	trim_material.albedo_color = edge
+	trim_material.emission_enabled = true
+	trim_material.emission = edge
+	trim_material.emission_energy_multiplier = 0.9
+	trim.material_override = trim_material
+	body.add_child(trim)
+	body.input_event.connect(_on_building_input.bind(kind))
+	add_child(body)
+
+
 func _add_guest_slot(location: Vector3) -> void:
 	## 门口的三个客人站位：模型按当日出现的客人切换，点击打开今日集市。
 	var slot_index := guest_slots.size()
@@ -308,6 +354,7 @@ func _build_hud() -> void:
 	hud.unlock_formula_requested.connect(_on_unlock_formula_requested)
 	hud.sell_batch_to_requested.connect(_on_sell_batch_to_requested)
 	hud.debug_mature_requested.connect(_debug_mature_all)
+	hud.expedition_save_requested.connect(_on_expedition_save_requested)
 
 
 func _refresh_all() -> void:
@@ -460,6 +507,12 @@ func _on_building_input(_camera: Node, event: InputEvent, _position: Vector3, _n
 			"breeder":
 				hud.view_now = _now()
 				hud.open_breeder()
+			"cave":
+				hud.open_expedition_hub()
+			"loadout":
+				hud.open_loadout()
+			"craft":
+				hud.show_status("制作台尚未开放：将在第二大阶段 2.5 提供配方与制作。")
 
 
 func _on_plant_seed_requested(plot_id: int, seed_id: int) -> void:
@@ -748,6 +801,16 @@ func _on_sell_batch_to_requested(batch_id: int, count: int, guest_id: int) -> vo
 		hud.show_status("存档写入失败，出售可能没有保存！")
 	_refresh_all()
 	hud.show_status("卖给%s %d 个作物，获得 %d 金币。" % [MarketDefs.GUESTS[guest_id]["display_name"], result["sold_count"], result["coins"]])
+
+
+func _on_expedition_save_requested(dirty: bool) -> void:
+	## 战备面板关闭：先剔除演示物品再保存（2.1 计划 W6：演示内容不进存档）。
+	var inventory := InventoryGame.new()
+	inventory.bind(game.state["expedition"])
+	inventory.strip_demo_instances()
+	if dirty and not _save():
+		hud.show_status("存档写入失败，战备调整可能没有保存！")
+	_refresh_all()
 
 
 func _debug_mature_all() -> void:

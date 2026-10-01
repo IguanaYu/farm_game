@@ -28,6 +28,7 @@ signal lock_formula_requested(kind: String)
 signal unlock_formula_requested
 signal sell_batch_to_requested(batch_id: int, count: int, guest_id: int)
 signal debug_mature_requested
+signal expedition_save_requested(dirty: bool)
 
 const SHOP_ICON := preload("res://assets/sprites/facility_shop.png")
 const WAREHOUSE_ICON := preload("res://assets/sprites/facility_warehouse.png")
@@ -84,6 +85,8 @@ var modal_icon: TextureRect
 var modal_content: VBoxContainer
 var sell_all_button: Button
 var harvest_all_entry: Button
+var expedition_hub_panel: ExpeditionHubPanel
+var loadout_panel: LoadoutPanel
 
 
 func _ready() -> void:
@@ -101,6 +104,7 @@ func _ready() -> void:
 	_build_actions()
 	_build_modal()
 	_build_tutorial_banner()
+	_build_expedition_panels()
 
 
 func refresh(state: Dictionary) -> void:
@@ -1420,6 +1424,44 @@ func _close_modal() -> void:
 
 func close_modal_after_action() -> void:
 	_close_modal()
+
+
+## —— 探险入口面板（2.1）：独立脚本挂接，实现不写进本文件 ——
+
+func _build_expedition_panels() -> void:
+	expedition_hub_panel = ExpeditionHubPanel.new()
+	expedition_hub_panel.name = "ExpeditionHubPanel"
+	expedition_hub_panel.close_requested.connect(close_expedition_panels)
+	expedition_hub_panel.open_loadout_requested.connect(open_loadout)
+	add_child(expedition_hub_panel)
+	loadout_panel = LoadoutPanel.new()
+	loadout_panel.name = "LoadoutPanel"
+	loadout_panel.close_requested.connect(_on_loadout_close)
+	add_child(loadout_panel)
+
+
+func open_expedition_hub() -> void:
+	_close_modal()
+	expedition_hub_panel.open(game)
+
+
+func open_loadout() -> void:
+	_close_modal()
+	expedition_hub_panel.close()
+	loadout_panel.open(game)
+
+
+func close_expedition_panels() -> void:
+	if expedition_hub_panel != null:
+		expedition_hub_panel.close()
+
+
+func _on_loadout_close() -> void:
+	## 关闭战备：剔除演示物品；真实改动通过信号交给组合根保存。
+	loadout_panel.close()
+	var dirty: bool = loadout_panel.dirty
+	loadout_panel.mark_saved()
+	expedition_save_requested.emit(dirty)
 
 
 func _image(texture: Texture2D, dimensions: Vector2) -> TextureRect:

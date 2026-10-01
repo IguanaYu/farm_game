@@ -1,0 +1,527 @@
+class_name LoadoutPanel
+extends Control
+## 战备首页 v0（2.1 设计 D2.1-03/04）：三容器、物品详情、牌组预览、准备检查。
+## 2.1 为点击式放置；拖放／旋转／自动整理在 2.3 升级。
+## 变更只在内存，关闭时由外界决定保存（演示物品先剔除）。
+
+signal close_requested
+signal save_requested
+
+const FOREST := Color("#294f3c")
+const CREAM := Color("#fff9ed")
+const TEXT_DARK := Color("#35513d")
+const TEXT_MUTED := Color("#788678")
+const BAD_RED := Color("#a4543f")
+const WARN_GOLD := Color("#9b713a")
+const CELL_EMPTY := Color("#efe8d4")
+const CELL_BORDER := Color("#d8cfb2")
+const CATEGORY_COLOR := {
+	"weapon": Color("#c08050"),
+	"armor": Color("#7d9cb5"),
+	"tool": Color("#c9b45c"),
+	"supply": Color("#8fae72"),
+	"material": Color("#a3a89f"),
+	"rare_seed": Color("#c58fa5"),
+	"cargo": Color("#9a86b8"),
+}
+
+var game: FarmGame
+var inventory: InventoryGame
+var selected_instance_id := -1
+var filter := "all"
+var dirty := false
+
+var stats_label: Label
+var warehouse_column: VBoxContainer
+var detail_column: VBoxContainer
+var deck_column: VBoxContainer
+var check_column: VBoxContainer
+var container_boxes: Dictionary = {}
+var status_label: Label
+var put_back_button: Button
+
+
+func _ready() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	mouse_filter = Control.MOUSE_FILTER_STOP
+	visible = false
+	var theme_root := Theme.new()
+	var font := SystemFont.new()
+	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
+	theme_root.default_font = font
+	theme_root.default_font_size = 16
+	theme = theme_root
+	_build()
+
+
+func open(target_game: FarmGame) -> void:
+	game = target_game
+	inventory = InventoryGame.new()
+	inventory.bind(game.state["expedition"])
+	selected_instance_id = -1
+	filter = "all"
+	dirty = false
+	status_label.text = ""
+	visible = true
+	_refresh()
+
+
+func close() -> void:
+	visible = false
+
+
+func mark_saved() -> void:
+	dirty = false
+
+
+func _build() -> void:
+	var shade := ColorRect.new()
+	shade.color = Color(0.11, 0.20, 0.14, 0.55)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(shade)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(center)
+	var panel := _panel(CREAM, Color("#d5c9aa"), 18)
+	panel.custom_minimum_size = Vector2(1180, 660)
+	center.add_child(panel)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 8)
+	panel.add_child(column)
+
+	var title_row := HBoxContainer.new()
+	column.add_child(title_row)
+	title_row.add_child(_label("战备箱", 24, FOREST))
+	var hint := _label("点击物品选中，再点一个容器放入（自动找位）；点已放入的物品可查看并放回。", 14, TEXT_MUTED)
+	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(hint)
+
+	stats_label = _label("", 16, TEXT_DARK)
+	column.add_child(stats_label)
+
+	var body := HBoxContainer.new()
+	body.add_theme_constant_override("separation", 12)
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(body)
+
+	# 左：仓库与筛选。
+	warehouse_column = VBoxContainer.new()
+	warehouse_column.add_theme_constant_override("separation", 6)
+	warehouse_column.custom_minimum_size = Vector2(250, 0)
+	body.add_child(warehouse_column)
+
+	# 中：三个容器。
+	var center_column := VBoxContainer.new()
+	center_column.add_theme_constant_override("separation", 8)
+	center_column.custom_minimum_size = Vector2(430, 0)
+	body.add_child(center_column)
+	for container in ExpeditionBaseline.CONTAINERS:
+		var box := _build_container_box(container)
+		center_column.add_child(box)
+		container_boxes[container] = box
+
+	# 右：详情／牌组／检查。
+	var right_column := VBoxContainer.new()
+	right_column.add_theme_constant_override("separation", 8)
+	right_column.custom_minimum_size = Vector2(380, 0)
+	right_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(right_column)
+	detail_column = _section(right_column, "物品详情")
+	deck_column = _section(right_column, "牌组预览（按加入回合）")
+	check_column = _section(right_column, "出发前检查")
+
+	# 底部操作。
+	var bottom := HBoxContainer.new()
+	bottom.add_theme_constant_override("separation", 10)
+	column.add_child(bottom)
+	var kit_button := _button("领取／补领基础装备", Color("#eaf4df"), Color("#87b06f"))
+	kit_button.pressed.connect(_on_grant_kit)
+	bottom.add_child(kit_button)
+	var demo_button := _button("载入演示物品", Color("#fff5df"), Color("#d5b87d"))
+	demo_button.pressed.connect(_on_inject_demo)
+	bottom.add_child(demo_button)
+	var clear_button := _button("清空配置", Color("#fff5df"), Color("#d5b87d"))
+	clear_button.pressed.connect(_on_clear_loadout)
+	bottom.add_child(clear_button)
+	put_back_button = _button("放回仓库", Color("#fff5df"), Color("#d5b87d"))
+	put_back_button.visible = false
+	put_back_button.pressed.connect(_on_put_back)
+	bottom.add_child(put_back_button)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bottom.add_child(spacer)
+	status_label = _label("", 14, BAD_RED)
+	status_label.custom_minimum_size = Vector2(260, 0)
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	bottom.add_child(status_label)
+	var depart := _button("出发", Color("#f0efe6"), Color("#b9b9a6"))
+	depart.disabled = true
+	depart.tooltip_text = "洞窟功能准备中：真实出发在 2.4 接入。"
+	bottom.add_child(depart)
+	var close_button := _button("返回", Color("#eaf4df"), Color("#87b06f"))
+	close_button.pressed.connect(_on_close)
+	bottom.add_child(close_button)
+
+
+func _build_container_box(container: String) -> VBoxContainer:
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation", 4)
+	var header := HBoxContainer.new()
+	box.add_child(header)
+	var display: String = ExpeditionBaseline.CONTAINER_DISPLAY[container]
+	var size: Vector2i = ExpeditionBaseline.CONTAINER_SIZE[container]
+	var join_round: int = ExpeditionBaseline.JOIN_ROUND[container]
+	var round_note := "第 1 回合加入牌库" if join_round == 1 else "第 %d 回合加入牌库" % join_round
+	header.add_child(_label("%s（%d×%d，%s）" % [display, size.x, size.y, round_note], 15, FOREST))
+	var grid := GridContainer.new()
+	grid.columns = size.x
+	grid.add_theme_constant_override("h_separation", 2)
+	grid.add_theme_constant_override("v_separation", 2)
+	box.add_child(grid)
+	box.set_meta("grid", grid)
+	return box
+
+
+func _section(parent: VBoxContainer, title: String) -> VBoxContainer:
+	var box := _panel(Color("#f7f1de"), Color("#e2e4d4"), 10)
+	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	parent.add_child(box)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 3)
+	box.add_child(column)
+	column.add_child(_label(title, 16, FOREST))
+	return column
+
+
+# —— 交互 ————————————————————————————————————————————————————————
+
+
+func _on_grant_kit() -> void:
+	var result := inventory.grant_basic_kit()
+	dirty = true
+	if result["granted"].is_empty():
+		_flash("基础装备已齐，无需补领。")
+	else:
+		var names: Array = []
+		for def_id in result["granted"]:
+			names.append(ItemDefs.get_item(def_id)["name"])
+		_flash("已发放基础装备：%s（在仓库列表中，点它再放入容器）" % "、".join(names))
+	_refresh()
+
+
+func _on_inject_demo() -> void:
+	var result := inventory.inject_demo_items()
+	_flash("演示物品已放入仓库（带“演示”标记，关闭面板即弃，不会存档）。")
+	_refresh()
+
+
+func _on_clear_loadout() -> void:
+	inventory.clear_loadout()
+	dirty = true
+	selected_instance_id = -1
+	_flash("已把全部物品放回仓库。")
+	_refresh()
+
+
+func _on_put_back() -> void:
+	if selected_instance_id < 0:
+		return
+	var result := inventory.move_to_warehouse(selected_instance_id)
+	if result["ok"]:
+		dirty = true
+		_flash("已放回仓库。")
+	else:
+		_flash(result["reason"])
+	_refresh()
+
+
+func _on_select_instance(instance_id: int) -> void:
+	selected_instance_id = instance_id
+	_refresh()
+
+
+func _on_container_clicked(container: String) -> void:
+	## 点容器里的空白格区域＝尝试把当前选中物品放进该容器（自动找位）。
+	if selected_instance_id < 0:
+		_flash("先在左侧仓库选中一件物品。")
+		return
+	var result := inventory.move_to_loadout(selected_instance_id, container)
+	if result["ok"]:
+		dirty = true
+		_flash("已放入%s。" % ExpeditionBaseline.CONTAINER_DISPLAY[container])
+	else:
+		_flash(result["reason"])
+	_refresh()
+
+
+func _on_filter(kind: String) -> void:
+	filter = kind
+	_refresh()
+
+
+func _on_close() -> void:
+	close_requested.emit()
+
+
+func _flash(message: String) -> void:
+	status_label.text = message
+
+
+# —— 刷新 ————————————————————————————————————————————————————————
+
+
+func _refresh() -> void:
+	_refresh_stats()
+	_refresh_warehouse()
+	for container in ExpeditionBaseline.CONTAINERS:
+		_refresh_container(container)
+	_refresh_detail()
+	_refresh_deck()
+	_refresh_check()
+
+
+func _refresh_stats() -> void:
+	var used := 0
+	var total := 0
+	for container in ExpeditionBaseline.CONTAINERS:
+		var size: Vector2i = ExpeditionBaseline.CONTAINER_SIZE[container]
+		total += size.x * size.y
+		for instance in inventory.loadout_list(container):
+			var def := ItemDefs.get_item(str(instance["def_id"]))
+			used += def["size"].x * def["size"].y
+	var preview := inventory.deck_preview()
+	var value_text := str(inventory.carry_sell_value()) + " 金币"
+	if inventory.has_basic_in_loadout():
+		value_text += "（基础装备不计可售价值）"
+	stats_label.text = "生命上限 %d ｜ 已用格数 %d/%d ｜ 首回合牌 %d 张 ｜ 后续加入牌 %d 张 ｜ 携带可售价值 %s ｜ 失败保护价值 %d 金币" % [
+		ExpeditionBaseline.MAX_HP, used, total,
+		int(preview["totals"][1]), int(preview["totals"][2]) + int(preview["totals"][3]),
+		value_text, inventory.protected_value(),
+	]
+
+
+func _refresh_warehouse() -> void:
+	for child in warehouse_column.get_children():
+		warehouse_column.remove_child(child)
+		child.queue_free()
+	var filter_row := HBoxContainer.new()
+	filter_row.add_theme_constant_override("separation", 4)
+	warehouse_column.add_child(filter_row)
+	var filters := [["all", "全部"], ["weapon", "武器"], ["armor", "防具"], ["tool", "工具"], ["supply", "补给"], ["material", "材料"], ["cargo", "货物"]]
+	for entry in filters:
+		var button := _small_button(entry[1], Color("#fff5df") if filter != entry[0] else Color("#e8f0d8"), Color("#d5b87d"))
+		button.pressed.connect(_on_filter.bind(entry[0]))
+		filter_row.add_child(button)
+	var list_title := _label("装备／材料仓库", 15, FOREST)
+	warehouse_column.add_child(list_title)
+	var items: Array = inventory.warehouse_list()
+	var shown := 0
+	for instance in items:
+		var def := ItemDefs.get_item(str(instance["def_id"]))
+		if filter != "all" and str(def["category"]) != filter:
+			continue
+		shown += 1
+		var row := Button.new()
+		var demo_mark := "［演示］" if bool(instance.get("demo", false)) else ""
+		row.text = "%s%s  %d×%d → %d 张牌" % [demo_mark, def["name"], def["size"].x, def["size"].y, def["cards"].size()]
+		row.add_theme_font_size_override("font_size", 14)
+		var fill := Color("#fffbea") if int(instance["instance_id"]) != selected_instance_id else Color("#e8f0d8")
+		var style := _style(fill, CATEGORY_COLOR.get(str(def["category"]), Color("#77a76d")), 8)
+		row.add_theme_stylebox_override("normal", style)
+		row.add_theme_stylebox_override("hover", style)
+		row.add_theme_stylebox_override("pressed", style)
+		row.pressed.connect(_on_select_instance.bind(int(instance["instance_id"])))
+		warehouse_column.add_child(row)
+	if shown == 0:
+		warehouse_column.add_child(_label("（仓库是空的：先领取基础装备，或载入演示物品看看）", 13, TEXT_MUTED))
+
+
+func _refresh_container(container: String) -> void:
+	var box: VBoxContainer = container_boxes[container]
+	var grid: GridContainer = box.get_meta("grid")
+	for child in grid.get_children():
+		grid.remove_child(child)
+		child.queue_free()
+	var size: Vector2i = ExpeditionBaseline.CONTAINER_SIZE[container]
+	var instances: Array = inventory.loadout_list(container)
+	var cell_owner := {}
+	for instance in instances:
+		var def := ItemDefs.get_item(str(instance["def_id"]))
+		for covered in ExpeditionBaseline.cells_of(def["size"], Vector2i(int(instance["cell"][0]), int(instance["cell"][1])), bool(instance.get("rotated", false))):
+			cell_owner[ExpeditionBaseline.cell_key(covered)] = instance
+	var dark := container == "safe"
+	for y in range(size.y):
+		for x in range(size.x):
+			var cell := Button.new()
+			cell.custom_minimum_size = Vector2(34, 30)
+			var key := ExpeditionBaseline.cell_key(Vector2i(x, y))
+			if cell_owner.has(key):
+				var instance: Dictionary = cell_owner[key]
+				var def := ItemDefs.get_item(str(instance["def_id"]))
+				var fill: Color = CATEGORY_COLOR.get(str(def["category"]), CELL_EMPTY)
+				if dark:
+					fill = fill.darkened(0.18)
+				var border := Color("#4a6f4a") if int(instance["instance_id"]) != selected_instance_id else Color("#2f4f2f")
+				cell.add_theme_stylebox_override("normal", _style(fill, border, 3))
+				cell.add_theme_stylebox_override("hover", _style(fill, border, 3))
+				cell.add_theme_stylebox_override("pressed", _style(fill, border, 3))
+				cell.tooltip_text = "%s%s" % [def["name"], "（演示）" if bool(instance.get("demo", false)) else ""]
+				cell.pressed.connect(_on_select_instance.bind(int(instance["instance_id"])))
+			else:
+				var empty_fill = CELL_EMPTY.darkened(0.06) if dark else CELL_EMPTY
+				cell.add_theme_stylebox_override("normal", _style(empty_fill, CELL_BORDER, 3))
+				cell.add_theme_stylebox_override("hover", _style(empty_fill.lightened(0.05), CELL_BORDER, 3))
+				cell.add_theme_stylebox_override("pressed", _style(empty_fill, CELL_BORDER, 3))
+				cell.pressed.connect(_on_container_clicked.bind(container))
+			grid.add_child(cell)
+
+
+func _refresh_detail() -> void:
+	for child in detail_column.get_children():
+		detail_column.remove_child(child)
+		child.queue_free()
+	put_back_button.visible = false
+	var instance := inventory.find_instance(selected_instance_id)
+	if instance.is_empty():
+		detail_column.add_child(_label("（选中一件物品查看详情）", 13, TEXT_MUTED))
+		return
+	var def := ItemDefs.get_item(str(instance["def_id"]))
+	var demo_mark := "［演示］" if bool(instance.get("demo", false)) else ""
+	detail_column.add_child(_label("%s%s（品质 %d）" % [demo_mark, def["name"], int(def["quality"])], 17, FOREST))
+	detail_column.add_child(_label("类别：%s ｜ 占格：%d×%d%s" % [
+		ExpeditionBaseline.CATEGORY_DISPLAY.get(str(def["category"]), "?"),
+		def["size"].x, def["size"].y,
+		"（已旋转）" if bool(instance.get("rotated", false)) else "",
+	], 14, TEXT_DARK))
+	var cards_text := ""
+	var counts := {}
+	for card_id in def["cards"]:
+		counts[card_id] = int(counts.get(card_id, 0)) + 1
+	for card_id in counts:
+		if cards_text != "":
+			cards_text += "、"
+		cards_text += "%s×%d" % [CardDefs.get_card(card_id)["name"], counts[card_id]]
+	detail_column.add_child(_label("来源牌（%d 张）：%s" % [def["cards"].size(), cards_text], 14, TEXT_DARK))
+	if bool(def.get("basic_kit", false)):
+		detail_column.add_child(_label("价值：基础装备，不计可售价值；不能出售、分享或用于制作。", 14, WARN_GOLD))
+	else:
+		detail_column.add_child(_label("可售价值：%d 金币 ｜ %s" % [int(def.get("base_value", 0)),
+			"可放保险箱（失败时保留）" if bool(def.get("safe_allowed", false)) else "不可放保险箱"], 14, TEXT_DARK))
+	detail_column.add_child(_label("当前归属：%s" % _owner_display(str(instance["container"])), 14, TEXT_DARK))
+	var desc := _label(str(def.get("desc", "")), 13, TEXT_MUTED)
+	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	desc.custom_minimum_size = Vector2(330, 0)
+	detail_column.add_child(desc)
+	if ExpeditionBaseline.JOIN_ROUND.has(str(instance["container"])):
+		put_back_button.visible = true
+
+
+func _refresh_deck() -> void:
+	for child in deck_column.get_children():
+		deck_column.remove_child(child)
+		child.queue_free()
+	var preview := inventory.deck_preview()
+	if int(preview["totals"][1]) + int(preview["totals"][2]) + int(preview["totals"][3]) == 0:
+		deck_column.add_child(_label("（三个容器都是空的：放入物品后这里显示会抽到什么牌）", 13, TEXT_MUTED))
+		return
+	for join_round in [1, 2, 3]:
+		var source: String = {"1": "胸挂", "2": "背包", "3": "保险箱"}[str(join_round)]
+		var text := "第 %d 回合（%s，共 %d 张）：" % [join_round, source, int(preview["totals"][join_round])]
+		var parts: Array = []
+		var order: Array = preview["rounds"][join_round].map(func(entry): return str(entry["card_id"]))
+		for card_id in order:
+			if card_id in parts:
+				continue
+			parts.append(card_id)
+		var names: Array = []
+		for card_id in parts:
+			names.append("%s×%d" % [CardDefs.get_card(card_id)["name"], int(preview["counts"][join_round][card_id])])
+		text += "、".join(names)
+		var label := _label(text, 14, TEXT_DARK)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.custom_minimum_size = Vector2(330, 0)
+		deck_column.add_child(label)
+	deck_column.add_child(_label("战斗开始时按当前布局构建牌库；战斗中不会把新战利品塞进手牌。", 12, TEXT_MUTED))
+
+
+func _refresh_check() -> void:
+	for child in check_column.get_children():
+		check_column.remove_child(child)
+		child.queue_free()
+	var check := inventory.loadout_check()
+	if check["hard_blocks"].is_empty() and check["advises"].is_empty():
+		check_column.add_child(_label("准备检查通过：随时可以出发（出发功能 2.4 开放）。", 14, Color("#3f7048")))
+		return
+	for problem in check["hard_blocks"]:
+		var label := _label("⛔ %s" % problem, 13, BAD_RED)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.custom_minimum_size = Vector2(330, 0)
+		check_column.add_child(label)
+	for advice in check["advises"]:
+		var label := _label("△ %s" % advice, 13, WARN_GOLD)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.custom_minimum_size = Vector2(330, 0)
+		check_column.add_child(label)
+
+
+func _owner_display(owner: String) -> String:
+	if owner == "warehouse":
+		return "装备／材料仓库"
+	if ExpeditionBaseline.CONTAINER_DISPLAY.has(owner):
+		return ExpeditionBaseline.CONTAINER_DISPLAY[owner]
+	return owner
+
+
+# —— 小构件 ——————————————————————————————————————————————————————
+
+
+func _panel(fill: Color, border: Color, radius: int) -> PanelContainer:
+	var panel := PanelContainer.new()
+	var style := StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_color = border
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(radius)
+	style.content_margin_left = 16
+	style.content_margin_right = 16
+	style.content_margin_top = 12
+	style.content_margin_bottom = 12
+	panel.add_theme_stylebox_override("panel", style)
+	return panel
+
+
+func _style(fill: Color, border: Color, radius: int) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = fill
+	style.border_color = border
+	style.set_border_width_all(2)
+	style.set_corner_radius_all(radius)
+	return style
+
+
+func _label(content: String, size: int, color: Color) -> Label:
+	var label := Label.new()
+	label.text = content
+	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_color_override("font_color", color)
+	return label
+
+
+func _button(content: String, fill: Color, border: Color) -> Button:
+	var button := Button.new()
+	button.text = content
+	button.add_theme_font_size_override("font_size", 15)
+	var style := _style(fill, border, 12)
+	style.content_margin_left = 12
+	style.content_margin_right = 12
+	button.add_theme_stylebox_override("normal", style)
+	button.add_theme_stylebox_override("hover", style)
+	button.add_theme_stylebox_override("pressed", style)
+	button.add_theme_stylebox_override("disabled", style)
+	return button
+
+
+func _small_button(content: String, fill: Color, border: Color) -> Button:
+	var button := _button(content, fill, border)
+	button.add_theme_font_size_override("font_size", 13)
+	return button

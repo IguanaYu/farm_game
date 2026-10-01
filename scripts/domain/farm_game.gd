@@ -1,7 +1,7 @@
 class_name FarmGame
 extends RefCounted
 
-const SAVE_VERSION := 5
+const SAVE_VERSION := 6
 const PLOT_COUNT := 6
 const MAX_PLOTS := 10
 const ROUND_EVENT_LIMIT := 24
@@ -39,6 +39,7 @@ func new_game(now: int) -> void:
 		"seeds": [],
 		"crop_batches": [],
 		"created_at": now,
+		"expedition": _default_expedition(now),
 	}
 	for kind in PlantDefs.FERTILIZERS:
 		state["fertilizers"][kind] = 0
@@ -67,6 +68,22 @@ func _default_market() -> Dictionary:
 	}
 
 
+## 第二大阶段的探险侧字段（2.1 计划 §3.1）。个人库存与农场资产同档保存，局档另存。
+func _default_expedition(now: int) -> Dictionary:
+	return {
+		"player_id": ExpeditionStore.new_player_id(now),
+		"next_instance_id": ExpeditionBaseline.FIRST_INSTANCE_ID,
+		"inventory": {
+			"warehouse": [],
+			"loadout": {"chest": [], "pack": [], "safe": []},
+			"occupied_by_run": "",
+		},
+		"loadouts": [],
+		"active_run_ref": "",
+		"applied_settlements": [],
+	}
+
+
 func _record_ledger(now: int, reason: String, amount: int) -> void:
 	## 经济记录：正数为收入，负数为支出。只记录，阶段 6 再分析平衡。
 	var ledger: Array = state.get("ledger", [])
@@ -88,6 +105,8 @@ func load_state(saved: Dictionary) -> bool:
 		source = _migrate_v3_to_v4(source)
 	if int(source.get("version", -1)) == 4:
 		source = _migrate_v4_to_v5(source)
+	if int(source.get("version", -1)) == 5:
+		source = _migrate_v5_to_v6(source)
 	if int(source.get("version", -1)) != SAVE_VERSION:
 		return false
 	# JSON 会把整数解析成浮点（3 → 3.0），而数组/字典的相等比较对类型严格；统一把整数值浮点归一化为 int。
@@ -134,6 +153,26 @@ func load_state(saved: Dictionary) -> bool:
 		return false
 	if not _is_number(source.get("tutorial_step", 99)):
 		return false
+	var expedition: Dictionary = source.get("expedition", {})
+	if not expedition is Dictionary or not str(expedition.get("player_id", "")).begins_with("p-"):
+		return false
+	if not _is_number(expedition.get("next_instance_id", 0)) or int(expedition.get("next_instance_id", 0)) < ExpeditionBaseline.FIRST_INSTANCE_ID:
+		return false
+	if not expedition.get("loadouts") is Array or not expedition.get("applied_settlements") is Array:
+		return false
+	if not str(expedition.get("active_run_ref", "")) is String:
+		return false
+	var expedition_inventory: Dictionary = expedition.get("inventory", {})
+	if not expedition_inventory is Dictionary or not expedition_inventory.get("warehouse") is Array:
+		return false
+	if not str(expedition_inventory.get("occupied_by_run", "")) is String:
+		return false
+	var loadout_state: Dictionary = expedition_inventory.get("loadout", {})
+	if not loadout_state is Dictionary:
+		return false
+	for container in ExpeditionBaseline.CONTAINERS:
+		if not loadout_state.get(container) is Array:
+			return false
 	for seed in source["seeds"]:
 		if not seed is Dictionary or not _is_number(seed.get("id")) or not PlantDefs.is_known_plant(str(seed.get("kind", ""))):
 			return false
@@ -1224,6 +1263,15 @@ func _migrate_v4_to_v5(saved: Dictionary) -> Dictionary:
 	migrated["version"] = 5
 	# 老玩家不再需要首轮引导；只有新档从第 0 步开始。
 	migrated["tutorial_step"] = 99
+	return migrated
+
+
+## v5→v6（2.1 计划 W4）：农场字段零改动，追加探险块。金币、种子（含词条）、十块地、
+## 成长经验、市场锁定与育种机进度全部原样保留。
+func _migrate_v5_to_v6(saved: Dictionary) -> Dictionary:
+	var migrated := saved.duplicate(true)
+	migrated["version"] = 6
+	migrated["expedition"] = _default_expedition(int(migrated.get("created_at", 0)))
 	return migrated
 
 
