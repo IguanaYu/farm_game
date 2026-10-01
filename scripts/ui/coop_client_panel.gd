@@ -96,7 +96,7 @@ func _build() -> void:
 	column.add_child(signal_row)
 	for entry in [["我来挡", "我来挡"], ["先集火", "先集火这个"], ["我能救你", "我能救你"], ["建议撤离", "建议撤离"]]:
 		var signal_button := _small(str(entry[0]), Color("#e8f0d8"), Color("#87b06f"))
-		signal_button.pressed.connect(client.send_action.bind("signal", {"text": str(entry[1])}))
+		signal_button.pressed.connect(func() -> void: client.send_action("signal", {"text": str(entry[1])}))
 		signal_row.add_child(signal_button)
 	status_label = _label("", 13, WARN_GOLD)
 	column.add_child(status_label)
