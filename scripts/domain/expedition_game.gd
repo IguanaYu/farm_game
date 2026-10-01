@@ -102,6 +102,224 @@ static func _build_map(layer_id: String) -> Dictionary:
 	return {"rows": rows}
 
 
+# —— 双人扩展（2.6）：成员 p2（客机）以 run["guest"] 并列存放 ——————————————
+
+## 出发（双人）：主机侧事务。guest_profile 由客机在出发握手时提供：
+## {name, player_id, loadout(实例快照), carried(实例 id 列表), next_instance_id, hp}。
+## 主机只占用主机农场；客机在自己的存档里自行占用（握手协议负责）。
+static func depart_coop(farm_game: FarmGame, guest_profile: Dictionary, now: int, run_id_override := "") -> Dictionary:
+	var inventory := InventoryGame.new()
+	inventory.bind(farm_game.state["expedition"])
+	var check := inventory.loadout_check()
+	if not check["hard_blocks"].is_empty():
+		return {"ok": false, "reason": "主机战备未通过检查"}
+	var preview := inventory.deck_preview()
+	if int(preview["totals"][1]) <= 0:
+		return {"ok": false, "reason": "主机首回合牌库为空"}
+	var run_id := run_id_override if run_id_override != "" else ExpeditionStore.new_run_id(int(Time.get_unix_time_from_system() * 1000.0))
+	if not inventory.set_run_occupied(run_id)["ok"]:
+		return {"ok": false, "reason": "写入占用失败"}
+	var expedition: Dictionary = farm_game.state["expedition"]
+	var seed_value := run_id.hash() + int(Time.get_unix_time_from_system())
+	var instance := ExpeditionGame.new()
+	instance.game = farm_game
+	instance.run = {
+		"fmt": 1,
+		"run_id": run_id,
+		"coop": true,
+		"rules_version": ExpeditionBaseline.PROTO_RULES_VERSION,
+		"layer_id": "moss_stone_shallow",
+		"rng_seed": seed_value,
+		"rng_state": str(seed_value),
+		"created_at": now,
+		"player": {"hp": ExpeditionBaseline.MAX_HP, "max_hp": ExpeditionBaseline.MAX_HP, "extra_draw_next": false},
+		"inventory": _snapshot_loadout(farm_game),
+		"guest": _guest_member(guest_profile),
+		"next_instance_id": maxi(int(expedition.get("next_instance_id", 1000)), int(guest_profile.get("next_instance_id", 1000))),
+		"map": _build_map("moss_stone_shallow"),
+		"current": {"row": 0, "col": 0},
+		"resolved": {},
+		"node_drops": [],
+		"battle": {},
+		"phase": "map",
+		"outcome": "",
+		"settlement_id": "",
+		"carried_from_farm": _carried_ids(farm_game),
+		"consumed": [],
+		"votes": {"p1": "", "p2": ""},
+		"extract_votes": {"p1": false, "p2": false},
+		"log": ["双人出发：主机与 %s" % str(guest_profile.get("name", "队友"))],
+	}
+	expedition["active_run_ref"] = run_id
+	if not ExpeditionStore.save_run(run_id, instance.run):
+		inventory.clear_run_occupied(run_id)
+		expedition["active_run_ref"] = ""
+		return {"ok": false, "reason": "局档写入失败，已恢复出发前状态"}
+	instance.rng.seed = seed_value
+	return {"ok": true, "reason": "", "run": instance.run, "game": instance}
+
+
+static func _guest_member(profile: Dictionary) -> Dictionary:
+	return {
+		"name": str(profile.get("name", "队友")),
+		"player_id": str(profile.get("player_id", "p-guest")),
+		"hp": int(profile.get("hp", ExpeditionBaseline.MAX_HP)),
+		"max_hp": ExpeditionBaseline.MAX_HP,
+		"extra_draw_next": false,
+		"inventory": {
+			"warehouse": [],
+			"loadout": (profile.get("loadout", {}) as Dictionary).duplicate(true),
+			"occupied_by_run": "",
+		},
+		"carried_from_farm": (profile.get("carried", []) as Array).duplicate(),
+		"consumed": [],
+	}
+
+
+func _fail(reason: String) -> Dictionary:
+	return {"ok": false, "reason": reason}
+
+
+func member_keys() -> Array:
+	if bool(run.get("coop", false)):
+		return ["p1", "p2"]
+	return ["p1"]
+
+
+## 成员统一视图：{name, hp, max_hp, inventory(块), carried, consumed, extra_draw_next}。
+func member(member_key: String) -> Dictionary:
+	if member_key == "p2" and bool(run.get("coop", false)):
+		var guest: Dictionary = run["guest"]
+		return {
+			"name": guest["name"], "hp": guest["hp"], "max_hp": guest["max_hp"],
+			"inventory": guest["inventory"],
+			"carried": guest.get("carried_from_farm", []),
+			"consumed": guest.get("consumed", []),
+			"extra_draw_next": guest.get("extra_draw_next", false),
+		}
+	return {
+		"name": "主机农夫",
+		"hp": int(run["player"]["hp"]), "max_hp": int(run["player"]["max_hp"]),
+		"inventory": run["inventory"], "carried": run["carried_from_farm"], "consumed": run["consumed"],
+		"extra_draw_next": bool(run["player"].get("extra_draw_next", false)),
+	}
+
+
+func _write_member_hp(member_key: String, hp: int) -> void:
+	if member_key == "p2" and bool(run.get("coop", false)):
+		run["guest"]["hp"] = hp
+	else:
+		run["player"]["hp"] = hp
+
+
+func member_inventory(member_key: String) -> InventoryGame:
+	var info := member(member_key)
+	var inventory := InventoryGame.new()
+	inventory.bind({"inventory": info["inventory"], "next_instance_id": run["next_instance_id"]})
+	return inventory
+
+
+## —— 共同选路：两人投同一个节点才移动（2.6 设计 §7）——————————————
+
+
+func vote_move(member_key: String, row: int, col: int) -> Dictionary:
+	if not member_keys().has(member_key):
+		return {"ok": false, "reason": "未知成员"}
+	if run["phase"] != "map":
+		return {"ok": false, "reason": "当前不在地图阶段"}
+	run["votes"][member_key] = "%d,%d" % [row, col]
+	var votes: Dictionary = run["votes"]
+	if str(votes.get("p1", "")) != "" and str(votes.get("p2", "")) != "":
+		if str(votes["p1"]) == str(votes["p2"]):
+			var parts := str(votes["p1"]).split(",")
+			run["votes"] = {"p1": "", "p2": ""}
+			return move_to(int(parts[0]), int(parts[1]))
+	return {"ok": true, "reason": "", "waiting": true}
+
+
+## —— 撤离确认：两人都确认才结算 ——————————————————————————————
+
+
+func vote_extract(member_key: String, agree: bool) -> Dictionary:
+	if not member_keys().has(member_key):
+		return {"ok": false, "reason": "未知成员"}
+	run["extract_votes"][member_key] = agree
+	var votes: Dictionary = run["extract_votes"]
+	if bool(votes.get("p1", false)) and bool(votes.get("p2", false)):
+		return _settle_run("extract", int(run["player"]["hp"]))
+	if not agree:
+		run["extract_votes"] = {"p1": false, "p2": false}
+	return {"ok": true, "reason": "", "waiting": true}
+
+
+## —— 分享（2.6 设计 §9）：提出→确认→一次移动；取消/满包留在原主人 ———————
+
+
+func share_offer(from_key: String, instance_id: int) -> Dictionary:
+	var from_inv := member_inventory(from_key)
+	var instance := from_inv.find_instance(instance_id)
+	if instance.is_empty():
+		return _fail("物品不存在")
+	if not ExpeditionBaseline.JOIN_ROUND.has(str(instance.get("container", ""))):
+		return _fail("只能分享随身携带的物品")
+	if ItemDefs.is_basic(str(instance["def_id"])):
+		return _fail("基础装备不允许分享")
+	if not (run.get("share_offer", {}) as Dictionary).is_empty():
+		return _fail("已有一笔分享进行中")
+	run["share_offer"] = {"from": from_key, "instance_id": instance_id, "state": "pending"}
+	return {"ok": true, "reason": ""}
+
+
+func share_accept(to_key: String, container: String) -> Dictionary:
+	var offer: Dictionary = run.get("share_offer", {})
+	if offer.is_empty() or str(offer.get("state", "")) != "pending":
+		return _fail("没有待确认的分享")
+	var from_key := str(offer["from"])
+	if to_key == from_key:
+		return _fail("不能分享给自己")
+	var from_inv := member_inventory(from_key)
+	var to_inv := member_inventory(to_key)
+	var instance := from_inv.find_instance(int(offer["instance_id"]))
+	if instance.is_empty():
+		run["share_offer"] = {}
+		return _fail("物品已不存在，分享取消")
+	## 原子转移：先从来源移除，目标放不下则原样回滚（两边都不变）。
+	var snapshot: Dictionary = instance.duplicate(true)
+	from_inv.discard_instance(int(offer["instance_id"]))
+	var added := to_inv.add_instance(str(instance["def_id"]), "share", int(instance.get("quality", 1)))
+	var placed := false
+	if added["ok"]:
+		placed = to_inv.move_to_loadout(int(added["instance_id"]), container)["ok"]
+	if not placed:
+		if added["ok"]:
+			to_inv.discard_instance(int(added["instance_id"]))
+		var back := from_inv.add_instance(str(snapshot["def_id"]), "share", int(snapshot.get("quality", 1)))
+		if back["ok"]:
+			from_inv.move_to_loadout(int(back["instance_id"]), str(snapshot["container"]))
+		run["share_offer"] = {}
+		return _fail("接收方放不下，物品留在原主人处")
+	var moved := to_inv.find_instance(int(added["instance_id"]))
+	moved["uses_remaining"] = int(snapshot.get("uses_remaining", 1))
+	moved["seed_traits"] = snapshot.get("seed_traits", [])
+	run["share_offer"] = {}
+	run["log"].append("分享：%s → %s（%s）" % [member(from_key)["name"], member(to_key)["name"], ItemDefs.get_item(str(snapshot["def_id"]))["name"]])
+	return {"ok": true, "reason": ""}
+
+
+func share_cancel() -> Dictionary:
+	if (run.get("share_offer", {}) as Dictionary).is_empty():
+		return _fail("没有进行中的分享")
+	run["share_offer"] = {}
+	return {"ok": true, "reason": ""}
+
+
+## 个人放弃（2.6 设计 §10）：只结算本人；剩余成员继续。
+func abandon_member(member_key: String) -> Dictionary:
+	if not member_keys().has(member_key):
+		return _fail("未知成员")
+	return _settle_run("abandon", int(run["player"]["hp"]), member_key)
+
+
 ## 恢复已有活动局（启动／重开时）。
 static func resume(farm_game: FarmGame) -> Dictionary:
 	var run_id := str(farm_game.state["expedition"].get("active_run_ref", ""))
@@ -225,15 +443,32 @@ func start_battle() -> Dictionary:
 		return {"ok": false, "reason": "这里没有战斗"}
 	if not run["battle"].is_empty():
 		return {"ok": false, "reason": "战斗已在进行"}
-	var inventory := run_inventory()
-	var build := DeckBuilder.build(inventory)
+	var battle_seed := int(run["rng_seed"]) + int(run["current"]["row"]) * 31 + int(run["current"]["col"])
+	var players: Array = []
+	var inventories := {}
+	for member_key in member_keys():
+		var info := member(member_key)
+		var inv := member_inventory(member_key)
+		inventories[member_key] = inv
+		players.append({
+			"key": member_key,
+			"name": str(info["name"]),
+			"max_hp": int(info["max_hp"]),
+			"hp": int(info["hp"]),
+			"deck": DeckBuilder.build(inv)["entries"],
+		})
+	## 消耗品扣减统一挂主机侧（p1）库存；p2 实体由其抽牌命中时经同一 InventoryGame 接口扣。
 	var encounter_id := _encounter_id(node)
-	var player := {"key": "p1", "name": "农夫", "max_hp": int(run["player"]["max_hp"]), "hp": int(run["player"]["hp"]), "deck": build["entries"]}
-	var combat := CombatGame.create([player], encounter_id, int(run["rng_seed"]) + int(run["current"]["row"]) * 31 + int(run["current"]["col"]), inventory)
-	if bool(run["player"].get("extra_draw_next", false)):
-		combat.draw_extra(1)
-		run["player"]["extra_draw_next"] = false
-		run["log"].append("检查装备生效：本场首回合多抽 1 张")
+	var combat := CombatGame.create(players, encounter_id, battle_seed, inventories.get("p1"))
+	## p2 的消耗品来源走各自库存：为每个玩家挂自己的库存视图。
+	if run["phase"] != null and run.get("coop", false):
+		combat.member_inventories = inventories
+	for member_key in member_keys():
+		var info2 := member(member_key)
+		if bool(info2.get("extra_draw_next", false)):
+			combat.draw_extra_for(member_key, 1)
+			_write_member_flag(member_key, "extra_draw_next", false)
+			run["log"].append("%s 检查装备生效：本场首回合多抽 1 张" % str(info2["name"]))
 	run["phase"] = "battle"
 	run["battle"] = combat.to_dict()
 	save()
@@ -323,7 +558,9 @@ func finish_battle(combat: CombatGame) -> Dictionary:
 	if run["phase"] != "battle":
 		return {"ok": false, "reason": "没有进行中的战斗"}
 	var outcome := str(combat.state.get("outcome", ""))
-	run["player"]["hp"] = int(combat.state["players"]["p1"]["hp"])
+	for member_key in member_keys():
+		if combat.state["players"].has(member_key):
+			_write_member_hp(member_key, int(combat.state["players"][member_key]["hp"]))
 	run["battle"] = {}
 	if outcome == "won":
 		run["phase"] = "node"
@@ -393,7 +630,11 @@ func _record_consumed() -> void:
 # —— 结算事务（总计划 §9.3：唯一结算 ID → 结算档 → 农场单次保存应用并登记 → 重复只回执）——
 
 
-func _settle_run(kind: String, detail: int) -> Dictionary:
+func _settle_run(kind: String, detail: int, member_key := "") -> Dictionary:
+	if member_key != "":
+		return _settle_member(kind, detail, member_key)
+	if bool(run.get("coop", false)):
+		return _settle_coop(kind, detail)
 	var settlement_id := ExpeditionStore.new_settlement_id(int(Time.get_unix_time_from_system() * 1000.0))
 	var inventory := run_inventory()
 	var carried: Array = run["carried_from_farm"]
@@ -455,6 +696,119 @@ func _settle_run(kind: String, detail: int) -> Dictionary:
 	if not apply["ok"]:
 		return {"ok": false, "reason": apply["reason"], "settlement": settlement}
 	return {"ok": true, "reason": "", "settlement": settlement}
+
+
+## 双人整局结算：主机侧结算自己并应用；客机侧只生成结算单（由客机自行应用，
+## 主机不代替客户端写农场档——总计划 §10-2.6 验收红线）。
+func _settle_coop(kind: String, detail: int) -> Dictionary:
+	var result := {"ok": true, "settlements": {}}
+	var host_settle := _settle_one_member(kind, detail, "p1", true)
+	if not host_settle["ok"]:
+		return host_settle
+	result["settlements"]["p1"] = host_settle["settlement"]
+	if bool(run.get("guest", {}).get("player_id", "x") != "x" or true):
+		var guest_settle := _settle_one_member(kind, detail, "p2", false)
+		if not guest_settle["ok"]:
+			return guest_settle
+		result["settlements"]["p2"] = guest_settle["settlement"]
+		run["guest_settlement"] = guest_settle["settlement"]
+	result["settlement"] = host_settle["settlement"]
+	return result
+
+
+## 个人放弃：只结算本人；剩余成员继续（2.6 设计 §10）。
+func _settle_member(kind: String, detail: int, member_key: String) -> Dictionary:
+	var is_host := member_key == "p1"
+	var result := _settle_one_member(kind, detail, member_key, is_host)
+	if not result["ok"]:
+		return result
+	if is_host:
+		## 主机个人放弃：本局转为由客机视角继续过于复杂，首版按"会话暂停"处理并记录。
+		run["log"].append("主机个人放弃：结算本人，会话保留待客机侧处理（2.7 扩展恢复）")
+		run["host_forfeited"] = true
+	else:
+		run["guest_forfeited"] = true
+		run["guest_settlement"] = result["settlement"]
+	if bool(run.get("host_forfeited", false)) and bool(run.get("guest_forfeited", false)):
+		run["outcome"] = kind
+		run["phase"] = "over"
+	save()
+	return result
+
+
+## 单成员结算：is_host 决定是否在本机农场档应用。
+func _settle_one_member(kind: String, detail: int, member_key: String, is_host: bool) -> Dictionary:
+	var settlement_id := ExpeditionStore.new_settlement_id(int(Time.get_unix_time_from_system() * 1000.0) + (0 if is_host else 1))
+	var info := member(member_key)
+	var inv := member_inventory(member_key)
+	var carried: Array = info["carried"]
+	var returned_items: Array = []
+	var gained_items: Array = []
+	var lost_items: Array = []
+	var protected_items: Array = []
+	var held: Array = []
+	for instance in inv.all_instances():
+		if int(instance.get("uses_remaining", 1)) > 0:
+			held.append(instance)
+		else:
+			(info["consumed"] as Array).append(int(instance.get("instance_id", 0)))
+	if kind == "extract" or kind == "gate_clear":
+		for instance in held:
+			var entry := _settle_entry(instance)
+			if int(instance["instance_id"]) in carried:
+				returned_items.append(entry)
+			else:
+				gained_items.append(entry)
+	else:
+		for instance in held:
+			var entry := _settle_entry(instance)
+			if str(instance.get("container", "")) == "safe":
+				protected_items.append(entry)
+			else:
+				lost_items.append(entry)
+	var settlement := {
+		"fmt": SETTLEMENT_FMT,
+		"settlement_id": settlement_id,
+		"run_id": str(run["run_id"]),
+		"kind": kind,
+		"detail": detail,
+		"member": member_key,
+		"created_at": int(Time.get_unix_time_from_system()),
+		"player_id": str(game.state["expedition"].get("player_id", "")) if is_host else str(run.get("guest", {}).get("player_id", "")),
+		"returned": returned_items,
+		"gained": gained_items,
+		"lost": lost_items,
+		"protected": protected_items,
+		"consumed": (info["consumed"] as Array).duplicate(),
+		"next_instance_id": int(run.get("next_instance_id", 1000)),
+		"applied": false,
+	}
+	if not is_host:
+		## 客机结算单：仅落盘等待客机拉取应用；主机的 run 标记继续。
+		settlement["guest_handoff"] = true
+		ExpeditionStore.save_settlement(settlement_id, settlement)
+		return {"ok": true, "reason": "", "settlement": settlement}
+	if not ExpeditionStore.save_settlement(settlement_id, settlement):
+		return {"ok": false, "reason": "结算档写入失败（本局保持未决，可重试）"}
+	var apply := apply_settlement(game, settlement)
+	if not apply["ok"]:
+		return {"ok": false, "reason": apply["reason"]}
+	if kind == "extract" or kind == "gate_clear":
+		run["outcome"] = kind
+		run["phase"] = "over"
+		run["settlement_id"] = settlement_id
+	else:
+		run["outcome"] = kind
+		run["phase"] = "over"
+	save()
+	return {"ok": true, "reason": "", "settlement": settlement}
+
+
+func _write_member_flag(member_key: String, flag: String, value: bool) -> void:
+	if member_key == "p2" and bool(run.get("coop", false)):
+		run["guest"][flag] = value
+	else:
+		run["player"][flag] = value
 
 
 static func _settle_entry(instance: Dictionary) -> Dictionary:

@@ -6,6 +6,7 @@ extends Control
 signal close_requested
 signal open_loadout_requested
 signal open_equipment_warehouse_requested
+signal open_room_requested
 signal depart_requested
 signal resume_requested
 
@@ -106,9 +107,9 @@ func _build() -> void:
 	depart_button = _button("出发（单人）", Color("#eaf4df"), Color("#87b06f"))
 	depart_button.pressed.connect(_on_depart_clicked)
 	buttons.add_child(depart_button)
-	var team_button := _button("好友组队", Color("#f0efe6"), Color("#b9b9a6"))
-	team_button.disabled = true
-	team_button.tooltip_text = "联机合作将在 2.6 阶段开放。"
+	var team_button := _button("好友组队", Color("#eaf4df"), Color("#87b06f"))
+	team_button.tooltip_text = "双人合作（局域网／本机直连）。"
+	team_button.pressed.connect(func() -> void: open_room_requested.emit())
 	buttons.add_child(team_button)
 	var warehouse_button := _button("装备仓库", Color("#fff5df"), Color("#d5b87d"))
 	warehouse_button.pressed.connect(func() -> void: open_equipment_warehouse_requested.emit())

@@ -86,9 +86,9 @@ const CARDS := {
 		"desc": "对一名敌人造成 15 点伤害。",
 	},
 	"rescue_signal": {
-		"name": "救援信号", "cost": 1, "target": "ally", "after": "exhaust_source",
-		"effects": [{"kind": "heal", "value": 6}],
-		"desc": "救起倒地队友并恢复 6 生命（2.6 接入倒地规则；单人可作为自用恢复），消耗来源救援包一次。",
+		"name": "救援信号", "cost": 1, "target": "rescue", "after": "exhaust_source",
+		"effects": [{"kind": "rescue", "value": 8}],
+		"desc": "救起倒地队友并恢复到 8 生命（每人每场一次；倒地规则见 2.6），消耗来源救援包一次。",
 	},
 }
 

@@ -91,6 +91,8 @@ var battle_screen: BattleScreen
 var map_panel: ExpeditionMapPanel
 var crafting_panel: CraftingPanel
 var equipment_warehouse_panel: WarehousePanel
+var room_panel: RoomPanel
+var coop_client_panel: CoopClientPanel
 var active_expedition: ExpeditionGame
 
 
@@ -1441,6 +1443,7 @@ func _build_expedition_panels() -> void:
 	expedition_hub_panel.depart_requested.connect(_on_depart_requested)
 	expedition_hub_panel.resume_requested.connect(_on_resume_requested)
 	expedition_hub_panel.open_equipment_warehouse_requested.connect(open_equipment_warehouse)
+	expedition_hub_panel.open_room_requested.connect(open_room)
 	add_child(expedition_hub_panel)
 	loadout_panel = LoadoutPanel.new()
 	loadout_panel.name = "LoadoutPanel"
@@ -1469,6 +1472,16 @@ func _build_expedition_panels() -> void:
 	equipment_warehouse_panel.save_requested.connect(func() -> void: expedition_save_requested.emit(true))
 	equipment_warehouse_panel.open_loadout_requested.connect(open_loadout)
 	add_child(equipment_warehouse_panel)
+	room_panel = RoomPanel.new()
+	room_panel.name = "RoomPanel"
+	room_panel.close_requested.connect(func() -> void: room_panel.close())
+	room_panel.coop_run_started_host.connect(_on_coop_run_started_host)
+	room_panel.coop_run_started_client.connect(_on_coop_run_started_client)
+	add_child(room_panel)
+	coop_client_panel = CoopClientPanel.new()
+	coop_client_panel.name = "CoopClientPanel"
+	coop_client_panel.close_requested.connect(func() -> void: coop_client_panel.close())
+	add_child(coop_client_panel)
 
 
 func open_crafting() -> void:
@@ -1481,6 +1494,22 @@ func open_equipment_warehouse() -> void:
 	## 2.5：装备／材料仓库（与作物/种子仓库分开）。
 	_close_modal()
 	equipment_warehouse_panel.open(game)
+
+
+func open_room() -> void:
+	## 2.6：好友组队房间页（局域网／本机直连）。
+	_close_modal()
+	room_panel.open(game)
+
+
+func _on_coop_run_started_host(expedition: ExpeditionGame) -> void:
+	active_expedition = expedition
+	expedition_save_requested.emit(true)
+	map_panel.open(expedition)
+
+
+func _on_coop_run_started_client(client: SessionClient) -> void:
+	coop_client_panel.open(client)
 
 
 func open_battle_demo() -> void:
