@@ -6,6 +6,7 @@ extends Control
 
 signal close_requested
 signal save_requested
+signal demo_battle_requested
 
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
@@ -140,6 +141,10 @@ func _build() -> void:
 	var demo_button := _button("载入演示物品", Color("#fff5df"), Color("#d5b87d"))
 	demo_button.pressed.connect(_on_inject_demo)
 	bottom.add_child(demo_button)
+	var demo_battle := _button("演示战斗", Color("#ffd98a"), Color("#9b713a"))
+	demo_battle.tooltip_text = "用基础套装打一场演示战斗（2.2）：不消耗物品、不写存档。"
+	demo_battle.pressed.connect(func() -> void: demo_battle_requested.emit())
+	bottom.add_child(demo_battle)
 	var clear_button := _button("清空配置", Color("#fff5df"), Color("#d5b87d"))
 	clear_button.pressed.connect(_on_clear_loadout)
 	bottom.add_child(clear_button)

@@ -306,5 +306,26 @@ func strip_demo_instances() -> void:
 		_inventory()["loadout"][container] = _inventory()["loadout"][container].filter(func(instance): return not bool(instance.get("demo", false)))
 
 
+## —— 消耗品实体（2.2 起用；2.3 扩展"耗尽清理关联牌"）————————————————
+
+
+## 一份药水有多张来源牌时，使用一张只扣一次实体次数。
+func consume_use(instance_id: int) -> Dictionary:
+	var instance := find_instance(instance_id)
+	if instance.is_empty():
+		return _fail("来源物品不存在")
+	if int(instance.get("uses_remaining", 1)) <= 0:
+		return _fail("来源物品已耗尽")
+	instance["uses_remaining"] = int(instance["uses_remaining"]) - 1
+	return {"ok": true, "reason": "", "uses_left": int(instance["uses_remaining"])}
+
+
+func uses_remaining(instance_id: int) -> int:
+	var instance := find_instance(instance_id)
+	if instance.is_empty():
+		return 0
+	return int(instance.get("uses_remaining", 1))
+
+
 func _fail(reason: String) -> Dictionary:
 	return {"ok": false, "reason": reason}

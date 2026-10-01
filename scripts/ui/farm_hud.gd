@@ -87,6 +87,7 @@ var sell_all_button: Button
 var harvest_all_entry: Button
 var expedition_hub_panel: ExpeditionHubPanel
 var loadout_panel: LoadoutPanel
+var battle_screen: BattleScreen
 
 
 func _ready() -> void:
@@ -1437,7 +1438,21 @@ func _build_expedition_panels() -> void:
 	loadout_panel = LoadoutPanel.new()
 	loadout_panel.name = "LoadoutPanel"
 	loadout_panel.close_requested.connect(_on_loadout_close)
+	loadout_panel.demo_battle_requested.connect(open_battle_demo)
 	add_child(loadout_panel)
+	battle_screen = preload("res://scenes/battle_screen.tscn").instantiate()
+	battle_screen.name = "BattleScreen"
+	add_child(battle_screen)
+
+
+func open_battle_demo() -> void:
+	## 2.2 演示战斗入口：从战备面板进入（固定基础套装，不动库存）。
+	_close_modal()
+	if expedition_hub_panel != null:
+		expedition_hub_panel.close()
+	if loadout_panel != null:
+		loadout_panel.visible = false
+	battle_screen.open_demo()
 
 
 func open_expedition_hub() -> void:
