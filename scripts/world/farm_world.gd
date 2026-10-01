@@ -28,6 +28,12 @@ const STAGE_MODELS := {
 		"growing": preload("res://assets/models/plot_carrot_growing.glb"),
 		"mature": preload("res://assets/models/plot_carrot_mature.glb"),
 	},
+	# 岩芽菜先用胡萝卜模型占位（2.8 换正式素材）。
+	"rock_sprout": {
+		"sprout": preload("res://assets/models/plot_carrot_sprout.glb"),
+		"growing": preload("res://assets/models/plot_carrot_growing.glb"),
+		"mature": preload("res://assets/models/plot_carrot_mature.glb"),
+	},
 }
 
 var game: FarmGame
@@ -483,6 +489,7 @@ func _do_harvest(plot_id: int) -> void:
 	if not result["ok"]:
 		hud.show_status(result["message"])
 		return
+	_record_harvest(str(result["batch"]["kind"]), int(result["batch"]["count"]))
 	_advance_tutorial(2)
 	if not _save():
 		hud.show_status("存档写入失败，本次收获结果可能没有保存！")
@@ -512,7 +519,9 @@ func _on_building_input(_camera: Node, event: InputEvent, _position: Vector3, _n
 			"loadout":
 				hud.open_loadout()
 			"craft":
-				hud.show_status("制作台尚未开放：将在第二大阶段 2.5 提供配方与制作。")
+				hud.open_crafting()
+			"equip_wh":
+				hud.open_equipment_warehouse()
 
 
 func _on_plant_seed_requested(plot_id: int, seed_id: int) -> void:
@@ -597,6 +606,8 @@ func _on_harvest_all_requested() -> void:
 	if not summary["ok"]:
 		hud.show_status("现在没有成熟的地块。")
 		return
+	for entry in summary["results"]:
+		_record_harvest(str(entry["batch"]["kind"]), int(entry["batch"]["count"]))
 	_advance_tutorial(2)
 	if not _save():
 		hud.show_status("存档写入失败，本次收获结果可能没有保存！")
@@ -832,6 +843,13 @@ func _advance_tutorial(completed_step: int) -> void:
 	if int(game.state.get("tutorial_step", 99)) != completed_step:
 		return
 	game.state["tutorial_step"] = 99 if completed_step >= 4 else completed_step + 1
+
+
+## 2.5：收获事件进成长统计（第一茬岩芽菜等目标判定）。
+func _record_harvest(kind: String, count: int) -> void:
+	var crafting := CraftingGame.new()
+	crafting.bind(game)
+	crafting.record_event("harvested", {"kind": kind, "count": count})
 
 
 func _now() -> int:

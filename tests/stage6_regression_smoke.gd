@@ -125,7 +125,7 @@ func _test_full_migration_chain() -> void:
 			v1["plots"].append({"id": index + 1, "seed_id": 0, "planted_at": 0, "ready_at": 0, "roll_seed": 0})
 	var game := FarmGame.new()
 	_check(game.load_state(v1), "v1 save migrates through to v5")
-	_check(game.state["version"] == 6, "final version is 6")
+	_check(game.state["version"] == 7, "final version is 7")
 	_check(int(game.state["coins"]) == 246, "coins survive the whole chain")
 	_check(game.state["seeds"].size() == 1 and int(game.state["seeds"][0]["id"]) == 21, "seeds survive the whole chain")
 	_check(game.state["crop_batches"].size() == 1, "batches survive the whole chain")

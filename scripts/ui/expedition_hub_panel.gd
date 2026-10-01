@@ -5,6 +5,7 @@ extends Control
 
 signal close_requested
 signal open_loadout_requested
+signal open_equipment_warehouse_requested
 signal depart_requested
 signal resume_requested
 
@@ -109,6 +110,9 @@ func _build() -> void:
 	team_button.disabled = true
 	team_button.tooltip_text = "联机合作将在 2.6 阶段开放。"
 	buttons.add_child(team_button)
+	var warehouse_button := _button("装备仓库", Color("#fff5df"), Color("#d5b87d"))
+	warehouse_button.pressed.connect(func() -> void: open_equipment_warehouse_requested.emit())
+	buttons.add_child(warehouse_button)
 
 	var legend := _label("操作说明：点击洞窟入口看这里；战备箱直接打开个人配装；制作台即将开放。探险时携带物品会被本局占用。", 14, TEXT_MUTED)
 	legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

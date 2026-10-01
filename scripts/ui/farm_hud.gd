@@ -89,6 +89,8 @@ var expedition_hub_panel: ExpeditionHubPanel
 var loadout_panel: LoadoutPanel
 var battle_screen: BattleScreen
 var map_panel: ExpeditionMapPanel
+var crafting_panel: CraftingPanel
+var equipment_warehouse_panel: WarehousePanel
 var active_expedition: ExpeditionGame
 
 
@@ -1438,6 +1440,7 @@ func _build_expedition_panels() -> void:
 	expedition_hub_panel.open_loadout_requested.connect(open_loadout)
 	expedition_hub_panel.depart_requested.connect(_on_depart_requested)
 	expedition_hub_panel.resume_requested.connect(_on_resume_requested)
+	expedition_hub_panel.open_equipment_warehouse_requested.connect(open_equipment_warehouse)
 	add_child(expedition_hub_panel)
 	loadout_panel = LoadoutPanel.new()
 	loadout_panel.name = "LoadoutPanel"
@@ -1455,6 +1458,29 @@ func _build_expedition_panels() -> void:
 	map_panel.farm_save_requested.connect(_on_expedition_farm_save)
 	map_panel.run_finished.connect(_on_run_finished)
 	add_child(map_panel)
+	crafting_panel = CraftingPanel.new()
+	crafting_panel.name = "CraftingPanel"
+	crafting_panel.close_requested.connect(func() -> void: crafting_panel.close())
+	crafting_panel.save_requested.connect(func() -> void: expedition_save_requested.emit(true))
+	add_child(crafting_panel)
+	equipment_warehouse_panel = WarehousePanel.new()
+	equipment_warehouse_panel.name = "EquipmentWarehousePanel"
+	equipment_warehouse_panel.close_requested.connect(func() -> void: equipment_warehouse_panel.close())
+	equipment_warehouse_panel.save_requested.connect(func() -> void: expedition_save_requested.emit(true))
+	equipment_warehouse_panel.open_loadout_requested.connect(open_loadout)
+	add_child(equipment_warehouse_panel)
+
+
+func open_crafting() -> void:
+	## 2.5：制作台（2.1 占位转正）。
+	_close_modal()
+	crafting_panel.open(game)
+
+
+func open_equipment_warehouse() -> void:
+	## 2.5：装备／材料仓库（与作物/种子仓库分开）。
+	_close_modal()
+	equipment_warehouse_panel.open(game)
 
 
 func open_battle_demo() -> void:

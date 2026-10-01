@@ -65,6 +65,31 @@ const CARDS := {
 		"effects": [{"kind": "heal", "value": 4}],
 		"desc": "恢复自己或一名存活队友 4 点生命，消耗来源绷带一次。",
 	},
+	"drink_soup": {
+		"name": "喝汤", "cost": 0, "target": "self", "after": "exhaust_source",
+		"effects": [{"kind": "heal", "value": 6}],
+		"desc": "恢复 6 点生命，消耗来源白菜汤一次。",
+	},
+	"drink_elixir": {
+		"name": "饮下药剂", "cost": 0, "target": "self", "after": "exhaust_source",
+		"effects": [{"kind": "heal", "value": 10}],
+		"desc": "恢复 10 点生命，消耗来源岩芽药剂一次。",
+	},
+	"slash7": {
+		"name": "利刃斩", "cost": 1, "target": "enemy", "after": "discard",
+		"effects": [{"kind": "damage", "value": 7}],
+		"desc": "对一名敌人造成 7 点伤害。",
+	},
+	"heavy_strike15": {
+		"name": "沉重一击", "cost": 2, "target": "enemy", "after": "discard",
+		"effects": [{"kind": "damage", "value": 15}],
+		"desc": "对一名敌人造成 15 点伤害。",
+	},
+	"rescue_signal": {
+		"name": "救援信号", "cost": 1, "target": "ally", "after": "exhaust_source",
+		"effects": [{"kind": "heal", "value": 6}],
+		"desc": "救起倒地队友并恢复 6 生命（2.6 接入倒地规则；单人可作为自用恢复），消耗来源救援包一次。",
+	},
 }
 
 const STATUS_DISPLAY := {

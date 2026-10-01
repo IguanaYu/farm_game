@@ -45,7 +45,7 @@ const ITEMS := {
 	# —— 正式物品池（2.3 设计 §4）：12~16 种预算内新增 12 种。
 	"copper_shortsword": {
 		"name": "铜短剑", "category": "weapon", "size": Vector2i(1, 3), "quality": 1,
-		"base_value": 40, "sellable": true, "basic_kit": false, "demo": false,
+		"base_value": 40, "buy_price": 70, "sellable": true, "basic_kit": false, "demo": false,
 		"safe_allowed": false, "cards": ["slash", "slash", "heavy_strike"],
 		"desc": "普通攻击装备：占 3 格，切击×2＋重击。",
 	},
@@ -69,7 +69,7 @@ const ITEMS := {
 	},
 	"small_potion": {
 		"name": "小药水", "category": "supply", "size": Vector2i(1, 1), "quality": 1,
-		"base_value": 6, "sellable": true, "basic_kit": false, "demo": false,
+		"base_value": 6, "buy_price": 8, "sellable": true, "basic_kit": false, "demo": false,
 		"safe_allowed": false, "cards": ["drink_potion"], "uses": 1,
 		"desc": "一次恢复补给：使用一次后实体消耗、关联牌清除。",
 	},
@@ -114,6 +114,31 @@ const ITEMS := {
 		"base_value": 60, "sellable": true, "basic_kit": false, "demo": false,
 		"safe_allowed": false, "cards": ["brace", "observe"],
 		"desc": "小型高价值资源：值钱也能打（稳住＋观察）；不可保护。",
+	},
+	# —— 2.5 制作产物与深层装备 ——
+	"cabbage_soup": {
+		"name": "白菜汤", "category": "supply", "size": Vector2i(1, 1), "quality": 1,
+		"base_value": 4, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["drink_soup"], "uses": 1,
+		"desc": "农场自产补给：恢复 6 生命，一次使用。",
+	},
+	"rock_elixir": {
+		"name": "岩芽药剂", "category": "supply", "size": Vector2i(1, 1), "quality": 2,
+		"base_value": 8, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["drink_elixir"], "uses": 1,
+		"desc": "洞窟植物制成：恢复 10 生命，一次使用。",
+	},
+	"iron_shortsword": {
+		"name": "铁短剑", "category": "weapon", "size": Vector2i(1, 3), "quality": 2,
+		"base_value": 90, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["slash7", "slash7", "heavy_strike15"],
+		"desc": "深层装备：切击(7)×2＋重击(15)。",
+	},
+	"rescue_kit": {
+		"name": "救援包", "category": "supply", "size": Vector2i(1, 2), "quality": 2,
+		"base_value": 20, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["first_aid", "rescue_signal"], "uses": 1,
+		"desc": "共享一次使用的恢复＋救援（救援牌在 2.6 合作接入；单人可自用恢复）。",
 	},
 }
 

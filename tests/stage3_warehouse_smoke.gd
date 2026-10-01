@@ -178,7 +178,7 @@ func _test_v2_to_v3_migration() -> void:
 			})
 	var game := FarmGame.new()
 	_check(game.load_state(v2), "version 2 save must migrate to version 3")
-	_check(game.state["version"] == 6, "migrated save reports version 6")
+	_check(game.state["version"] == 7, "migrated save reports version 7")
 	_check(game.state["warehouse_level"] == 1 and game.state["breeder"]["owned"] == false, "migration fills warehouse and breeder defaults")
 	_check(game.state["pending"]["crops"].is_empty() and game.state["pending"]["seeds"].is_empty(), "migration starts with empty pending")
 	_check(game.get_plot(1)["parent_traits"] == [], "growing plot gets an empty parent entry list")

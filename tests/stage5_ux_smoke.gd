@@ -95,7 +95,7 @@ func _test_v4_to_v5_migration() -> void:
 		})
 	var game := FarmGame.new()
 	_check(game.load_state(v4), "version 4 save migrates to version 5")
-	_check(game.state["version"] == 6, "migrated save reports version 6")
+	_check(game.state["version"] == 7, "migrated save reports version 7")
 	_check(int(game.state["tutorial_step"]) == 99, "existing players skip the tutorial")
 	_check(game.state["market"]["guest_ids"] == [1, 2, 3], "market state survives the migration")
 	_check(game.state["coins"] == 123, "coins survive the migration")

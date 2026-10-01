@@ -16,6 +16,19 @@ const PLANTS: Dictionary = {
 		"unlock_farming_level": 1,
 		"unlock_shop_level": 1,
 	},
+	# 洞窟稀有植物（2.5）：60 分钟档位、更好的恢复补给来源。
+	"rock_sprout": {
+		"display_name": "岩芽菜",
+		"grow_seconds": 3600,
+		"base_score": 600,
+		"crop_count": 5,
+		"seed_price": 30,
+		"water_segments": 1,
+		"encounter_count": 2,
+		"harvest_exp": 60,
+		"unlock_farming_level": 1,
+		"unlock_shop_level": 3,
+	},
 	# 正式名称未定：carrot 仅是临时美术 ID，不据此确定正式名称。
 	"carrot": {
 		"display_name": "胡萝卜（暂名）",

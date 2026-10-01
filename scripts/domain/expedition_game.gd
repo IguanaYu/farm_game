@@ -465,6 +465,7 @@ static func _settle_entry(instance: Dictionary) -> Dictionary:
 		"name": str(def.get("name", instance.get("def_id", "?"))),
 		"container": str(instance.get("container", "")),
 		"uses_remaining": int(instance.get("uses_remaining", 1)),
+		"seed_traits": instance.get("seed_traits", []),
 		"sell_value": int(def.get("base_value", 0)) if bool(def.get("sellable", false)) else 0,
 	}
 
@@ -517,6 +518,7 @@ static func apply_settlement(farm_game: FarmGame, settlement: Dictionary) -> Dic
 				"demo": false,
 				"source": "settlement",
 				"uses_remaining": int(entry.get("uses_remaining", def.get("uses", 1))),
+				"seed_traits": entry.get("seed_traits", []),
 			}
 			expedition["inventory"]["warehouse"].append(fresh)
 			restored += 1
@@ -552,6 +554,33 @@ static func apply_settlement(farm_game: FarmGame, settlement: Dictionary) -> Dic
 				expedition["inventory"]["loadout"][container].erase(target)
 			expedition["inventory"]["warehouse"].erase(target)
 			removed += 1
+	## 稀有种子进入原种子体系（2.5 设计 §6）：物品实例转为农场种子（保留实例上的词条）。
+	var seed_tool := InventoryGame.new()
+	seed_tool.bind(expedition)
+	for group in ["gained", "protected"]:
+		for entry in settlement.get(group, []):
+			if str(entry.get("def_id", "")) != "rock_sprout_seed":
+				continue
+			var instance := seed_tool.find_instance(int(entry.get("instance_id", 0)))
+			var traits: Array = instance.get("seed_traits", []) if not instance.is_empty() else []
+			farm_game.add_seed_with_traits("rock_sprout", traits)
+			if not instance.is_empty():
+				expedition["inventory"]["warehouse"].erase(instance)
+	## 成长统计与目标钩子（2.5）。
+	var crafting := CraftingGame.new()
+	crafting.bind(farm_game)
+	var kind := str(settlement.get("kind", ""))
+	if kind == "extract":
+		crafting.record_event("extract", {})
+	elif kind == "gate_clear":
+		crafting.record_event("gate_clear", {})
+	var brought_now := {}
+	for group in ["gained", "protected"]:
+		for entry in settlement.get(group, []):
+			var def_id := str(entry.get("def_id", ""))
+			brought_now[def_id] = int(brought_now.get(def_id, 0)) + 1
+	for def_id in brought_now:
+		crafting.record_event("brought", {"id": def_id, "count": int(brought_now[def_id])})
 	applied.append(settlement_id)
 	expedition["applied_settlements"] = applied
 	settlement["applied"] = true

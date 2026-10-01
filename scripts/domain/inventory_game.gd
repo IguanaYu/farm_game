@@ -91,7 +91,7 @@ func add_instance(def_id: String, source := "", quality := 1, demo := false) -> 
 func find_first_fit(container: String, size: Vector2i) -> Variant:
 	if not ExpeditionBaseline.CONTAINER_SIZE.has(container):
 		return null
-	var bounds: Vector2i = ExpeditionBaseline.CONTAINER_SIZE[container]
+	var bounds: Vector2i = ExpeditionBaseline.size_for(expedition, container)
 	var occupied := ExpeditionBaseline.occupancy_map(_inventory()["loadout"].get(container, []), container)
 	for rotated in [false, true]:
 		for y in range(bounds.y):
@@ -114,7 +114,7 @@ func move_to_loadout(instance_id: int, container: String) -> Dictionary:
 		return _fail("保险箱只允许存放小型材料与稀有种子，%s 放不进去" % def["name"])
 	var fit = find_first_fit(container, def["size"])
 	if fit == null:
-		var free := ExpeditionBaseline.largest_free_rect(container, _inventory()["loadout"].get(container, []))
+		var free := ExpeditionBaseline.largest_free_rect(container, _inventory()["loadout"].get(container, []), expedition)
 		return _fail("%s 已放不下%s（最大连续空位 %d×%d，需要 %d×%d）" % [
 			ExpeditionBaseline.CONTAINER_DISPLAY[container], def["name"], free.x, free.y, def["size"].x, def["size"].y])
 	_remove_from_current(instance)
@@ -155,8 +155,9 @@ func place_at(instance_id: int, container: String, cell: Vector2i, rotated: bool
 	if container == "safe" and not bool(def.get("safe_allowed", false)):
 		return _fail("保险箱只允许存放白名单物品，%s 放不进去" % def["name"])
 	var occupied := ExpeditionBaseline.occupancy_map(_inventory()["loadout"].get(container, []), container)
-	if not ExpeditionBaseline.can_place(container, def["size"], cell, rotated, occupied, int(instance["instance_id"])):
-		var free := ExpeditionBaseline.largest_free_rect(container, _inventory()["loadout"].get(container, []))
+	var bounds := ExpeditionBaseline.size_for(expedition, container)
+	if not ExpeditionBaseline.can_place_in(bounds, def["size"], cell, rotated, occupied, int(instance["instance_id"])):
+		var free := ExpeditionBaseline.largest_free_rect(container, _inventory()["loadout"].get(container, []), expedition)
 		return _fail("放不下：%s 的最大连续空位是 %d×%d，需要 %d×%d" % [
 			ExpeditionBaseline.CONTAINER_DISPLAY[container], free.x, free.y,
 			def["size"].x if not rotated else def["size"].y,
@@ -214,7 +215,7 @@ func auto_tidy(container: String) -> Dictionary:
 		placed["cell"] = [int(fit[0]), int(fit[1])]
 		placed["rotated"] = bool(fit[2])
 		_inventory()["loadout"][container].append(placed)
-	var problems: Array = ExpeditionBaseline.layout_integrity(_inventory()["loadout"])
+	var problems: Array = ExpeditionBaseline.layout_integrity(_inventory()["loadout"], expedition)
 	if not problems.is_empty():
 		_inventory()["loadout"][container] = original
 		return _fail("自动整理结果异常，已恢复原布局")
@@ -356,7 +357,7 @@ func loadout_check() -> Dictionary:
 	var advises: Array = []
 	if is_run_occupied():
 		hard_blocks.append("有未解决的活动局：先完成结算或放弃当前探险")
-	hard_blocks.append_array(ExpeditionBaseline.layout_integrity(_inventory()["loadout"]))
+	hard_blocks.append_array(ExpeditionBaseline.layout_integrity(_inventory()["loadout"], expedition))
 	var preview := deck_preview()
 	if preview["rounds"][1].is_empty():
 		hard_blocks.append("首回合牌库为空：把装备放进胸挂（背包牌第 2 回合、保险箱牌第 3 回合才加入）")

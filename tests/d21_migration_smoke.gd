@@ -32,7 +32,7 @@ func _initialize() -> void:
 	if not ok:
 		_finish()
 		return
-	_check(int(migrated.state["version"]) == 6, "迁移：版本升为 6")
+	_check(int(migrated.state["version"]) == 7, "迁移：版本升为 7（经 v6 中转）")
 	_check(int(migrated.state["coins"]) == 666, "迁移：金币保留")
 	_check(int(migrated.state["farming_exp"]) == 480, "迁移：成长经验保留")
 	_check(migrated.owned_plot_ids().size() == 10, "迁移：十块地拥有状态保留")
@@ -50,9 +50,9 @@ func _initialize() -> void:
 	var new_game := FarmGame.new()
 	new_game.new_game(3000)
 	_check(new_game.load_state(new_game.state.duplicate(true)), "v6 档直接加载不触发迁移分支")
-	var v7: Dictionary = new_game.state.duplicate(true)
-	v7["version"] = 7
-	_check(not new_game.load_state(v7), "未知版本（7）被拒绝加载")
+	var v8: Dictionary = new_game.state.duplicate(true)
+	v8["version"] = 8
+	_check(not new_game.load_state(v8), "未知版本（8）被拒绝加载")
 	var broken: Dictionary = new_game.state.duplicate(true)
 	broken["expedition"] = {"player_id": ""}
 	_check(not migrated.load_state(broken), "损坏的 expedition 块被拒绝，不静默重建")

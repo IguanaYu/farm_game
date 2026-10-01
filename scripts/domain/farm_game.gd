@@ -1,7 +1,7 @@
 class_name FarmGame
 extends RefCounted
 
-const SAVE_VERSION := 6
+const SAVE_VERSION := 7
 const PLOT_COUNT := 6
 const MAX_PLOTS := 10
 const ROUND_EVENT_LIMIT := 24
@@ -68,6 +68,29 @@ func _default_market() -> Dictionary:
 	}
 
 
+## 制作/升级/目标（2.5）。plant_unlocks 同时是市场与种子购买的解锁开关。
+func _default_crafting() -> Dictionary:
+	return {
+		"unlocked_recipes": [],
+		"unlocked_upgrades": [],
+		"plant_unlocks": [],
+		"pending_items": [],
+		"upgrade_levels": {"storage": 1, "chest": 1, "pack": 1, "safe": 1},
+		"goals": {},
+		"stats": {"extracts": 0, "coop_extracts": 0, "gate_clears": 0, "brought": [], "harvested": {}, "craft_counts": {}},
+	}
+
+
+## v6→v7（2.5）：追加 crafting 块，其余零改动。
+func _migrate_v6_to_v7(saved: Dictionary) -> Dictionary:
+	var migrated := saved.duplicate(true)
+	migrated["version"] = 7
+	var expedition: Dictionary = migrated.get("expedition", {})
+	expedition["crafting"] = _default_crafting()
+	migrated["expedition"] = expedition
+	return migrated
+
+
 ## 第二大阶段的探险侧字段（2.1 计划 §3.1）。个人库存与农场资产同档保存，局档另存。
 func _default_expedition(now: int) -> Dictionary:
 	return {
@@ -81,6 +104,7 @@ func _default_expedition(now: int) -> Dictionary:
 		"loadouts": [],
 		"active_run_ref": "",
 		"applied_settlements": [],
+		"crafting": _default_crafting(),
 	}
 
 
@@ -107,6 +131,8 @@ func load_state(saved: Dictionary) -> bool:
 		source = _migrate_v4_to_v5(source)
 	if int(source.get("version", -1)) == 5:
 		source = _migrate_v5_to_v6(source)
+	if int(source.get("version", -1)) == 6:
+		source = _migrate_v6_to_v7(source)
 	if int(source.get("version", -1)) != SAVE_VERSION:
 		return false
 	# JSON 会把整数解析成浮点（3 → 3.0），而数组/字典的相等比较对类型严格；统一把整数值浮点归一化为 int。
@@ -795,15 +821,31 @@ func buy_seeds(quantity: int, kind := "cabbage") -> String:
 	return ""
 
 
+## 2.5：洞窟种子转换入种子区（沿用现有种子结构与容量口径）。
+func add_seed_with_traits(kind: String, traits: Array) -> bool:
+	if not PlantDefs.is_known_plant(kind):
+		return false
+	var seed := _new_seed(kind)
+	seed["traits"] = traits.duplicate(true)
+	if seed_slots_after_adding([seed]) > warehouse_capacity():
+		state["pending"]["seeds"].append(seed)
+		return true
+	state["seeds"].append(seed)
+	return true
+
+
 func seed_lock_reason(kind: String) -> String:
 	var defn := PlantDefs.get_plant(kind)
 	if defn.is_empty():
 		return "未知种子。"
 	var missing: Array = []
-	if farming_level() < defn["unlock_farming_level"]:
-		missing.append("种地等级 %d（当前 %d）" % [defn["unlock_farming_level"], farming_level()])
+	# 2.5：洞窟植物要先解锁种类（第一茬收获后商店才卖基础种子）。
+	if not ["cabbage", "carrot"].has(kind) and not state.get("expedition", {}).get("crafting", {}).get("plant_unlocks", []).has(kind):
+		return "还没有解锁这种植物：先从洞窟带回种子种出第一茬。"
 	if int(state["shop_level"]) < defn["unlock_shop_level"]:
 		missing.append("商店等级 %d（当前 %d）" % [defn["unlock_shop_level"], int(state["shop_level"])])
+	if farming_level() < defn["unlock_farming_level"]:
+		missing.append("种地等级 %d（当前 %d）" % [defn["unlock_farming_level"], farming_level()])
 	if missing.is_empty():
 		return ""
 	return "解锁%s还需要：" % defn["display_name"] + "、".join(missing) + "。"
@@ -1013,7 +1055,11 @@ func refresh_market(now: int) -> bool:
 		pool.remove_at(index)
 	picked.sort()
 	market["guest_ids"] = picked
-	for kind in ["cabbage", "carrot"]:
+	var market_kinds: Array = ["cabbage", "carrot"]
+	# 2.5：解锁岩芽菜后进入植物市场（偏好倍率 1.0，公式沿用现有池）。
+	if state.get("expedition", {}).get("crafting", {}).get("plant_unlocks", []).has("rock_sprout"):
+		market_kinds.append("rock_sprout")
+	for kind in market_kinds:
 		var formula_rng := RandomNumberGenerator.new()
 		formula_rng.seed = day * 40503 + int(kind.hash()) % 65521
 		var formula := {}
