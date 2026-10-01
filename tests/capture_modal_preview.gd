@@ -28,5 +28,5 @@ func _capture() -> void:
 		return
 	await process_frame
 	await RenderingServer.frame_post_draw
-	root.get_viewport().get_texture().get_image().save_png("res://docs/harvest_preview.png")
+	root.get_viewport().get_texture().get_image().save_png("res://screenshots/harvest_preview.png")
 	quit(0)

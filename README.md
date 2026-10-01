@@ -2,6 +2,8 @@
 
 点击式种田游戏：在立体农场里直接点击地块与建筑操作，作物按现实时间生长（关游戏也继续）。完整循环：**选种 → 播种与照料 → 成熟收获 → 育种或复制 → 比价出售 → 购买、扩地与升级 → 下一轮**。
 
+第二大阶段“农场与合作洞窟”处于设计阶段：[整体计划](docs/Godot_第二大阶段_农场与合作洞窟_整体开发计划_v0.1.md)、[九份详细功能设计](docs/design/第二大阶段详细设计索引.md)与[九份代码执行计划](docs/plan/第二大阶段代码执行计划索引.md)（尚未开始实施）。文档中的新增功能尚未实现。
+
 ## 启动
 
 - 玩家：直接运行 `build/小小农场.exe`（Windows 导出包），或用 Godot 4.6.1 打开本目录按 F5。
@@ -41,4 +43,4 @@ $godot = 'E:\其他\chorme_download\Godot_v4.6.1-stable_win64.exe\Godot_v4.6.1-s
 & $godot --headless --path 'E:\gpt\godot\farm' --script 'res://tests/stage6_regression_smoke.gd'
 ```
 
-规则数值集中在 `scripts/domain/plant_defs.gd`（种植）、`breeding_defs.gd`（育种/仓库/育种机）、`market_defs.gd`（客人/经济）。素材原件在 `art/lowpoly/`（`.gdignore` 隔离），运行时副本与盘点见 `assets/stage1_manifest.json`。各阶段交付文档在 `docs/`。
+规则数值集中在 `scripts/domain/plant_defs.gd`（种植）、`breeding_defs.gd`（育种/仓库/育种机）、`market_defs.gd`（客人/经济）。素材原件在 `art/lowpoly/`（`.gdignore` 隔离），运行时副本与盘点见 `assets/stage1_manifest.json`。文档结构：`docs/` 顶层是第二大阶段（农场与合作洞窟）的总体开发计划，设计文档在 `docs/design/`，第一大阶段（单人首版）的全部已完成文档在 `docs/archive/`，界面截图在 `screenshots/`，索引见 [docs/README.md](docs/README.md)。
