@@ -786,6 +786,7 @@ func _settle_one_member(kind: String, detail: int, member_key: String, is_host: 
 	if not is_host:
 		## 客机结算单：仅落盘等待客机拉取应用；主机的 run 标记继续。
 		settlement["guest_handoff"] = true
+		settlement["player_id"] = str(run.get("guest", {}).get("player_id", ""))
 		ExpeditionStore.save_settlement(settlement_id, settlement)
 		return {"ok": true, "reason": "", "settlement": settlement}
 	if not ExpeditionStore.save_settlement(settlement_id, settlement):

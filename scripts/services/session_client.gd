@@ -13,6 +13,9 @@ var farm_game: FarmGame
 var mirror_run: Dictionary = {}
 var pending_run_id := ""
 var next_action_seq := 0
+var _last_ping_ms := 0
+## 连接建立前的待发队列（握手包不再被静默丢弃——2.7）。
+var _outbox: Array = []
 
 
 func connect_to_host(address: String, farm: FarmGame, port := SessionHost.DEFAULT_PORT) -> bool:
@@ -23,6 +26,17 @@ func connect_to_host(address: String, farm: FarmGame, port := SessionHost.DEFAUL
 func poll() -> void:
 	if peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
 		return
+	## 心跳：主机据此判定在线/掉线（2.7）。
+	var now_ms := Time.get_ticks_msec()
+	if link_ready():
+		if now_ms - _last_ping_ms > 800:
+			_last_ping_ms = now_ms
+			_send({"t": "ping"})
+		if not _outbox.is_empty():
+			var flush: Array = _outbox.duplicate()
+			_outbox.clear()
+			for message in flush:
+				_send(message)
 	peer.poll()
 	while peer.get_available_packet_count() > 0:
 		var message: Variant = JSON.parse_string(peer.get_packet().get_string_from_utf8())
@@ -34,7 +48,15 @@ func link_ready() -> bool:
 	return peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
 
 
+## 主动断开（重连前调用，释放主机侧旧 peer）。
+func disconnect_link() -> void:
+	peer.close()
+
+
 func _send(message: Dictionary) -> void:
+	if not link_ready():
+		_outbox.append(message)
+		return
 	peer.set_target_peer(1)
 	peer.put_packet(JSON.stringify(message).to_utf8_buffer())
 
@@ -108,7 +130,7 @@ func send_action(kind: String, args: Dictionary = {}) -> String:
 
 
 func send_settlement_applied(settlement_id: String) -> void:
-	_send({"t": "settlement_applied", "settlement_id": settlement_id})
+	_send({"t": "settlement_applied", "settlement_id": settlement_id, "player_id": str(farm_game.state["expedition"].get("player_id", ""))})
 
 
 # —— 消息处理 ——————————————————————————————————————————————
