@@ -319,6 +319,7 @@ func _build_tutorial_banner() -> void:
 	tutorial_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	row.add_child(tutorial_label)
 	var skip_button := _plain_button("跳过", Color("#ffd98a"))
+	skip_button.name = "SkipTutorialButton"
 	skip_button.custom_minimum_size.x = 58
 	skip_button.size_flags_horizontal = Control.SIZE_SHRINK_END
 	skip_button.pressed.connect(func():

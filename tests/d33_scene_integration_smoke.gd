@@ -82,10 +82,11 @@ func _run() -> void:
 
 
 func _click_skip(hud: FarmHud) -> bool:
-	for button in hud.find_children("*", "Button", true, false):
-		if str(button.text) == "跳过引导" and not button.disabled:
-			button.pressed.emit()
-			return true
+	# 文案精简后仍按同一入口检查落盘，不把按钮显示文字当作接口。
+	var button := hud.find_child("SkipTutorialButton", true, false) as Button
+	if button != null and not button.disabled:
+		button.pressed.emit()
+		return true
 	return false
 
 
