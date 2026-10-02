@@ -112,6 +112,9 @@ var coop_client_panel: CoopClientPanel
 var active_expedition: ExpeditionGame
 ## 合作局主机侧会话（F-04）：地图/战斗面板的裁定入口与快照刷新从这里注入。
 var coop_host: SessionHost = null
+## ESC 暂停菜单（主菜单轮）：所有面板收起时才允许弹出。
+var pause_overlay: Control
+var pause_back_button: Button
 
 
 func _ready() -> void:
@@ -130,6 +133,7 @@ func _ready() -> void:
 	_build_tutorial_banner()
 	_build_modal()
 	_build_expedition_panels()
+	_build_pause_overlay()
 
 
 func refresh(state: Dictionary) -> void:
@@ -1321,6 +1325,80 @@ func _close_modal() -> void:
 
 func close_modal_after_action() -> void:
 	_close_modal()
+
+
+# —— ESC 暂停菜单（主菜单轮）———————————————————————————————————
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+		if pause_overlay != null and pause_overlay.visible:
+			_close_pause()
+		elif not _any_panel_open():
+			_open_pause()
+
+
+## 战斗/组队等面板自己也监听 ESC 但不消费事件：面板打开时 HUD 必须完全让位，
+## 否则同一次 ESC 会既关面板又弹暂停。
+func _any_panel_open() -> bool:
+	if active_modal != "" or modal_overlay.visible:
+		return true
+	for ui_panel in [expedition_hub_panel, loadout_panel, battle_screen, map_panel, crafting_panel, equipment_warehouse_panel, room_panel, coop_client_panel]:
+		if ui_panel != null and ui_panel.visible:
+			return true
+	return false
+
+
+func _build_pause_overlay() -> void:
+	pause_overlay = Control.new()
+	pause_overlay.name = "PauseOverlay"
+	pause_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	pause_overlay.visible = false
+	add_child(pause_overlay)
+	var shade := ColorRect.new()
+	shade.name = "PauseShade"
+	shade.color = Color(0.10, 0.18, 0.13, 0.5)
+	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.add_child(shade)
+	var center := CenterContainer.new()
+	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_overlay.add_child(center)
+	var card := _panel(CREAM, Color("#d5c9aa"), 18)
+	card.custom_minimum_size = Vector2(380, 0)
+	center.add_child(card)
+	var stack := _card_stack(card)
+	var title := _label("⏸ 暂停", 26, FOREST)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stack.add_child(title)
+	var hint := _label("农场进度每一步都会自动保存", 13, TEXT_MUTED)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	stack.add_child(hint)
+	var resume_button := _solid_button("继续游戏", LEAF)
+	resume_button.name = "PauseResumeButton"
+	resume_button.pressed.connect(_close_pause)
+	stack.add_child(resume_button)
+	pause_back_button = _solid_button("回到主菜单", ACCENT_GOLD)
+	pause_back_button.name = "PauseBackToMenuButton"
+	pause_back_button.pressed.connect(_on_pause_back_to_menu)
+	stack.add_child(pause_back_button)
+
+
+func _open_pause() -> void:
+	# 联机房间/对局进行中不允许回主菜单（会直接断开双方链路），按钮置灰说明原因。
+	var coop_active := coop_host != null or room_panel.host != null or room_panel.client != null or coop_client_panel.client != null
+	pause_back_button.disabled = coop_active
+	pause_back_button.tooltip_text = "联机房间或对局进行中，请先在房间页退出" if coop_active else ""
+	pause_overlay.visible = true
+
+
+func _close_pause() -> void:
+	pause_overlay.visible = false
+
+
+func _on_pause_back_to_menu() -> void:
+	GameFlow.reset()
+	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
 
 
 ## —— 探险入口面板（2.1）：独立脚本挂接，实现不写进本文件 ——

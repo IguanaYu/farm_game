@@ -53,14 +53,26 @@ var hovered_plot_id: int = 0
 
 func _ready() -> void:
 	game = FarmGame.new()
-	var saved := SaveStore.load_state()
-	var loaded := not saved.is_empty() and game.load_state(saved)
-	if not loaded:
-		saved = SaveStore.load_backup_state()
-		loaded = not saved.is_empty() and game.load_state(saved)
-	if not loaded:
+	var fresh_start := GameFlow.mode == GameFlow.Mode.NEW_GAME
+	if fresh_start:
+		# 主菜单"开始新游戏"：跳过读档直接开新局（旧档由原子写自动进 .bak）。
 		game.new_game(_now())
+	else:
+		var saved := SaveStore.load_state()
+		var loaded := not saved.is_empty() and game.load_state(saved)
+		if not loaded:
+			saved = SaveStore.load_backup_state()
+			loaded = not saved.is_empty() and game.load_state(saved)
+		if not loaded:
+			fresh_start = true
+			game.new_game(_now())
+	if _consume_tutorial_replay() and not fresh_start:
+		# 只有读档路径需要归零（新档本来就是 0）；新档只落一次盘，保住"开新局前"的 .bak。
+		game.state["tutorial_step"] = 0
 		_save()
+	elif fresh_start:
+		_save()
+	GameFlow.reset()
 	var market_changed := game.refresh_market(_now())
 	if game.breeder_settle(_now()) or market_changed:
 		_save()
@@ -882,6 +894,18 @@ func _record_harvest(kind: String, count: int) -> void:
 
 func _now() -> int:
 	return int(Time.get_unix_time_from_system())
+
+
+## 主菜单"重新显示新手引导"：合并 GameFlow（本次会话）与 settings.cfg（跨启动）两个来源，
+## cfg 标志消费即清除，避免下次进农场再次重播。
+func _consume_tutorial_replay() -> bool:
+	var replay := GameFlow.reset_tutorial
+	var config := ConfigFile.new()
+	if config.load("user://settings.cfg") == OK and bool(config.get_value("tutorial", "replay", false)):
+		replay = true
+		config.set_value("tutorial", "replay", false)
+		config.save("user://settings.cfg")
+	return replay
 
 
 func _save() -> bool:

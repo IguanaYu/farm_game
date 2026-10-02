@@ -3,7 +3,7 @@ config_version=5
 [application]
 
 config/name="小小农场"
-run/main_scene="res://scenes/main.tscn"
+run/main_scene="res://scenes/main_menu.tscn"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/description="点击种植、离线成长的农场游戏"
 config/icon="res://assets/icons/farm_icon.png"
