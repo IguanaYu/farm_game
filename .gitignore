@@ -7,3 +7,4 @@ playtest_shots/*
 build/*
 !build/.gdignore
 .audit_backup/
+__pycache__/

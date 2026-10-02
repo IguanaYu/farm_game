@@ -1,14 +1,17 @@
 class_name SessionClient
 extends RefCounted
-## 双人合作会话·客机侧（2.6）。提交意图、接收快照与结算；只对自己的农场档落盘。
+## 双人合作会话·客机侧（2.6）。传输层二选一：ENet 局域网直连（connect_to_host）
+## 或 TCP 中继「互联网房号」（connect_relay）。提交意图、接收快照与结算；
+## 只对自己的农场档落盘。
 
 signal welcome_received(ok: bool, reason: String)
 signal run_received(run: Dictionary)
 signal action_result_received(action_id: String, result: Dictionary)
 signal settlement_received(settlement: Dictionary)
 signal room_updated(room: Dictionary)
+signal join_failed(reason: String)
 
-var peer := ENetMultiplayerPeer.new()
+var transport: SessionTransport = null
 var farm_game: FarmGame
 var mirror_run: Dictionary = {}
 ## 镜像序号：每收到 depart/snapshot 递增，UI 据此判断是否需要重建。
@@ -22,11 +25,25 @@ var _outbox: Array = []
 
 func connect_to_host(address: String, farm: FarmGame, port := SessionHost.DEFAULT_PORT) -> bool:
 	farm_game = farm
-	return peer.create_client(address, port) == OK
+	var direct := EnetTransport.new()
+	if not direct.open_guest(address, port):
+		return false
+	transport = direct
+	return true
+
+
+## 互联网模式：连中继服务器按房号加入；失败原因经 join_failed 信号上报。
+func connect_relay(code: String, farm: FarmGame, address: String, port: int) -> bool:
+	farm_game = farm
+	var relay := RelayTransport.new()
+	if not relay.open_guest(address, port, code):
+		return false
+	transport = relay
+	return true
 
 
 func poll() -> void:
-	if peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
+	if transport == null:
 		return
 	## 心跳：主机据此判定在线/掉线（2.7）。
 	var now_ms := Time.get_ticks_msec()
@@ -39,28 +56,32 @@ func poll() -> void:
 			_outbox.clear()
 			for message in flush:
 				_send(message)
-	peer.poll()
-	while peer.get_available_packet_count() > 0:
-		var message: Variant = JSON.parse_string(peer.get_packet().get_string_from_utf8())
-		if message is Dictionary:
-			_handle(message)
+	for event in transport.poll():
+		match str(event.get("kind", "")):
+			"message":
+				_handle(event["message"])
+			"error":
+				join_failed.emit(str(event.get("reason", "")))
+			_:
+				pass
 
 
 func link_ready() -> bool:
-	return peer.get_connection_status() == MultiplayerPeer.CONNECTION_CONNECTED
+	return transport != null and transport.link_ready()
 
 
 ## 主动断开（重连前调用，释放主机侧旧 peer）。
 func disconnect_link() -> void:
-	peer.close()
+	if transport != null:
+		transport.close()
+		transport = null
 
 
 func _send(message: Dictionary) -> void:
 	if not link_ready():
 		_outbox.append(message)
 		return
-	peer.set_target_peer(1)
-	peer.put_packet(JSON.stringify(message).to_utf8_buffer())
+	transport.send(1, message)
 
 
 # —— 加入与准备 ——————————————————————————————————————————————

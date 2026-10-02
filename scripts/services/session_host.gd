@@ -1,17 +1,20 @@
 class_name SessionHost
 extends RefCounted
-## 双人合作会话·主机侧（2.6）。ENet 直连 + JSON 包协议（不走 MultiplayerAPI 场景树，
-## 便于 headless 双端同进程测试与跨进程部署）。主机权威：客户端只发意图，主机验证、
-## 裁定并广播快照（总计划 §9.2）；客机结算单由客机自行应用，主机不写对方农场档。
+## 双人合作会话·主机侧（2.6）。传输层二选一：ENet 局域网直连（listen）或
+## TCP 中继「互联网房号」（listen_relay，见 tools/relay_server.py）。JSON 包协议
+## （不走 MultiplayerAPI 场景树，便于 headless 双端同进程测试与跨进程部署）。
+## 主机权威：客户端只发意图，主机验证、裁定并广播快照（总计划 §9.2）；
+## 客机结算单由客机自行应用，主机不写对方农场档。
 
 signal packet_received(peer_id: int, message: Dictionary)
+signal relay_error(reason: String)
 
 const DEFAULT_PORT := 31967
 const MAX_MEMBERS := 2
 ## 掉线判定与暂停（2.7 设计 §9.4：客户端掉线→暂停推进；等待可配）。
 const MEMBER_TIMEOUT_MS := 2500
 
-var peer := ENetMultiplayerPeer.new()
+var transport: SessionTransport = null
 var room: Dictionary = {}
 var expedition: ExpeditionGame = null
 var pending_run_id := ""
@@ -23,28 +26,71 @@ var action_log: Dictionary = {}
 
 
 func listen(farm: FarmGame, port := DEFAULT_PORT) -> bool:
+	var direct := EnetTransport.new()
+	if not direct.listen(port):
+		return false
+	transport = direct
+	_setup_room(farm)
+	return true
+
+
+## 互联网模式：主动连中继服务器建房，房号异步到达（relay_room_code()/relay_error）。
+func listen_relay(farm: FarmGame, address: String, port: int) -> bool:
+	var relay := RelayTransport.new()
+	if not relay.open_host(address, port):
+		return false
+	transport = relay
+	_setup_room(farm)
+	return true
+
+
+func _setup_room(farm: FarmGame) -> void:
 	farm_game = farm
 	room = {
 		"open": true,
 		"members": {1: {"peer_id": 1, "name": "主机（我）", "player_id": str(farm.state["expedition"].get("player_id", "")), "ready": false, "is_host": true}},
 	}
-	## 槽位放宽：掉线重连会占用新 peer 位，靠 player_id 去重而非连接数限制。
-	return peer.create_server(port, 8) == OK
+
+
+## 中继模式房号（建房确认后非空；局域网模式恒空）。
+func relay_room_code() -> String:
+	return transport.room_code() if transport != null else ""
+
+
+## 中继链路是否已就绪（房号确认）；局域网模式等同监听成功。
+func relay_online() -> bool:
+	return transport != null and transport.link_ready()
 
 
 func poll() -> void:
-	if peer.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
+	if transport == null:
 		return
-	peer.poll()
-	while peer.get_available_packet_count() > 0:
-		var sender := peer.get_packet_peer()
-		var message: Variant = JSON.parse_string(peer.get_packet().get_string_from_utf8())
-		if message is Dictionary:
-			if sender == 0:
-				sender = 1
-			_handle(sender, message)
-			packet_received.emit(sender, message)
+	for event in transport.poll():
+		match str(event.get("kind", "")):
+			"message":
+				var sender := int(event.get("peer_id", 0))
+				if sender == 0:
+					sender = 1
+				_handle(sender, event["message"])
+				packet_received.emit(sender, event["message"])
+			"peer_down":
+				_mark_member_offline(int(event.get("peer_id", 0)))
+			"error":
+				relay_error.emit(str(event.get("reason", "")))
+			_:
+				pass
 	sweep_members(Time.get_ticks_msec())
+
+
+## 中继即时掉线路径：直接置离线并广播（超时扫落在其后兜底，语义一致）。
+func _mark_member_offline(peer_id: int) -> void:
+	var member: Dictionary = room["members"].get(peer_id, {})
+	if member.is_empty() or not bool(member.get("online", true)):
+		return
+	member["online"] = false
+	if expedition != null:
+		expedition.run["log"].append("%s 掉线：本局暂停推进，等待重连" % str(member.get("name", "队友")))
+	broadcast({"t": "room", "room": _room_view()})
 
 
 ## 掉线检测：超时成员标记离线并广播暂停（不凭掉线判负/判撤离）。
@@ -71,8 +117,9 @@ func any_member_offline() -> bool:
 
 
 func _send(peer_id: int, message: Dictionary) -> void:
-	peer.set_target_peer(peer_id)
-	peer.put_packet(JSON.stringify(message).to_utf8_buffer())
+	if transport == null:
+		return
+	transport.send(peer_id, message)
 
 
 func broadcast(message: Dictionary) -> void:

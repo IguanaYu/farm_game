@@ -2,7 +2,8 @@ class_name RoomPanel
 extends Control
 ## 好友组队房间页（2.6 设计 D2.6-01/02/03）。主机/客机两种角色；
 ## 轮询驱动 SessionHost／SessionClient（本面板 _process 负责泵网络）。
-## 局域网／本机直连为当前实测方式；互联网直连需端口可达（交付报告如实标注）。
+## 两种连接方式：「局域网直连」（ENet，主机 IP＋端口）与「互联网房号」
+## （TCP 中继，tools/relay_server.py；建房得 6 位房号，好友输入加入，双方无需端口映射）。
 
 signal close_requested
 signal coop_run_started_host(expedition: ExpeditionGame)
@@ -15,6 +16,9 @@ const TEXT_MUTED := Color("#3f4a42")
 const BAD_RED := Color("#a4543f")
 ## 加入超时提示（毫秒）：链路一直不 ready 时给出可读原因。
 const JOIN_TIMEOUT_MS := 5000
+## 中继默认地址（本机联调用）；实机填腾讯云 IP:端口，成功连接后会记住。
+const RELAY_DEFAULT_ADDRESS := "127.0.0.1:31970"
+const RELAY_PREFS_PATH := "user://relay_prefs.cfg"
 
 var game: FarmGame
 var host: SessionHost = null
@@ -27,10 +31,19 @@ var members_label: Label
 var address_edit: LineEdit
 var ready_button: Button
 var depart_button: Button
+var mode_option: OptionButton
+var lan_row: HBoxContainer
+var relay_row: HBoxContainer
+var relay_address_edit: LineEdit
+var room_code_edit: LineEdit
 ## 客机准备状态以主机广播为准（F-11：据此切换而不是固定 true）。
 var client_ready_state := false
 var _hello_sent := false
 var _join_started_ms := 0
+## 中继加入已被明确拒绝（房号错等）：超时提示不再覆盖拒绝原因。
+var _join_failed := false
+## 中继主机侧：等待房号到达（到达前状态行显示连接中）。
+var _relay_wait_code := false
 ## 已处理过的出发局 ID：同一局只确认一次；拒绝后主机再次发起（新 ID）仍会确认。
 var _handled_run_id := ""
 
@@ -54,6 +67,8 @@ func open(target_game: FarmGame) -> void:
 	visible = true
 	client_ready_state = false
 	_hello_sent = false
+	_join_failed = false
+	_relay_wait_code = false
 	_handled_run_id = ""
 	status_label.text = "选择「创建房间」（主机）或输入主机地址后「加入房间」（客机）。"
 
@@ -65,6 +80,11 @@ func close() -> void:
 func _process(_delta: float) -> void:
 	if host != null:
 		host.poll()
+		if _relay_wait_code:
+			var relay_code := host.relay_room_code()
+			if relay_code != "":
+				_relay_wait_code = false
+				status_label.text = "互联网房间已创建：房号 %s（告诉好友即可加入；房间保留 10 分钟）。" % relay_code
 		if host.expedition != null and visible:
 			var expedition: ExpeditionGame = host.expedition
 			visible = false
@@ -79,8 +99,8 @@ func _process(_delta: float) -> void:
 				inventory.bind(game.state["expedition"])
 				client.hello_with(str(game.state["expedition"].get("player_id", "")), inventory)
 				status_label.text = "已连接，正在握手……"
-			elif Time.get_ticks_msec() - _join_started_ms > JOIN_TIMEOUT_MS:
-				status_label.text = "连不上主机：检查地址与端口（31967）。"
+			elif not _join_failed and Time.get_ticks_msec() - _join_started_ms > JOIN_TIMEOUT_MS:
+				status_label.text = "连接超时：检查网络与地址（互联网模式还需正确的服务器地址与房号）。"
 		## 出发指令到达：本机保存→写占用→回执（F-03；保存失败阻止开局）。
 		if client.pending_run_id != "" and client.pending_run_id != _handled_run_id:
 			_handled_run_id = client.pending_run_id
@@ -102,23 +122,50 @@ func _build() -> void:
 	column.add_theme_constant_override("separation", 10)
 	panel.add_child(column)
 	column.add_child(_label("好友组队（双人合作）", 22, FOREST))
-	var connect_note := _label("当前连接方式：局域网／本机直连（主机 IP＋端口 31967）。互联网好友直连需主机端口可达，实测记录见交付报告。", 13, TEXT_MUTED)
+	var connect_note := _label("局域网直连：主机 IP＋端口 31967。互联网房号：经联机服务器中继，双方无需端口映射——建房得 6 位房号，好友输入即可加入。", 13, TEXT_MUTED)
 	connect_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(connect_note)
 
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	column.add_child(row)
+	mode_option = OptionButton.new()
+	mode_option.add_item("连接方式：局域网直连", 0)
+	mode_option.add_item("连接方式：互联网房号", 1)
+	mode_option.selected = 0
+	mode_option.item_selected.connect(_on_mode_selected)
+	column.add_child(mode_option)
+
+	lan_row = HBoxContainer.new()
+	lan_row.add_theme_constant_override("separation", 8)
+	column.add_child(lan_row)
 	var create_button := _button("创建房间（主机）", Color("#eaf4df"), Color("#87b06f"))
 	create_button.pressed.connect(_on_create)
-	row.add_child(create_button)
+	lan_row.add_child(create_button)
 	address_edit = LineEdit.new()
 	address_edit.placeholder_text = "主机地址（如 192.168.1.5）"
 	address_edit.custom_minimum_size = Vector2(180, 0)
-	row.add_child(address_edit)
+	lan_row.add_child(address_edit)
 	var join_button := _button("加入房间", Color("#fff5df"), Color("#d5b87d"))
 	join_button.pressed.connect(_on_join)
-	row.add_child(join_button)
+	lan_row.add_child(join_button)
+
+	relay_row = HBoxContainer.new()
+	relay_row.add_theme_constant_override("separation", 8)
+	relay_row.visible = false
+	column.add_child(relay_row)
+	relay_address_edit = LineEdit.new()
+	relay_address_edit.text = _load_relay_address()
+	relay_address_edit.placeholder_text = "联机服务器（IP:端口）"
+	relay_address_edit.custom_minimum_size = Vector2(170, 0)
+	relay_row.add_child(relay_address_edit)
+	var relay_create_button := _button("创建房间（互联网）", Color("#eaf4df"), Color("#87b06f"))
+	relay_create_button.pressed.connect(_on_create_relay)
+	relay_row.add_child(relay_create_button)
+	room_code_edit = LineEdit.new()
+	room_code_edit.placeholder_text = "6 位房号"
+	room_code_edit.custom_minimum_size = Vector2(90, 0)
+	relay_row.add_child(room_code_edit)
+	var relay_join_button := _button("加入房间（互联网）", Color("#fff5df"), Color("#d5b87d"))
+	relay_join_button.pressed.connect(_on_join_relay)
+	relay_row.add_child(relay_join_button)
 
 	members_label = _label("成员：—", 14, TEXT_DARK)
 	column.add_child(members_label)
@@ -190,6 +237,7 @@ func _on_join() -> void:
 	is_host = false
 	host = null
 	_hello_sent = false
+	_join_failed = false
 	_handled_run_id = ""
 	_join_started_ms = Time.get_ticks_msec()
 	ready_button.disabled = false
@@ -198,6 +246,109 @@ func _on_join() -> void:
 	client.run_received.connect(_on_client_depart)
 	client.welcome_received.connect(_on_client_welcome)
 	status_label.text = "连接中……（主机确认后这里会更新）"
+
+
+# —— 互联网房号模式（TCP 中继）———————————————————————————————————
+
+
+func _on_mode_selected(index: int) -> void:
+	lan_row.visible = index == 0
+	relay_row.visible = index == 1
+	status_label.text = ""
+
+
+func _on_create_relay() -> void:
+	var parts := _relay_address_parts()
+	if parts.is_empty():
+		status_label.text = "服务器地址格式不对，应为 IP:端口（如 1.2.3.4:31970）。"
+		return
+	host = SessionHost.new()
+	if not host.listen_relay(game, str(parts[0]), int(parts[1])):
+		status_label.text = "连接发起失败（检查网络后重试）。"
+		host = null
+		return
+	is_host = true
+	client = null
+	_relay_wait_code = true
+	ready_button.disabled = false
+	host.packet_received.connect(_on_host_packet)
+	host.relay_error.connect(_on_relay_error)
+	_save_relay_address(str(parts[0]) + ":" + str(parts[1]))
+	_refresh_room()
+	status_label.text = "正在连接联机服务器……"
+
+
+func _on_join_relay() -> void:
+	var code := room_code_edit.text.strip_edges()
+	if code.length() != 6 or not code.is_valid_int():
+		status_label.text = "请输入 6 位数字房号。"
+		return
+	var parts := _relay_address_parts()
+	if parts.is_empty():
+		status_label.text = "服务器地址格式不对，应为 IP:端口（如 1.2.3.4:31970）。"
+		return
+	client = SessionClient.new()
+	if not client.connect_relay(code, game, str(parts[0]), int(parts[1])):
+		status_label.text = "连接发起失败（检查网络后重试）。"
+		client = null
+		return
+	is_host = false
+	host = null
+	_hello_sent = false
+	_join_failed = false
+	_handled_run_id = ""
+	_join_started_ms = Time.get_ticks_msec()
+	ready_button.disabled = false
+	depart_button.disabled = true
+	client.room_updated.connect(_on_room_updated)
+	client.run_received.connect(_on_client_depart)
+	client.welcome_received.connect(_on_client_welcome)
+	client.join_failed.connect(_on_join_failed)
+	_save_relay_address(str(parts[0]) + ":" + str(parts[1]))
+	status_label.text = "正在连接联机服务器并加入房间 %s……" % code
+
+
+func _on_relay_error(reason: String) -> void:
+	if _relay_wait_code:
+		_relay_wait_code = false
+	status_label.text = "联机服务器连接失败：%s" % reason
+
+
+func _on_join_failed(reason: String) -> void:
+	_join_failed = true
+	status_label.text = "加入失败：%s" % reason
+
+
+## 解析「IP:端口」输入；非法返回空数组。
+func _relay_address_parts() -> Array:
+	var text := ""
+	if relay_address_edit != null:
+		text = relay_address_edit.text.strip_edges()
+	if text == "":
+		text = RELAY_DEFAULT_ADDRESS
+	var split := text.rsplit(":", false, 1)
+	if split.size() != 2 or not str(split[1]).is_valid_int():
+		return []
+	var port := int(str(split[1]))
+	if port <= 0 or port > 65535 or str(split[0]) == "":
+		return []
+	return [str(split[0]), port]
+
+
+func _load_relay_address() -> String:
+	var config := ConfigFile.new()
+	if config.load(RELAY_PREFS_PATH) == OK and config.has_section_key("relay", "address"):
+		var saved := str(config.get_value("relay", "address", ""))
+		if saved != "":
+			return saved
+	return RELAY_DEFAULT_ADDRESS
+
+
+func _save_relay_address(address: String) -> void:
+	var config := ConfigFile.new()
+	config.load(RELAY_PREFS_PATH)
+	config.set_value("relay", "address", address)
+	config.save(RELAY_PREFS_PATH)
 
 
 func _on_client_welcome(ok: bool, reason: String) -> void:
