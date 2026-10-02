@@ -704,6 +704,22 @@ func _reward_choose_one(resolved: Dictionary) -> bool:
 	return bool(resolved.get("choose_one", ["battle", "elite", "gate"].has(str(resolved.get("type", "")))))
 
 
+## 从节点公共丢弃区捡回一件（F-04：规则层事务，客机经主机裁定复用同一路径）。
+func pick_node_drop(member_key: String, instance_id: int) -> Dictionary:
+	if not member_keys().has(member_key):
+		return _fail("未知成员")
+	for instance in run["node_drops"]:
+		if int(instance["instance_id"]) == instance_id:
+			run["node_drops"].erase(instance)
+			instance["container"] = "warehouse"
+			instance["cell"] = [0, 0]
+			member_inventory(member_key).restore_to_warehouse(instance)
+			run["log"].append("%s 捡回：%s" % [member(member_key)["name"], str(ItemDefs.get_item(str(instance["def_id"])).get("name", "?"))])
+			save()
+			return {"ok": true, "reason": ""}
+	return _fail("丢弃区没有这件物品")
+
+
 func _record_consumed() -> void:
 	## 记录本节点战斗中耗尽的补给（结算报告用；uses 在实体上已扣）。
 	## 消耗清单跨 JSON 往返会变 float：按 int 归一后查重，避免重复登记。

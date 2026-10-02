@@ -276,6 +276,11 @@ func clear_loadout() -> Dictionary:
 	return {"ok": true, "reason": "", "moved": moved}
 
 
+## 把一件已离开库存的实体重新登记进仓库（节点丢弃区捡回路径；不做布局校验）。
+func restore_to_warehouse(instance: Dictionary) -> void:
+	_inventory()["warehouse"].append(instance)
+
+
 func _remove_from_current(instance: Dictionary) -> void:
 	var current := str(instance.get("container", "warehouse"))
 	if current == "warehouse":

@@ -11,6 +11,8 @@ signal room_updated(room: Dictionary)
 var peer := ENetMultiplayerPeer.new()
 var farm_game: FarmGame
 var mirror_run: Dictionary = {}
+## 镜像序号：每收到 depart/snapshot 递增，UI 据此判断是否需要重建。
+var mirror_serial := 0
 var pending_run_id := ""
 var next_action_seq := 0
 var _last_ping_ms := 0
@@ -154,6 +156,7 @@ func _handle(message: Dictionary) -> void:
 			room_updated.emit(message["room"])
 		"depart":
 			mirror_run = message.get("run", {})
+			mirror_serial += 1
 			run_received.emit(mirror_run)
 		"depart_begin":
 			pending_run_id = str(message.get("run_id", ""))
@@ -161,6 +164,7 @@ func _handle(message: Dictionary) -> void:
 			welcome_received.emit(false, str(message.get("reason", "")))
 		"snapshot":
 			mirror_run = message.get("run", {})
+			mirror_serial += 1
 			run_received.emit(mirror_run)
 		"action_result":
 			action_result_received.emit(str(message.get("id", "")), message.get("result", {}))

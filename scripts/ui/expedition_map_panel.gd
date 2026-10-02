@@ -7,6 +7,10 @@ signal battle_start_requested(combat: CombatGame)
 signal farm_save_requested
 signal run_finished
 
+## 合作局会话裁定入口（F-04）：设置后所有推进/领取/撤离动作改走主机裁定，
+## 双人同票才推进；单人局此入口为空，直接调本地 ExpeditionGame。
+var host_action_sink: Callable = Callable()
+
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
@@ -141,15 +145,42 @@ func _refresh() -> void:
 		for instance in run["inventory"]["loadout"][container]:
 			if str(ItemDefs.get_item(str(instance["def_id"])).get("category", "")) == "supply" and int(instance.get("uses_remaining", 1)) > 0:
 				supplies += 1
-	header_label.text = "%s ｜ 第 %d/%d 排 ｜ 生命 %d/%d ｜ 补给 %d ｜ 携带可售 %d 金币 ｜ 保护区 %d 金币" % [
+	header_label.text = "%s ｜ 第 %d/%d 排 ｜ 生命 %d/%d ｜ 补给 %d ｜ 携带可售 %d 金币 ｜ 保护区 %d 金币%s%s" % [
 		ExpeditionDefs.layer(str(run["layer_id"])).get("name", "?"),
 		int(run["current"]["row"]), int(ExpeditionDefs.layer(str(run["layer_id"])).get("rows", 9)) - 1,
 		int(run["player"]["hp"]), int(run["player"]["max_hp"]),
-		supplies, inventory.carry_sell_value(), inventory.protected_value()]
+		supplies, inventory.carry_sell_value(), inventory.protected_value(),
+		_coop_note(run), _vote_note(run)]
 	_refresh_map()
 	_refresh_node()
 	var entries: Array = run.get("log", [])
 	log_label.text = "\n".join(entries.slice(maxi(0, entries.size() - 8), entries.size()))
+
+
+## 合作局队友一行提示（单人局返回空）。
+func _coop_note(run: Dictionary) -> String:
+	if not bool(run.get("coop", false)):
+		return ""
+	var guest: Dictionary = run.get("guest", {})
+	return " ｜ 队友 %d/%d" % [int(guest.get("hp", 0)), int(guest.get("max_hp", 0))]
+
+
+## 选路投票进度（两人各自投了哪一格；非等待期返回空）。
+func _vote_note(run: Dictionary) -> String:
+	var votes: Dictionary = run.get("votes", {})
+	var mine := str(votes.get("p1", ""))
+	var theirs := str(votes.get("p2", ""))
+	if mine == "" and theirs == "":
+		return ""
+	var next_row := int(run["current"]["row"]) + 1
+	var parts: Array = []
+	if mine != "" and int(mine.split(",")[0]) == next_row:
+		parts.append("你已投第 %s 排·列 %s" % [mine.split(",")[0], mine.split(",")[1]])
+	if theirs != "" and int(theirs.split(",")[0]) == next_row:
+		parts.append("队友已投第 %s 排·列 %s" % [theirs.split(",")[0], theirs.split(",")[1]])
+	if parts.is_empty():
+		return ""
+	return " ｜ " + "；".join(parts)
 
 
 func _refresh_map() -> void:
@@ -299,9 +330,62 @@ func _refresh_rewards_area(resolved: Dictionary, key: String, choose_one: bool) 
 			pick.pressed.connect(_on_pick_drop.bind(int(instance["instance_id"])))
 			row.add_child(pick)
 			node_column.add_child(row)
+	_refresh_share_area()
 	var leave := _button("完成并离开本节点", Color("#ffd98a"), Color("#9b713a"))
 	leave.pressed.connect(_on_leave_node)
 	node_column.add_child(leave)
+
+
+## 合作局的分享区（F-04）：待确认提议的接受/取消；自己可提出分享首件背包物。
+func _refresh_share_area() -> void:
+	if not bool(expedition.run.get("coop", false)):
+		return
+	var offer: Dictionary = expedition.run.get("share_offer", {})
+	if offer.is_empty():
+		var share := _button("分享背包首件物品给队友", Color("#fff5df"), Color("#d5b87d"))
+		share.pressed.connect(func() -> void:
+			var pack: Array = expedition.run_inventory().loadout_list("pack")
+			if pack.is_empty():
+				_flash_overlay("背包里没有可分享的物品。")
+				return
+			if host_action_sink.is_valid():
+				var offered: Dictionary = _arbitrate("share_offer", {"instance_id": int(pack[0]["instance_id"])})
+				if not offered.is_empty() and not bool(offered.get("ok", true)):
+					_flash_overlay(str(offered.get("reason", "")))
+				return
+			var result := expedition.share_offer("p1", int(pack[0]["instance_id"]))
+			if not result["ok"]:
+				_flash_overlay(result["reason"])
+			_refresh()
+		)
+		node_column.add_child(share)
+		return
+	if str(offer.get("from", "")) == "p2":
+		var item_name := str(ItemDefs.get_item(str(expedition.member_inventory("p2").find_instance(int(offer.get("instance_id", 0))).get("def_id", ""))).get("name", "?"))
+		var accept := _button("接受队友分享：%s（放背包）" % item_name, Color("#eaf4df"), Color("#87b06f"))
+		accept.pressed.connect(func() -> void:
+			if host_action_sink.is_valid():
+				var taken: Dictionary = _arbitrate("share_accept", {"container": "pack"})
+				if not taken.is_empty() and not bool(taken.get("ok", true)):
+					_flash_overlay(str(taken.get("reason", "")))
+				return
+			var result := expedition.share_accept("p1", "pack")
+			if not result["ok"]:
+				_flash_overlay(result["reason"])
+			_refresh()
+		)
+		node_column.add_child(accept)
+	else:
+		node_column.add_child(_label("已向队友提出分享，等待对方处理……", 13, WARN_GOLD))
+	var cancel := _button("取消分享", Color("#fff5df"), Color("#d5b87d"))
+	cancel.pressed.connect(func() -> void:
+		if host_action_sink.is_valid():
+			_arbitrate("share_cancel", {})
+			return
+		expedition.share_cancel()
+		_refresh()
+	)
+	node_column.add_child(cancel)
 
 
 func _refresh_event_node(resolved: Dictionary, _key: String) -> void:
@@ -348,7 +432,39 @@ func _refresh_rest_node(resolved: Dictionary, _key: String) -> void:
 # —— 操作 ————————————————————————————————————————————————————————
 
 
+## 合作局动作统一入口：经 sink 交给 SessionHost 裁定并广播镜像；返回结果字典。
+## 单人局返回空字典（调用方走本地路径）。
+func _arbitrate(kind: String, args: Dictionary = {}) -> Dictionary:
+	if not host_action_sink.is_valid():
+		return {}
+	var result: Dictionary = host_action_sink.call(kind, args)
+	_refresh()
+	return result
+
+
+## 统一结果消费：失败弹原因；带回结算则展示结算。
+func _handle_run_result(result: Dictionary) -> void:
+	if result.is_empty():
+		return
+	if not bool(result.get("ok", true)):
+		_flash_overlay(str(result.get("reason", "")))
+		return
+	if result.has("settlements"):
+		var host_settle: Dictionary = result["settlements"].get("p1", {})
+		if not host_settle.is_empty() and host_settle.has("settlement_id"):
+			_show_settlement(host_settle)
+			return
+	if result.has("settlement") and (result["settlement"] as Dictionary).has("settlement_id"):
+		_show_settlement(result["settlement"])
+
+
 func _on_move(row: int, col: int) -> void:
+	if host_action_sink.is_valid():
+		## 合作局：投票经主机裁定，同票才前进；投票进度显示在顶栏（_vote_note）。
+		var voted: Dictionary = _arbitrate("vote_move", {"row": row, "col": col})
+		if not voted.is_empty() and not bool(voted.get("ok", true)):
+			_flash_overlay(str(voted.get("reason", "")))
+		return
 	var result := expedition.move_to(row, col)
 	if not result["ok"]:
 		_flash_overlay(result["reason"])
@@ -356,6 +472,13 @@ func _on_move(row: int, col: int) -> void:
 
 
 func _on_start_battle() -> void:
+	if host_action_sink.is_valid():
+		var started: Dictionary = _arbitrate("start_battle", {})
+		if bool(started.get("ok", false)) and started.has("combat"):
+			battle_start_requested.emit(started["combat"])
+		elif not started.is_empty() and not bool(started.get("ok", true)):
+			_flash_overlay(str(started.get("reason", "")))
+		return
 	var result := expedition.start_battle()
 	if not result["ok"]:
 		_flash_overlay(result["reason"])
@@ -365,6 +488,10 @@ func _on_start_battle() -> void:
 
 func battle_finished() -> void:
 	## battle_screen 关闭后由外部调用：结算战斗并回到节点或显示结算。
+	if host_action_sink.is_valid():
+		## 合作局：结束战斗也走裁定（主机结算＋向客机下发结算单）。
+		_handle_run_result(_arbitrate("finish_battle", {}))
+		return
 	var result := expedition.finish_battle(expedition_battle_result)
 	if not result["ok"]:
 		_flash_overlay(result["reason"])
@@ -384,7 +511,12 @@ func report_battle_result(combat: CombatGame) -> void:
 
 
 func _on_claim_reward(key: String, def_id: String, container: String, _choose_one: bool) -> void:
-	## 领取走规则层事务（F-02）：校验候选→放置→记录领取在 ExpeditionGame 内一次完成。
+	## 领取走规则层事务（F-02）；合作局经主机裁定（F-04）。
+	if host_action_sink.is_valid():
+		var claimed: Dictionary = _arbitrate("claim_reward", {"def_id": def_id, "container": container})
+		if not claimed.is_empty() and not bool(claimed.get("ok", true)):
+			_flash_overlay(str(claimed.get("reason", "")))
+		return
 	var result := expedition.claim_node_reward("p1", key, def_id, container)
 	if not result["ok"]:
 		_flash_overlay(str(result["reason"]))
@@ -394,6 +526,11 @@ func _on_claim_reward(key: String, def_id: String, container: String, _choose_on
 
 
 func _on_claim_public(key: String, def_id: String) -> void:
+	if host_action_sink.is_valid():
+		var claimed: Dictionary = _arbitrate("claim_public", {"def_id": def_id})
+		if not claimed.is_empty() and not bool(claimed.get("ok", true)):
+			_flash_overlay(str(claimed.get("reason", "")))
+		return
 	var result := expedition.claim_node_public("p1", key, def_id)
 	if not result["ok"]:
 		_flash_overlay(str(result["reason"]))
@@ -401,37 +538,22 @@ func _on_claim_public(key: String, def_id: String) -> void:
 
 
 func _on_pick_drop(instance_id: int) -> void:
-	## 从节点公共区捡回：直接放回局内仓库（玩家再自行整理）。
-	var run: Dictionary = expedition.run
-	var inventory := expedition.run_inventory()
-	var target := {}
-	for instance in run["node_drops"]:
-		if int(instance["instance_id"]) == instance_id:
-			target = instance
-	if target.is_empty():
+	## 从节点公共区捡回（规则层事务；合作局经主机裁定）。
+	if host_action_sink.is_valid():
+		var picked: Dictionary = _arbitrate("pick_drop", {"instance_id": instance_id})
+		if not picked.is_empty() and not bool(picked.get("ok", true)):
+			_flash_overlay(str(picked.get("reason", "")))
 		return
-	run["node_drops"].erase(target)
-	target["container"] = "warehouse"
-	target["cell"] = [0, 0]
-	run["inventory"]["warehouse"].append(target)
-	expedition.save()
+	var result := expedition.pick_node_drop("p1", instance_id)
+	if not result["ok"]:
+		_flash_overlay(str(result["reason"]))
 	_refresh()
 
 
-func _on_leave_node() -> void:
-	var run: Dictionary = expedition.run
-	var resolved: Dictionary = run["resolved"].get(expedition.node_id(int(run["current"]["row"]), int(run["current"]["col"])), {})
-	var pending := int(resolved.get("rewards", []).size()) + int(resolved.get("public", []).size())
-	if pending > 0 or not run["node_drops"].is_empty():
-		_confirm_overlay("还有 %d 件候选/公共物品未领取，离开后将放弃。确认离开？" % (pending + run["node_drops"].size()), func() -> void:
-			var result := expedition.leave_node()
-			if not result["ok"]:
-				_flash_overlay(result["reason"])
-			elif result.get("settlement", {}).has("settlement_id"):
-				_show_settlement(result["settlement"])
-			else:
-				_refresh()
-		)
+func _leave_node_now() -> void:
+	## 离开节点（确认弹窗后的实际动作）：合作局经主机裁定。
+	if host_action_sink.is_valid():
+		_handle_run_result(_arbitrate("leave_node", {}))
 		return
 	var result := expedition.leave_node()
 	if not result["ok"]:
@@ -442,7 +564,24 @@ func _on_leave_node() -> void:
 		_refresh()
 
 
+func _on_leave_node() -> void:
+	var run: Dictionary = expedition.run
+	var resolved: Dictionary = run["resolved"].get(expedition.node_id(int(run["current"]["row"]), int(run["current"]["col"])), {})
+	var pending := int(resolved.get("rewards", []).size()) + int(resolved.get("public", []).size())
+	if pending > 0 or not run["node_drops"].is_empty():
+		_confirm_overlay("还有 %d 件候选/公共物品未领取，离开后将放弃。确认离开？" % (pending + run["node_drops"].size()), func() -> void:
+			_leave_node_now()
+		)
+		return
+	_leave_node_now()
+
+
 func _on_choose_event(option_id: String) -> void:
+	if host_action_sink.is_valid():
+		var chosen: Dictionary = _arbitrate("choose_event", {"option": option_id})
+		if not chosen.is_empty() and not bool(chosen.get("ok", true)):
+			_flash_overlay(str(chosen.get("reason", "")))
+		return
 	var result := expedition.choose_event(option_id)
 	if not result["ok"]:
 		_flash_overlay(result["reason"])
@@ -450,6 +589,11 @@ func _on_choose_event(option_id: String) -> void:
 
 
 func _on_rest(option: String) -> void:
+	if host_action_sink.is_valid():
+		var rested: Dictionary = _arbitrate("take_rest", {"option": option})
+		if not rested.is_empty() and not bool(rested.get("ok", true)):
+			_flash_overlay(str(rested.get("reason", "")))
+		return
 	var result := expedition.take_rest(option)
 	if not result["ok"]:
 		_flash_overlay(result["reason"])
@@ -496,6 +640,14 @@ func _open_extract_confirm() -> void:
 	var go_home := _button("带着这些回家", Color("#ffd98a"), Color("#9b713a"))
 	go_home.pressed.connect(func() -> void:
 		_close_overlay()
+		if host_action_sink.is_valid():
+			## 合作局：撤离是共同确认——先投自己一票，等队友也确认才结算。
+			var voted: Dictionary = _arbitrate("vote_extract", {"agree": true})
+			if bool(voted.get("waiting", false)):
+				_flash_overlay("你已确认撤离；等队友也确认后一起回家。")
+			else:
+				_handle_run_result(voted)
+			return
 		var result := expedition.extract()
 		if result["ok"]:
 			_show_settlement(result["settlement"])
@@ -506,6 +658,12 @@ func _open_extract_confirm() -> void:
 	var go_deep := _button("继续深入", Color("#eaf4df"), Color("#87b06f"))
 	go_deep.pressed.connect(func() -> void:
 		_close_overlay()
+		if host_action_sink.is_valid():
+			var declined: Dictionary = _arbitrate("vote_extract", {"agree": false})
+			if not declined.is_empty() and not bool(declined.get("ok", true)):
+				_flash_overlay(str(declined.get("reason", "")))
+			_leave_node_now()
+			return
 		var leave_result := expedition.leave_node()
 		if not leave_result["ok"]:
 			_flash_overlay(leave_result["reason"])
@@ -542,6 +700,10 @@ func _open_menu() -> void:
 	abandon.pressed.connect(func() -> void:
 		_close_overlay()
 		_confirm_overlay("放弃将失去：%s。保险箱内物品保留。确认放弃？" % ("、".join(unprotected) if not unprotected.is_empty() else "（没有未保护携带物）"), func() -> void:
+			if host_action_sink.is_valid():
+				## 合作局：个人放弃（只结算本人，队友继续）。
+				_handle_run_result(_arbitrate("abandon_member", {}))
+				return
 			var result := expedition.abandon()
 			if result["ok"]:
 				_show_settlement(result["settlement"])

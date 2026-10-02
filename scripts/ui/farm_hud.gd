@@ -99,6 +99,8 @@ var equipment_warehouse_panel: WarehousePanel
 var room_panel: RoomPanel
 var coop_client_panel: CoopClientPanel
 var active_expedition: ExpeditionGame
+## 合作局主机侧会话（F-04）：地图/战斗面板的裁定入口与快照刷新从这里注入。
+var coop_host: SessionHost = null
 
 
 func _ready() -> void:
@@ -1520,6 +1522,18 @@ func open_room() -> void:
 
 func _on_coop_run_started_host(expedition: ExpeditionGame) -> void:
 	active_expedition = expedition
+	coop_host = room_panel.host
+	if coop_host != null:
+		## F-04：合作局所有推进/出牌动作走同一会话裁定入口（host_action），
+		## 战斗对象在每次裁定后从权威局重新恢复。
+		map_panel.host_action_sink = func(kind: String, args: Dictionary) -> Dictionary:
+			return coop_host.host_action(kind, args)
+		battle_screen.action_sink = map_panel.host_action_sink
+		battle_screen.combat_refresher = func() -> CombatGame:
+			if coop_host == null or coop_host.expedition == null:
+				return null
+			return coop_host.expedition.restore_battle()
+		battle_screen.player_key = "p1"
 	expedition_save_requested.emit(true)
 	map_panel.open(expedition)
 
@@ -1547,6 +1561,7 @@ func _on_battle_inventory_mutated() -> void:
 ## —— 探险局编排（2.4）：出发/继续、局内战斗路由、结算收尾 ——
 
 func _on_depart_requested() -> void:
+	_clear_coop_sinks()
 	var result := ExpeditionGame.depart(game, int(Time.get_unix_time_from_system()))
 	if not result["ok"]:
 		if expedition_hub_panel != null:
@@ -1561,6 +1576,7 @@ func _on_depart_requested() -> void:
 
 
 func _on_loadout_depart_requested() -> void:
+	_clear_coop_sinks()
 	## 战备页直接出发：先剔除演示物品（与关闭保存同一规则），失败原因留在战备页。
 	var inventory := InventoryGame.new()
 	inventory.bind(game.state["expedition"])
@@ -1581,6 +1597,7 @@ func _on_loadout_depart_requested() -> void:
 
 
 func _on_resume_requested() -> void:
+	_clear_coop_sinks()
 	var result := ExpeditionGame.resume(game)
 	if not result["ok"]:
 		if expedition_hub_panel != null:
@@ -1621,6 +1638,16 @@ func _on_expedition_farm_save() -> void:
 
 func _on_run_finished() -> void:
 	active_expedition = null
+	coop_host = null
+	_clear_coop_sinks()
+
+
+## 回到单人路径时清掉合作裁定入口：地图/战斗面板恢复直调本地 ExpeditionGame。
+func _clear_coop_sinks() -> void:
+	map_panel.host_action_sink = Callable()
+	battle_screen.action_sink = Callable()
+	battle_screen.combat_refresher = Callable()
+	battle_screen.player_key = "p1"
 
 
 func open_expedition_hub() -> void:

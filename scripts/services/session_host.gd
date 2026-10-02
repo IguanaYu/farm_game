@@ -280,6 +280,9 @@ func _on_action(sender: int, message: Dictionary) -> void:
 ## 主机自己的动作直通裁定（与客机动作同一入口，保证同一验证路径与结算下发）。
 func host_action(kind: String, args: Dictionary = {}) -> Dictionary:
 	var result := _execute_action("p1", kind, args)
+	## F-04：主机动作同样要广播快照——否则客机镜像永远看不到主机的推进。
+	if expedition != null and result.get("run_changed", false):
+		_push_snapshot()
 	_broadcast_guest_settlement(result)
 	return result
 
@@ -345,6 +348,10 @@ func _execute_action(member_key: String, kind: String, args: Dictionary) -> Dict
 		"claim_public":
 			var public_key := expedition.node_id(int(run["current"]["row"]), int(run["current"]["col"]))
 			var r: Dictionary = expedition.claim_node_public(member_key, public_key, str(args.get("def_id", "")))
+			r["run_changed"] = true
+			return r
+		"pick_drop":
+			var r := expedition.pick_node_drop(member_key, int(args.get("instance_id", 0)))
 			r["run_changed"] = true
 			return r
 		"take_rest":

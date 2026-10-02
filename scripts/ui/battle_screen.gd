@@ -21,6 +21,13 @@ var run_mode := false
 var game: FarmGame
 var carried_hp := -1  # 两场之间生命延续（2.3 设计 §5：各场战斗生命延续，首场按出发状态）
 var selected_uid := -1
+## 本屏操作者（F-04）：单人/主机为 p1；客机界面用 p2 视角（手牌、能量、目标都按此取）。
+var player_key := "p1"
+## 合作局裁定入口（F-04）：设置后出牌/结束回合不再直改本地 CombatGame，
+## 而是把意图交给会话层——主机＝host_action 直通裁定，客机＝send_action 发意图。
+## combat_refresher 在裁定/镜像更新后取回最新战斗对象。
+var action_sink: Callable = Callable()
+var combat_refresher: Callable = Callable()
 var status_label: Label
 var detail_label: Label
 var log_label: RichTextLabel
@@ -53,8 +60,10 @@ func _ready() -> void:
 
 
 ## 探险局内战斗（2.4）：由地图面板发起；必须打到出胜负才能离开，结果回传结算。
-func open_run(combat: CombatGame) -> void:
+## actor：本屏操作者（合作局主机 p1／客机 p2；单人默认 p1）。
+func open_run(combat: CombatGame, actor := "p1") -> void:
 	run_mode = true
+	player_key = actor
 	self.combat = combat
 	selected_uid = -1
 	played_count = 0
@@ -241,7 +250,19 @@ func _on_target_clicked(target_key: String) -> void:
 	if selected_uid < 0:
 		status_label.text = "先点一张手牌。"
 		return
-	var result := combat.play_card("p1", selected_uid, target_key)
+	if action_sink.is_valid():
+		## 合作局：出牌意图交会话裁定（主机直通／客机发送），本地只消费回执与镜像。
+		var sent: Variant = action_sink.call("play_card", {"uid": selected_uid, "target": target_key})
+		selected_uid = -1
+		if combat_refresher.is_valid():
+			combat = combat_refresher.call()
+		if sent is Dictionary and not bool(sent.get("ok", true)):
+			status_label.text = str(sent.get("reason", ""))
+		elif not (sent is Dictionary):
+			status_label.text = "已出牌，等待主机裁定……"
+		_refresh()
+		return
+	var result := combat.play_card(player_key, selected_uid, target_key)
 	selected_uid = -1
 	if not result["ok"]:
 		status_label.text = result["reason"]
@@ -253,7 +274,20 @@ func _on_target_clicked(target_key: String) -> void:
 
 
 func _on_end_turn() -> void:
-	var result := combat.end_turn("p1")
+	if action_sink.is_valid():
+		var sent: Variant = action_sink.call("end_turn", {})
+		if combat_refresher.is_valid():
+			combat = combat_refresher.call()
+		if sent is Dictionary:
+			if bool(sent.get("waiting", false)):
+				status_label.text = "已结束行动，等待队友……"
+			elif not bool(sent.get("ok", true)):
+				status_label.text = str(sent.get("reason", ""))
+		else:
+			status_label.text = "已请求结束行动，等待主机裁定……"
+		_refresh()
+		return
+	var result := combat.end_turn(player_key)
 	if result.get("waiting", false):
 		status_label.text = "等待其他玩家结束……"
 		return
@@ -270,10 +304,17 @@ func _on_end_turn() -> void:
 func _refresh() -> void:
 	if combat == null or combat.state.is_empty():
 		return
-	var player: Dictionary = combat.state["players"]["p1"]
-	round_label.text = "第 %d 回合 ｜ 生命 %d/%d ｜ 格挡 %d ｜ 能量 %d ｜ 手牌 %d" % [
+	if not combat.state["players"].has(player_key):
+		return
+	var player: Dictionary = combat.state["players"][player_key]
+	var ally_line := ""
+	for other_key in combat.state["players"]:
+		if str(other_key) != player_key:
+			var ally: Dictionary = combat.state["players"][other_key]
+			ally_line = " ｜ 队友 %d/%d%s" % [int(ally["hp"]), int(ally["max_hp"]), "（倒地）" if bool(ally.get("downed", false)) else ""]
+	round_label.text = "第 %d 回合 ｜ 生命 %d/%d ｜ 格挡 %d ｜ 能量 %d ｜ 手牌 %d%s" % [
 		int(combat.state["round"]), int(player["hp"]), int(player["max_hp"]),
-		int(player["block"]), int(player["energy"]), int(player["hand"].size())]
+		int(player["block"]), int(player["energy"]), int(player["hand"].size()), ally_line]
 	end_button.text = "结束行动（剩余能量 %d）" % int(player["energy"])
 	_refresh_enemies()
 	_refresh_hand()
@@ -283,7 +324,7 @@ func _refresh() -> void:
 	if combat.is_over():
 		_show_outcome()
 		if combat.state["outcome"] == "won":
-			carried_hp = int(combat.state["players"]["p1"]["hp"])
+			carried_hp = int(combat.state["players"][player_key]["hp"])
 		else:
 			carried_hp = -1
 
@@ -318,7 +359,7 @@ func _refresh_hand() -> void:
 	for child in hand_row.get_children():
 		hand_row.remove_child(child)
 		child.queue_free()
-	var player: Dictionary = combat.state["players"]["p1"]
+	var player: Dictionary = combat.state["players"][player_key]
 	for card in player["hand"]:
 		var def := CardDefs.get_card(str(card["card_id"]))
 		var button := Button.new()
@@ -351,12 +392,17 @@ func _refresh_piles() -> void:
 	for child in pile_panel.get_children():
 		pile_panel.remove_child(child)
 		child.queue_free()
-	var player: Dictionary = combat.state["players"]["p1"]
+	var player: Dictionary = combat.state["players"][player_key]
 	pile_panel.add_child(_label("抽牌堆 %d ｜ 弃牌堆 %d ｜ 已移除 %d" % [
 		player["draw_pile"].size(), player["discard_pile"].size(), player["exhaust_pile"].size()], 14, Color("#cfe2c2")))
 	var self_target := _button("以自己为目标", Color("#eaf4df"), Color("#87b06f"))
-	self_target.pressed.connect(_on_target_clicked.bind("p1"))
+	self_target.pressed.connect(_on_target_clicked.bind(player_key))
 	pile_panel.add_child(self_target)
+	var ally_key := _ally_key()
+	if ally_key != "" and combat.state["players"].has(ally_key):
+		var ally_target := _button("以队友为目标", Color("#eaf4df"), Color("#87b06f"))
+		ally_target.pressed.connect(_on_target_clicked.bind(ally_key))
+		pile_panel.add_child(ally_target)
 
 
 func _refresh_log() -> void:
@@ -382,7 +428,7 @@ func _preview_text(card: Dictionary) -> String:
 	var target_key := _preview_target(str(def["target"]))
 	if target_key == "":
 		return "（点目标后显示预计数值）"
-	var preview := combat.preview_play("p1", int(card["uid"]), target_key)
+	var preview := combat.preview_play(player_key, int(card["uid"]), target_key)
 	if not bool(preview.get("ok", false)):
 		return "（等待合法目标）"
 	var parts: Array = []
@@ -405,8 +451,20 @@ func _preview_target(rule: String) -> String:
 	match rule:
 		"enemy":
 			return _first_alive_enemy()
-		"self", "ally":
-			return "p1"
+		"self":
+			return player_key
+		"ally":
+			return _ally_key() if _ally_key() != "" else player_key
+	return ""
+
+
+## 合作局的另一位玩家键（无队友返回空）。
+func _ally_key() -> String:
+	if combat == null:
+		return ""
+	for other_key in combat.state["players"]:
+		if str(other_key) != player_key:
+			return str(other_key)
 	return ""
 
 
@@ -418,7 +476,7 @@ func _first_alive_enemy() -> String:
 
 
 func _show_outcome() -> void:
-	var player: Dictionary = combat.state["players"]["p1"]
+	var player: Dictionary = combat.state["players"][player_key]
 	var won: bool = str(combat.state["outcome"]) == "won"
 	overlay_label.text = "%s\n\n历时 %d 回合 ｜ 剩余生命 %d/%d ｜ 本场出牌 %d 张" % [
 		"战斗胜利！" if won else "战斗失败……",
@@ -480,7 +538,7 @@ func _popup_at(anchor: Control, text: String, color: Color) -> void:
 
 
 func _unit_anchor(unit_key: String) -> Control:
-	if unit_key == "p1":
+	if str(unit_key).begins_with("p"):
 		return player_panel
 	for child in enemy_row.get_children():
 		if str(child.get_meta("unit_key", "")) == unit_key:
@@ -494,7 +552,7 @@ func _unit_anchor(unit_key: String) -> Control:
 func _hand_card(uid: int) -> Dictionary:
 	if combat == null:
 		return {}
-	for card in combat.state["players"]["p1"]["hand"]:
+	for card in combat.state["players"][player_key]["hand"]:
 		if int(card["uid"]) == uid:
 			return card
 	return {}
