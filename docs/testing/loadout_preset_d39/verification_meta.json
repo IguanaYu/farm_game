@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-02",
+  "head_commit": "d9964628002b5df8173a2f031aa773da04d95e40",
+  "engine": "Godot 4.6.1 stable (14d19694e)",
+  "round": "配装预设 UI（d39）",
+  "total": 45,
+  "exit_nonzero": 0,
+  "script_errors": 3,
+  "evidence": [
+    "regression_output.txt",
+    "d39_loadout_preset_smoke.txt",
+    "results.json"
+  ]
+}

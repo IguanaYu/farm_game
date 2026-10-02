@@ -63,6 +63,9 @@ var container_boxes: Dictionary = {}
 var status_label: Label
 var put_back_button: Button
 var rotate_button: Button
+var preset_option: OptionButton
+var preset_name_edit: LineEdit
+var presets_data: Dictionary = {}
 
 
 func _ready() -> void:
@@ -87,6 +90,8 @@ func open(target_game: FarmGame) -> void:
 	filter = "all"
 	dirty = false
 	status_label.text = ""
+	presets_data = PresetStore.load_presets()
+	_refresh_presets()
 	visible = true
 	_refresh()
 
@@ -154,6 +159,32 @@ func _build() -> void:
 	detail_column = _section(right_column, "物品详情")
 	deck_column = _section(right_column, "牌组预览（按加入回合）")
 	check_column = _section(right_column, "出发前检查")
+
+	# 配装预设行：保存/切换多套战备方案（交付遗留项）。
+	var preset_row := HBoxContainer.new()
+	preset_row.add_theme_constant_override("separation", 8)
+	column.add_child(preset_row)
+	preset_row.add_child(_label("配装预设", 15, FOREST))
+	preset_option = OptionButton.new()
+	preset_option.add_theme_font_size_override("font_size", 14)
+	preset_option.custom_minimum_size = Vector2(170, 0)
+	preset_row.add_child(preset_option)
+	preset_name_edit = LineEdit.new()
+	preset_name_edit.placeholder_text = "名称（留空自动编号）"
+	preset_name_edit.max_length = LoadoutPresets.NAME_MAX_CHARS
+	preset_name_edit.custom_minimum_size = Vector2(150, 0)
+	preset_row.add_child(preset_name_edit)
+	var save_preset_button := _small_button("存为预设", Color("#eaf4df"), Color("#87b06f"))
+	save_preset_button.tooltip_text = "把当前三个容器的布局存成一套预设；同名覆盖旧内容。"
+	save_preset_button.pressed.connect(func() -> void: save_preset(preset_name_edit.text))
+	preset_row.add_child(save_preset_button)
+	var apply_preset_button := _small_button("应用预设", Color("#ffd98a"), Color("#9b713a"))
+	apply_preset_button.tooltip_text = "清空当前容器并按预设复原；缺失物品会逐件提示。"
+	apply_preset_button.pressed.connect(apply_selected)
+	preset_row.add_child(apply_preset_button)
+	var delete_preset_button := _small_button("删除", Color("#fff5df"), Color("#d5b87d"))
+	delete_preset_button.pressed.connect(delete_selected)
+	preset_row.add_child(delete_preset_button)
 
 	# 底部操作。
 	var bottom := HBoxContainer.new()
@@ -342,6 +373,96 @@ func _on_close() -> void:
 
 func _flash(message: String) -> void:
 	status_label.text = message
+
+
+# —— 配装预设 ————————————————————————————————————————————————————
+
+
+func preset_names() -> Array:
+	var names: Array = []
+	for preset in presets_data.get("presets", []):
+		names.append(str(preset.get("name", "")))
+	return names
+
+
+func save_preset(raw_name: String) -> Dictionary:
+	## 把当前三容器快照存为预设；同名覆盖。预设文件独立于农场档，立即落盘。
+	var presets: Array = presets_data.get("presets", [])
+	var name := LoadoutPresets.normalize_name(raw_name, presets.size() + 1)
+	var captured := LoadoutPresets.capture(inventory)
+	var replaced := false
+	for preset in presets:
+		if str(preset.get("name", "")) == name:
+			preset["items"] = captured["items"]
+			preset["updated_at"] = int(Time.get_unix_time_from_system())
+			replaced = true
+			break
+	if not replaced:
+		if presets.size() >= LoadoutPresets.MAX_PRESETS:
+			_flash("预设已满（最多 %d 套）：先删除再保存。" % LoadoutPresets.MAX_PRESETS)
+			return {"ok": false, "reason": "预设已满"}
+		presets.append({"name": name, "items": captured["items"],
+				"created_at": int(Time.get_unix_time_from_system())})
+	presets_data["presets"] = presets
+	if not PresetStore.save_presets(presets_data):
+		_flash("预设文件写入失败：本次未保存。")
+		return {"ok": false, "reason": "写入失败"}
+	_refresh_presets(name)
+	preset_name_edit.text = ""
+	_flash("已%s预设「%s」（%d 件）。" % ["覆盖" if replaced else "保存", name, (captured["items"] as Array).size()])
+	return {"ok": true, "reason": "", "name": name, "count": (captured["items"] as Array).size()}
+
+
+func apply_selected() -> Dictionary:
+	var index := preset_option.selected
+	var presets: Array = presets_data.get("presets", [])
+	if index < 0 or index >= presets.size():
+		_flash("先在预设列表选中一套。")
+		return {"ok": false, "reason": "未选中预设"}
+	var preset: Dictionary = presets[index]
+	var result := LoadoutPresets.apply(inventory, preset)
+	if result["ok"]:
+		dirty = true
+		selected_instance_id = -1
+	_refresh()
+	_flash(LoadoutPresets.report(result, str(preset.get("name", ""))))
+	return result
+
+
+func delete_selected() -> Dictionary:
+	var index := preset_option.selected
+	var presets: Array = presets_data.get("presets", [])
+	if index < 0 or index >= presets.size():
+		_flash("先在预设列表选中一套。")
+		return {"ok": false, "reason": "未选中预设"}
+	var name := str(presets[index].get("name", ""))
+	presets.remove_at(index)
+	presets_data["presets"] = presets
+	if not PresetStore.save_presets(presets_data):
+		_flash("预设文件写入失败：本次未删除。")
+		return {"ok": false, "reason": "写入失败"}
+	_refresh_presets()
+	_flash("已删除预设「%s」。" % name)
+	return {"ok": true, "reason": ""}
+
+
+func _refresh_presets(select_name: String = "") -> void:
+	preset_option.clear()
+	var presets: Array = presets_data.get("presets", [])
+	if presets.is_empty():
+		preset_option.add_item("（暂无预设）")
+		preset_option.disabled = true
+		preset_option.selected = 0
+		return
+	preset_option.disabled = false
+	var select_index := 0
+	for index in range(presets.size()):
+		var preset: Dictionary = presets[index]
+		var item_name := str(preset.get("name", ""))
+		preset_option.add_item("%s（%d 件）" % [item_name, (preset.get("items", []) as Array).size()])
+		if item_name == select_name:
+			select_index = index
+	preset_option.selected = select_index
 
 
 # —— 刷新 ————————————————————————————————————————————————————————

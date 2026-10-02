@@ -1,0 +1,321 @@
+{
+  "items": [
+    {
+      "name": "d21_defs_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d21_inventory_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d21_migration_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d21_net_probe.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d22_rules_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d22_serialize_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d22_worked_example.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d23_combat_worked.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d23_defs_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d23_inventory_worked.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d23_save_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d24_recovery_sim.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d24_run_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d24_settle_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d25_crafting_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d25_goals_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d25_plant_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d26_combat_coop_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d26_session_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d27_recovery_matrix.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d28_content_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d29_arbitrage_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d29_economy_sim.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d29_regression_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d30_asset_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d31_coop_depart_ui_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d32_coop_play_ui_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d33_scene_integration_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d34_relay_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d35_main_menu_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d36_pause_menu_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d37_settings_store_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d38_main_menu_room_entry_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "d39_loadout_preset_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "stage1_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "stage2_rules_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "stage2_worked_example.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "stage3_breeding_sim.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "stage3_breeding_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "stage3_warehouse_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "stage4_market_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "stage5_ux_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "stage6_economy_sim.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    },
+    {
+      "name": "stage6_regression_smoke.gd",
+      "exit": 0,
+      "errors": 3,
+      "allow": 3,
+      "status": "ok"
+    },
+    {
+      "name": "world_picking_smoke.gd",
+      "exit": 0,
+      "errors": 0,
+      "allow": 0,
+      "status": "ok"
+    }
+  ],
+  "total": 45,
+  "failed": 0
+}
