@@ -29,7 +29,7 @@
 
 ### T0 自动化回归基线（每次实机测试前跑一遍）
 
-- [ ] T0-1（P0）编辑器 headless 全量 32 项通过，结果与 `tests/d29_full_regression_output.txt` 一致。命令见 [README §验证](../README.md)。
+- [ ] T0-1（P0）回归收集器全量通过：`bash tests/run_regression.sh`（或 `powershell -File tests/run_regression.ps1`）。通过口径＝退出码 0 **且** 无未预期 ERROR 行（白名单仅 stage6 故障注入 3 条）；输出末行 `REGRESSION_ALL_PASS`。清单覆盖全部非截图测试（修复轮批次 D 起，含 d30~d33）。
 
 ### T1 农场回归——第一大阶段未被新内容破坏（设备 A，编辑器或导出包）
 

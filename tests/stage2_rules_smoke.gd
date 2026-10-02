@@ -132,6 +132,8 @@ func _test_score_breakdown_exact() -> void:
 
 
 func _test_watering_boundaries() -> void:
+	## F-06 修复：按当前 FarmGame.water() 契约断言（返回 watered/skipped 与 message，
+	## 时段经 current_water_segment / watered_segments 核对，不再访问不存在的 segment 键）。
 	var game := _fresh_game()
 	_grant_carrot_seed(game, 901)
 	game.plant(1, 5000, "carrot")
@@ -140,25 +142,37 @@ func _test_watering_boundaries() -> void:
 	result = game.water(3, 5000)
 	_check(not result["ok"], "watering an empty plot fails")
 	result = game.water(1, 5100)
-	_check(result["ok"] and result["segment"] == 0, "carrot minute ~1 water lands in segment 1")
+	_check(result["ok"] and (result["watered"] as Array).has(1), "carrot minute ~1 water lands in segment 1")
+	_check(game.current_water_segment(1, 5100) == 0, "carrot at minute ~1 is segment 0")
 	result = game.water(1, 5300)
 	_check(not result["ok"], "same segment twice is rejected")
 	_check(game.get_plot(1)["watered_segments"] == [{"segment": 0, "can_level": 1}], "rejected water does not record")
 	result = game.water(1, 8599)
 	_check(not result["ok"], "just before the boundary still counts as segment 1")
 	result = game.water(1, 8600)
-	_check(result["ok"] and result["segment"] == 1, "exactly minute 60 starts segment 2")
+	_check(result["ok"] and game.current_water_segment(1, 8600) == 1, "exactly minute 60 starts segment 2")
 	result = game.water(1, 12199)
 	_check(not result["ok"], "second water in segment 2 is rejected")
 	result = game.water(1, 12200)
-	_check(not result["ok"], "watering at maturity is invalid")
+	_check(not result["ok"] and str(result.get("message", "")).find("成熟") != -1, "watering at maturity is invalid with reason")
 	_check(game.get_plot(1)["watered_segments"] == [{"segment": 0, "can_level": 1}, {"segment": 1, "can_level": 1}], "carrot records both segments")
 	result = game.water(2, 5100)
-	_check(result["ok"] and result["segment"] == 0, "cabbage single segment water works")
+	_check(result["ok"] and (result["watered"] as Array).has(2), "cabbage single segment water works")
 	result = game.water(2, 5600)
 	_check(not result["ok"], "cabbage has only one valid segment")
 	var status := game.watering_status(1, 5300)
 	_check(status["current"] == 0 and status["segments"].size() == 2, "watering status reports two carrot segments")
+	## 二级水壶批量作用：一次覆盖 3 块已拥有地块。
+	var game2 := _fresh_game()
+	_grant_carrot_seed(game2, 902)
+	game2.state["can_level"] = 2
+	game2.plant(1, 5000, "carrot")
+	game2.plant(2, 5000)
+	game2.plant(3, 5000)
+	var batch: Dictionary = game2.water(1, 5100)
+	_check(batch["ok"] and (batch["watered"] as Array).size() == 3, "can level 2 waters three plots at once")
+	for plot_id in [1, 2, 3]:
+		_check(game2.get_plot(plot_id)["watered_segments"].size() == 1, "plot %d records the batched watering" % plot_id)
 
 
 func _test_fertilizer_lifecycle() -> void:

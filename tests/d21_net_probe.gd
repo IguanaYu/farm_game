@@ -35,11 +35,23 @@ func _initialize() -> void:
 		_check(echoed == "pong", "ENet：客户端收到主机回复")
 
 		client.close()
+		## F-12 修复：关闭后的 peer 不再 poll（inactive 实例每次 poll 都刷错误）。
+		## 主机侧继续泵，直到它观测到对端断开；客机只查询连接状态。
+		var host_seen_disconnect := false
 		for attempt in range(50):
 			host.poll()
-			client.poll()
+			if client.get_connection_status() == MultiplayerPeer.CONNECTION_DISCONNECTED:
+				host_seen_disconnect = true
+				break
 			OS.delay_msec(10)
 		_check(client.get_connection_status() != MultiplayerPeer.CONNECTION_CONNECTED, "ENet：主动断开后连接关闭")
+		_check(host_seen_disconnect, "ENet：主机侧观测到对端断开")
+		var leftover := 0
+		while host.get_available_packet_count() > 0:
+			host.get_packet()
+			leftover += 1
+		if leftover > 0:
+			print("  note: 断开时主机剩余 %d 个未读包（已清空）" % leftover)
 
 	if failed:
 		push_error("D21_NET_PROBE_FAIL")
