@@ -1,0 +1,14 @@
+{
+  "date": "2026-10-02",
+  "head_commit_at_start": "80392e727f96ef9754698f2cc620d8514c975605",
+  "engine": "Godot 4.6.1 stable (14d19694e)",
+  "round": "音频轮（d41 新增；白名单 d41=1 为 dummy 音频驱动退出期提示）",
+  "total": 47,
+  "exit_nonzero": 0,
+  "script_errors": 4,
+  "evidence": [
+    "regression_output.txt",
+    "d41_audio_smoke.txt",
+    "results.json"
+  ]
+}

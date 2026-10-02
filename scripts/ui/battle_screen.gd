@@ -269,6 +269,7 @@ func _on_target_clicked(target_key: String) -> void:
 		_refresh()
 		return
 	played_count += 1
+	AudioKit.play(self, "card_play")
 	_flash_events(result["events"])
 	_refresh()
 
@@ -508,6 +509,7 @@ func _flash_events(events: Array) -> void:
 			"poison":
 				_popup_on_unit(str(event["target"]), "毒 -%d" % int(event["amount"]), Color("#a5679f"))
 			"outcome":
+				AudioKit.play(self, "victory" if str(event["outcome"]) == "won" else "defeat")
 				_popup_center("胜利！" if str(event["outcome"]) == "won" else "失败……", WARN_GOLD)
 
 

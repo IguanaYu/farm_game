@@ -1,0 +1,40 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: 总线：Master 存在
+  ok: 总线：Music 存在
+  ok: 总线：SFX 存在
+  ok: 资产：音效 ui_click.wav 可加载
+  ok: 资产：音效 plant.wav 可加载
+  ok: 资产：音效 water.wav 可加载
+  ok: 资产：音效 harvest.wav 可加载
+  ok: 资产：音效 coins.wav 可加载
+  ok: 资产：音效 buy.wav 可加载
+  ok: 资产：音效 craft.wav 可加载
+  ok: 资产：音效 open.wav 可加载
+  ok: 资产：音效 warn.wav 可加载
+  ok: 资产：音效 card_play.wav 可加载
+  ok: 资产：音效 battle_hit.wav 可加载
+  ok: 资产：音效 victory.wav 可加载
+  ok: 资产：音效 defeat.wav 可加载
+  ok: 资产：音效 move_step.wav 可加载
+  ok: 资产：背景音乐 farm_day.wav 可加载
+  ok: 播放：一次性播放器挂在 SFX 总线且带流
+  ok: 播放：播放器命名可识别（Sfx_<id>）
+  ok: 播放：宿主下只有一个播放器
+WARNING: AudioKit: 缺少音效文件 res://assets/sounds/not_exist_sound.wav
+   at: push_warning (core/variant/variant_utility.cpp:1034)
+   GDScript backtrace (most recent call first):
+       [0] stream (res://scripts/services/audio_kit.gd:32)
+       [1] play (res://scripts/services/audio_kit.gd:42)
+       [2] _playback (res://tests/d41_audio_smoke.gd:50)
+       [3] _run (res://tests/d41_audio_smoke.gd:24)
+  ok: 播放：缺文件只告警不建节点
+  ok: 音乐：常驻播放器挂在 Music 总线
+  ok: 音乐：重复播放替换旧播放器（每宿主一个）
+  ok: 音乐：finished 后循环重播
+  ok: 音乐：stop_music 标记移除（queue_free）
+  ok: 音量：设置读写往返（Music 0.5）
+  ok: 音量：apply 后 Music 总线分贝一致
+  ok: 音量：0 音量静音 SFX 总线
+  ok: 音量：恢复 1.0 后取消静音
+D41_AUDIO_SMOKE_PASS

@@ -89,6 +89,7 @@ func _ready() -> void:
 	if open_room and hud != null:
 		# 主菜单"好友联机"直入：读档/建档完成后自动打开房间页（延迟一帧让 HUD 先完成布局）。
 		hud.call_deferred("open_room")
+	AudioKit.play_music(self)
 
 
 func _process(delta: float) -> void:
@@ -517,8 +518,10 @@ func _on_plot_action(plot_id: int) -> void:
 func _do_harvest(plot_id: int) -> void:
 	var result := game.harvest(plot_id, _now())
 	if not result["ok"]:
+		AudioKit.play(self, "warn")
 		hud.show_status(result["message"])
 		return
+	AudioKit.play(self, "harvest")
 	_record_harvest(str(result["batch"]["kind"]), int(result["batch"]["count"]))
 	_advance_tutorial(2)
 	if not _save():
@@ -536,6 +539,7 @@ func _do_harvest(plot_id: int) -> void:
 
 func _on_building_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int, kind: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
 		match kind:
 			"shop":
 				hud.open_shop()
@@ -557,9 +561,11 @@ func _on_building_input(_camera: Node, event: InputEvent, _position: Vector3, _n
 func _on_plant_seed_requested(plot_id: int, seed_id: int) -> void:
 	var result := game.plant_seed(plot_id, seed_id, _now())
 	if result != "":
+		AudioKit.play(self, "warn")
 		hud.show_status(result)
 		_refresh_all()
 		return
+	AudioKit.play(self, "plant")
 	## F-08：成功动作先推进引导再统一保存/刷新——推进本身也会落盘（见 _advance_tutorial），
 	## 保证播种后磁盘与横幅立即到下一步，退出重开不回退。
 	if int(game.state.get("tutorial_step", 99)) == 0:
@@ -577,6 +583,8 @@ func _on_plant_seed_requested(plot_id: int, seed_id: int) -> void:
 
 func _on_water_requested(plot_id: int) -> void:
 	var result := game.water(plot_id, _now())
+	if result["ok"]:
+		AudioKit.play(self, "water")
 	hud.show_status(result["message"] if not result["ok"] else "第 %d 块地浇水完成，本时段加分已记录。" % plot_id)
 	if result["ok"]:
 		_advance_tutorial(1)
@@ -588,9 +596,11 @@ func _on_water_requested(plot_id: int) -> void:
 func _on_fertilize_requested(plot_id: int, kind: String) -> void:
 	var result := game.apply_fertilizer(plot_id, kind, _now())
 	if not result["ok"]:
+		AudioKit.play(self, "warn")
 		hud.show_status(result["message"])
 		_refresh_all()
 		return
+	AudioKit.play(self, "water")
 	if not _save():
 		hud.show_status("存档写入失败，本次施肥可能没有保存！")
 	_refresh_all()
@@ -600,8 +610,10 @@ func _on_fertilize_requested(plot_id: int, kind: String) -> void:
 func _on_buy_seed_requested(kind: String, quantity: int) -> void:
 	var result := game.buy_seeds(quantity, kind)
 	if result != "":
+		AudioKit.play(self, "warn")
 		hud.show_status(result)
 		return
+	AudioKit.play(self, "buy")
 	if not _save():
 		hud.show_status("存档写入失败，本次购买可能没有保存！")
 	_refresh_all()
@@ -612,8 +624,10 @@ func _on_buy_seed_requested(kind: String, quantity: int) -> void:
 func _on_buy_fertilizer_requested(kind: String, quantity: int) -> void:
 	var result := game.buy_fertilizer(kind, quantity)
 	if result != "":
+		AudioKit.play(self, "warn")
 		hud.show_status(result)
 		return
+	AudioKit.play(self, "buy")
 	if not _save():
 		hud.show_status("存档写入失败，本次购买可能没有保存！")
 	_refresh_all()
@@ -625,8 +639,10 @@ func _on_buy_fertilizer_requested(kind: String, quantity: int) -> void:
 func _on_upgrade_shop_requested() -> void:
 	var result := game.upgrade_shop()
 	if result != "":
+		AudioKit.play(self, "warn")
 		hud.show_status(result)
 		return
+	AudioKit.play(self, "buy")
 	if not _save():
 		hud.show_status("存档写入失败，商店升级可能没有保存！")
 	_refresh_all()
@@ -636,8 +652,10 @@ func _on_upgrade_shop_requested() -> void:
 func _on_harvest_all_requested() -> void:
 	var summary := game.harvest_all(_now())
 	if not summary["ok"]:
+		AudioKit.play(self, "warn")
 		hud.show_status("现在没有成熟的地块。")
 		return
+	AudioKit.play(self, "harvest")
 	for entry in summary["results"]:
 		_record_harvest(str(entry["batch"]["kind"]), int(entry["batch"]["count"]))
 	_advance_tutorial(2)
@@ -651,8 +669,10 @@ func _on_harvest_all_requested() -> void:
 func _on_sell_batch_requested(batch_id: int) -> void:
 	var result := game.sell_batch(batch_id)
 	if not result["ok"]:
+		AudioKit.play(self, "warn")
 		hud.show_status(result["message"])
 		return
+	AudioKit.play(self, "coins")
 	_advance_tutorial(3)
 	if not _save():
 		hud.show_status("存档写入失败，本次出售可能没有保存！")
@@ -662,8 +682,10 @@ func _on_sell_batch_requested(batch_id: int) -> void:
 
 func _on_sell_all_requested() -> void:
 	if game.state["crop_batches"].is_empty():
+		AudioKit.play(self, "warn")
 		hud.show_status("仓库里没有可出售的作物。")
 		return
+	AudioKit.play(self, "coins")
 	var earned := game.sell_all_batches()
 	_advance_tutorial(3)
 	if not _save():
@@ -674,6 +696,8 @@ func _on_sell_all_requested() -> void:
 
 func _on_recycle_seed_requested(seed_id: int) -> void:
 	var result := game.recycle_seed(seed_id)
+	if result["ok"]:
+		AudioKit.play(self, "coins")
 	hud.show_status("回收 1 粒种子，获得 %d 金币。" % result["coins"] if result["ok"] else result["message"])
 	if result["ok"] and not _save():
 		hud.show_status("存档写入失败，本次回收可能没有保存！")
@@ -699,9 +723,11 @@ func _on_sell_pending_crop_requested(batch_id: int) -> void:
 func _on_claim_pending_requested() -> void:
 	var moved := game.claim_pending()
 	if moved["crops"] == 0 and moved["seeds"] == 0:
+		AudioKit.play(self, "warn")
 		hud.show_status("仓库空间仍然不足，先出售或回收一些存货。")
 		_refresh_all()
 		return
+	AudioKit.play(self, "open")
 	if not _save():
 		hud.show_status("存档写入失败，本次领取可能没有保存！")
 	_refresh_all()

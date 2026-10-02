@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # 回归收集器（修复轮批次 D）：跑全部 headless 规则/场景测试，
 # 通过口径 = 退出码 0 且无"未预期 ERROR 行"（不止看 PASS 字符串）。
-# 白名单：stage6_regression_smoke 的 3 条 JSON 故障注入属预期路径。
+# 白名单：stage6_regression_smoke 的 3 条 JSON 故障注入属预期路径；
+# d41_audio_smoke 的 1 条为无头 dummy 音频驱动退出期的"resources still in use"引擎级提示
+# （成功播放过的流在 ResourceCache 清理后仍被驱动侧持有，脚本侧无法回收，实机无声卡问题）。
 # 用法：bash tests/run_regression.sh [godot可执行文件路径]
 set -u
 
@@ -11,6 +13,7 @@ cd "$(dirname "$0")/.."
 # 测试名 -> 允许的未预期 ERROR 行数（0 = 必须完全干净）
 declare -A WHITELIST=(
   ["stage6_regression_smoke.gd"]=3
+  ["d41_audio_smoke.gd"]=1
 )
 
 total=0
