@@ -1,8 +1,9 @@
 class_name MainMenu
 extends Control
-## 主菜单（启动首页）：继续 / 新游戏（覆盖需确认）/ 设置 / 退出。
+## 主菜单（启动首页）：继续 / 新游戏（覆盖需确认）/ 好友联机 / 设置 / 退出。
 ## 纯代码构建，沿用 room_panel 的主题与配色约定；1440×900 设计坐标。
 ## 按钮显式命名（ContinueButton 等），测试按控件名查找。
+## 设置子页复用 SettingsView（与游戏内暂停菜单共用一套）。
 
 const FOREST := Color("#294f3c")
 const LEAF := Color("#396d50")
@@ -13,20 +14,14 @@ const BAD_RED := Color("#a4543f")
 const GOLD_FILL := Color("#fff5df")
 const GOLD_LINE := Color("#d5b87d")
 
-const SETTINGS_PATH := "user://settings.cfg"
-const RELAY_PREFS_PATH := "user://relay_prefs.cfg"
-const RELAY_DEFAULT_ADDRESS := "127.0.0.1:31970"
 const WORLD_SCENE := "res://scenes/main.tscn"
 
 var main_view: VBoxContainer
 var confirm_view: VBoxContainer
 var settings_view: VBoxContainer
+var settings_panel: SettingsView
 var continue_button: Button
 var confirm_summary: Label
-var fullscreen_option: OptionButton
-var tutorial_replay_check: CheckButton
-var relay_address_edit: LineEdit
-var settings_hint: Label
 ## 装饰 emoji 的基准位置，_process 里做轻微浮动。
 var _float_labels: Array = []
 var _float_bases: Array = []
@@ -41,14 +36,15 @@ func _ready() -> void:
 	theme_root.default_font = font
 	theme_root.default_font_size = 17
 	theme = theme_root
-	_apply_window_mode_setting()
+	SettingsStore.apply_window_settings()
+	SettingsStore.apply_volumes()
 	_build()
 	set_process(true)
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	## 设置/确认页按 ESC 返回主按钮页（不退出菜单场景）。
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
+	## 设置/确认页按 pause（默认 ESC）返回主按钮页（不退出菜单场景）。
+	if event is InputEventKey and event.pressed and not event.echo and event.is_action_pressed("pause"):
 		if settings_view.visible or confirm_view.visible:
 			_show_main_view()
 			get_viewport().set_input_as_handled()
@@ -88,6 +84,10 @@ func _build() -> void:
 	new_game_button.name = "NewGameButton"
 	new_game_button.pressed.connect(_on_new_game)
 	main_view.add_child(new_game_button)
+	var coop_button := _menu_button("好友联机", Color("#e7eef6"), Color("#8fa8c8"), 40, 16)
+	coop_button.name = "CoopButton"
+	coop_button.pressed.connect(_on_coop)
+	main_view.add_child(coop_button)
 	var settings_button := _menu_button("设置", Color("#f2eede"), Color("#cfc4a6"), 40, 16)
 	settings_button.name = "SettingsButton"
 	settings_button.pressed.connect(_on_settings)
@@ -102,7 +102,8 @@ func _build() -> void:
 	settings_view = _build_settings_view()
 	stack.add_child(settings_view)
 
-	var footer := _label("存档即时保存 · 单机本地单存档", 12, TEXT_MUTED)
+	var footer := _label("v%s · 存档即时保存 · 单机本地单存档" % SettingsStore.game_version(), 12, TEXT_MUTED)
+	footer.name = "MenuFooter"
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stack.add_child(footer)
 	_refresh_continue_summary()
@@ -139,40 +140,9 @@ func _build_settings_view() -> VBoxContainer:
 	view.visible = false
 	view.add_theme_constant_override("separation", 12)
 	view.add_child(_label("设置", 22, FOREST))
-
-	var window_row := HBoxContainer.new()
-	window_row.add_theme_constant_override("separation", 10)
-	view.add_child(window_row)
-	window_row.add_child(_label("窗口模式", 15, TEXT_DARK))
-	fullscreen_option = OptionButton.new()
-	fullscreen_option.name = "FullscreenOption"
-	fullscreen_option.add_item("窗口化", 0)
-	fullscreen_option.add_item("全屏", 1)
-	fullscreen_option.item_selected.connect(_on_fullscreen_selected)
-	window_row.add_child(fullscreen_option)
-
-	var tutorial_row := HBoxContainer.new()
-	tutorial_row.add_theme_constant_override("separation", 10)
-	view.add_child(tutorial_row)
-	var tutorial_label := _label("重新显示新手引导", 15, TEXT_DARK)
-	tutorial_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	tutorial_row.add_child(tutorial_label)
-	tutorial_replay_check = CheckButton.new()
-	tutorial_replay_check.name = "TutorialReplayCheck"
-	tutorial_replay_check.toggled.connect(_on_tutorial_replay_toggled)
-	tutorial_row.add_child(tutorial_replay_check)
-
-	var relay_title := _label("联机服务器地址（互联网房号模式用）", 15, TEXT_DARK)
-	view.add_child(relay_title)
-	relay_address_edit = LineEdit.new()
-	relay_address_edit.name = "RelayAddressEdit"
-	relay_address_edit.placeholder_text = "IP:端口（如 1.2.3.4:31970）"
-	view.add_child(relay_address_edit)
-	var relay_save_button := _menu_button("保存联机服务器地址", Color("#eaf4df"), Color("#87b06f"), 36, 15)
-	relay_save_button.pressed.connect(_on_relay_address_save)
-	view.add_child(relay_save_button)
-	settings_hint = _label("", 13, LEAF)
-	view.add_child(settings_hint)
+	settings_panel = SettingsView.new()
+	settings_panel.name = "SettingsPanel"
+	view.add_child(settings_panel)
 	var back_button := _menu_button("返回", Color("#f2eede"), Color("#cfc4a6"), 36, 15)
 	back_button.pressed.connect(func() -> void: _show_main_view())
 	view.add_child(back_button)
@@ -183,7 +153,6 @@ func _show_main_view() -> void:
 	main_view.visible = true
 	confirm_view.visible = false
 	settings_view.visible = false
-	settings_hint.text = ""
 	_refresh_continue_summary()
 
 
@@ -209,8 +178,15 @@ func _on_new_game() -> void:
 
 
 func _on_settings() -> void:
-	_load_settings_values()
+	settings_panel.refresh()
 	_show_view(settings_view)
+
+
+func _on_coop() -> void:
+	## 好友联机入口：读档进农场并自动打开房间页（房间页里再选局域网/互联网）。
+	GameFlow.mode = GameFlow.Mode.CONTINUE
+	GameFlow.open_room_on_entry = true
+	get_tree().change_scene_to_file(WORLD_SCENE)
 
 
 func _on_quit() -> void:
@@ -220,42 +196,6 @@ func _on_quit() -> void:
 func _enter_world(mode: int) -> void:
 	GameFlow.mode = mode
 	get_tree().change_scene_to_file(WORLD_SCENE)
-
-
-func _on_fullscreen_selected(index: int) -> void:
-	var config := ConfigFile.new()
-	config.load(SETTINGS_PATH)
-	config.set_value("window", "fullscreen", index == 1)
-	config.save(SETTINGS_PATH)
-	if index == 1:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
-	else:
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED)
-
-
-func _on_tutorial_replay_toggled(pressed: bool) -> void:
-	## 同时写 cfg（跨启动生效）与 GameFlow（本次立即进农场也生效，由 farm_world 消费后清除）。
-	var config := ConfigFile.new()
-	config.load(SETTINGS_PATH)
-	config.set_value("tutorial", "replay", pressed)
-	config.save(SETTINGS_PATH)
-	GameFlow.reset_tutorial = pressed
-
-
-func _on_relay_address_save() -> void:
-	var address := relay_address_edit.text.strip_edges()
-	var split := address.rsplit(":", false, 1)
-	if address != "" and (split.size() != 2 or not str(split[1]).is_valid_int() or int(str(split[1])) <= 0 or int(str(split[1])) > 65535 or str(split[0]) == ""):
-		settings_hint.text = "地址格式不对，应为 IP:端口（如 1.2.3.4:31970）。"
-		return
-	if address == "":
-		address = RELAY_DEFAULT_ADDRESS
-	var config := ConfigFile.new()
-	config.load(RELAY_PREFS_PATH)
-	config.set_value("relay", "address", address)
-	config.save(RELAY_PREFS_PATH)
-	relay_address_edit.text = address
-	settings_hint.text = "联机服务器地址已保存（房间页会使用同一地址）。"
 
 
 # —— 存档摘要与设置读取 ————————————————————————————————————
@@ -280,29 +220,6 @@ func _refresh_continue_summary() -> void:
 	else:
 		continue_button.disabled = false
 		continue_button.text = "继续游戏 · %s" % summary
-
-
-func _apply_window_mode_setting() -> void:
-	var config := ConfigFile.new()
-	if config.load(SETTINGS_PATH) == OK and bool(config.get_value("window", "fullscreen", false)):
-		DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_FULLSCREEN)
-
-
-func _load_settings_values() -> void:
-	var config := ConfigFile.new()
-	config.load(SETTINGS_PATH)
-	fullscreen_option.selected = 1 if bool(config.get_value("window", "fullscreen", false)) else 0
-	tutorial_replay_check.set_pressed_no_signal(bool(config.get_value("tutorial", "replay", false)))
-	relay_address_edit.text = _load_relay_address()
-
-
-func _load_relay_address() -> String:
-	var config := ConfigFile.new()
-	if config.load(RELAY_PREFS_PATH) == OK and config.has_section_key("relay", "address"):
-		var saved := str(config.get_value("relay", "address", ""))
-		if saved != "":
-			return saved
-	return RELAY_DEFAULT_ADDRESS
 
 
 # —— 背景装饰 ———————————————————————————————————————————————

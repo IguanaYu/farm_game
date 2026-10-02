@@ -1,7 +1,7 @@
 extends SceneTree
-## 主菜单轮 d35：启动首页（继续/新游戏/设置/退出）与 farm_world 的模式分流。
-## 覆盖：无档禁用继续、存档摘要、新游戏覆盖确认与 .bak 备份、
-## 设置页（窗口模式/重播引导/中继地址持久化）、ESC 返回主按钮页、
+## 主菜单轮 d35：启动首页（继续/新游戏/好友联机/设置/退出）与 farm_world 的模式分流。
+## 覆盖：无档禁用继续、存档摘要、新游戏覆盖确认与 .bak 备份、好友联机按钮、
+## 版本号页脚、设置页（SettingsView：重播引导/中继地址持久化）、ESC 返回主按钮页、
 ## tutorial_step 重播消费（GameFlow 与 settings.cfg 两个来源）。
 ## 运行前后备份/恢复真实存档与设置文件（与 d33 的隔离约定一致）。
 
@@ -32,19 +32,23 @@ func _run() -> void:
 	_check(continue_button.disabled, "无档时继续按钮禁用")
 	_check("暂无存档" in continue_button.text, "无档文案提示暂无存档")
 	_check(menu.find_child("NewGameButton", true, false) != null, "新游戏按钮存在")
+	_check(menu.find_child("CoopButton", true, false) != null, "好友联机按钮存在")
 	_check(menu.find_child("QuitButton", true, false) != null, "退出按钮存在")
+	var footer := menu.find_child("MenuFooter", true, false) as Label
+	_check(footer != null and ("v" + SettingsStore.game_version()) in footer.text, "页脚显示版本号")
 
 	# —— 设置页：中继地址持久化（合法/非法）、重播引导写 cfg 与 GameFlow ——
 	(menu.find_child("SettingsButton", true, false) as Button).pressed.emit()
 	await process_frame
 	var settings_view := menu.find_child("SettingsView", true, false) as Control
 	_check(settings_view.visible, "设置页打开")
+	var settings_panel := menu.find_child("SettingsPanel", true, false) as SettingsView
 	var relay_edit := menu.find_child("RelayAddressEdit", true, false) as LineEdit
 	relay_edit.text = "abc"
-	menu._on_relay_address_save()
-	_check("格式不对" in menu.settings_hint.text, "非法中继地址被拒绝")
+	settings_panel.save_relay_address()
+	_check("格式不对" in settings_panel.hint_label.text, "非法中继地址被拒绝")
 	relay_edit.text = "10.1.2.3:31970"
-	menu._on_relay_address_save()
+	settings_panel.save_relay_address()
 	var relay_config := ConfigFile.new()
 	relay_config.load("user://relay_prefs.cfg")
 	_check(str(relay_config.get_value("relay", "address", "")) == "10.1.2.3:31970", "合法中继地址写入 relay_prefs.cfg（与房间页共用）")

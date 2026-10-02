@@ -112,9 +112,13 @@ var coop_client_panel: CoopClientPanel
 var active_expedition: ExpeditionGame
 ## 合作局主机侧会话（F-04）：地图/战斗面板的裁定入口与快照刷新从这里注入。
 var coop_host: SessionHost = null
-## ESC 暂停菜单（主菜单轮）：所有面板收起时才允许弹出。
+## ESC 暂停菜单：所有面板收起时才允许弹出；卡片内分主视图与设置子视图两页。
 var pause_overlay: Control
 var pause_back_button: Button
+var pause_quit_button: Button
+var pause_main_view: VBoxContainer
+var pause_settings_view: VBoxContainer
+var pause_settings_panel: SettingsView
 
 
 func _ready() -> void:
@@ -1331,8 +1335,10 @@ func close_modal_after_action() -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
-		if pause_overlay != null and pause_overlay.visible:
+	if event is InputEventKey and event.pressed and not event.echo and event.is_action_pressed("pause"):
+		if pause_settings_view != null and pause_settings_view.visible:
+			_show_pause_main()
+		elif pause_overlay != null and pause_overlay.visible:
 			_close_pause()
 		elif not _any_panel_open():
 			_open_pause()
@@ -1365,35 +1371,94 @@ func _build_pause_overlay() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	pause_overlay.add_child(center)
 	var card := _panel(CREAM, Color("#d5c9aa"), 18)
-	card.custom_minimum_size = Vector2(380, 0)
+	card.custom_minimum_size = Vector2(500, 0)
 	center.add_child(card)
 	var stack := _card_stack(card)
+	stack.add_child(_build_pause_main_view())
+	stack.add_child(_build_pause_settings_view())
+
+
+func _build_pause_main_view() -> VBoxContainer:
+	pause_main_view = VBoxContainer.new()
+	pause_main_view.name = "PauseMainView"
+	pause_main_view.add_theme_constant_override("separation", 10)
 	var title := _label("⏸ 暂停", 26, FOREST)
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	stack.add_child(title)
+	pause_main_view.add_child(title)
 	var hint := _label("农场进度每一步都会自动保存", 13, TEXT_MUTED)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	stack.add_child(hint)
+	hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_main_view.add_child(hint)
 	var resume_button := _solid_button("继续游戏", LEAF)
 	resume_button.name = "PauseResumeButton"
 	resume_button.pressed.connect(_close_pause)
-	stack.add_child(resume_button)
+	pause_main_view.add_child(resume_button)
+	var settings_button := _solid_button("设置", Color("#e7eef0"))
+	settings_button.name = "PauseSettingsButton"
+	settings_button.pressed.connect(_show_pause_settings)
+	pause_main_view.add_child(settings_button)
 	pause_back_button = _solid_button("回到主菜单", ACCENT_GOLD)
 	pause_back_button.name = "PauseBackToMenuButton"
 	pause_back_button.pressed.connect(_on_pause_back_to_menu)
-	stack.add_child(pause_back_button)
+	pause_main_view.add_child(pause_back_button)
+	pause_quit_button = _solid_button("退出游戏", Color("#c98d77"))
+	pause_quit_button.name = "PauseQuitButton"
+	pause_quit_button.pressed.connect(_on_pause_quit)
+	pause_main_view.add_child(pause_quit_button)
+	var version := _label("v%s" % SettingsStore.game_version(), 12, TEXT_MUTED)
+	version.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_main_view.add_child(version)
+	return pause_main_view
+
+
+func _build_pause_settings_view() -> VBoxContainer:
+	pause_settings_view = VBoxContainer.new()
+	pause_settings_view.name = "PauseSettingsView"
+	pause_settings_view.visible = false
+	pause_settings_view.add_theme_constant_override("separation", 12)
+	var title := _label("设置", 22, FOREST)
+	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pause_settings_view.add_child(title)
+	pause_settings_panel = SettingsView.new()
+	pause_settings_panel.name = "PauseSettingsPanel"
+	pause_settings_view.add_child(pause_settings_panel)
+	var back_button := _solid_button("返回", ACCENT_GOLD)
+	back_button.name = "PauseSettingsBackButton"
+	back_button.pressed.connect(_show_pause_main)
+	pause_settings_view.add_child(back_button)
+	return pause_settings_view
+
+
+func _show_pause_settings() -> void:
+	pause_settings_panel.refresh()
+	pause_main_view.visible = false
+	pause_settings_view.visible = true
+
+
+func _show_pause_main() -> void:
+	pause_main_view.visible = true
+	pause_settings_view.visible = false
 
 
 func _open_pause() -> void:
-	# 联机房间/对局进行中不允许回主菜单（会直接断开双方链路），按钮置灰说明原因。
+	# 联机房间/对局进行中不允许回主菜单（会直接断开双方链路），按钮置灰说明原因；
+	# 退出游戏保持可用（玩家显式退出，tooltip 说明后果）。
 	var coop_active := coop_host != null or room_panel.host != null or room_panel.client != null or coop_client_panel.client != null
 	pause_back_button.disabled = coop_active
 	pause_back_button.tooltip_text = "联机房间或对局进行中，请先在房间页退出" if coop_active else ""
+	pause_quit_button.tooltip_text = "联机房间或对局进行中，退出会直接断开双方连接" if coop_active else ""
+	_show_pause_main()
 	pause_overlay.visible = true
 
 
 func _close_pause() -> void:
 	pause_overlay.visible = false
+	_show_pause_main()
+
+
+func _on_pause_quit() -> void:
+	## 进度已即时落盘，直接退出进程；联机中的后果由按钮 tooltip 提示。
+	get_tree().quit()
 
 
 func _on_pause_back_to_menu() -> void:

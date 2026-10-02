@@ -9,8 +9,11 @@ enum Mode { AUTO, CONTINUE, NEW_GAME }
 static var mode: int = Mode.AUTO
 ## 主菜单"设置→重新显示新手引导"：进农场读档后把 tutorial_step 归零。
 static var reset_tutorial := false
+## 主菜单"好友联机"：进农场读档后自动打开房间页（无档时 farm_world 自动开新档兜底）。
+static var open_room_on_entry := false
 
 
 static func reset() -> void:
 	mode = Mode.AUTO
 	reset_tutorial = false
+	open_room_on_entry = false

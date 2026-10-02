@@ -1,6 +1,7 @@
 extends SceneTree
 ## 主菜单轮 d36：游戏内 ESC 暂停菜单。
-## 覆盖：默认 AUTO 直启不回归、ESC 开/关暂停、模态与面板打开时 ESC 让位、
+## 覆盖：默认 AUTO 直启不回归、ESC 开/关暂停、设置子视图与退出游戏按钮、
+## 设置子视图 ESC 先返回主视图、模态与面板打开时 ESC 让位、
 ## 联机占用时"回到主菜单"置灰、正常路径点按钮切回主菜单场景。
 ## 运行前后备份/恢复真实存档（与 d33 的隔离约定一致）。
 
@@ -42,6 +43,20 @@ func _run() -> void:
 	_check(not hud.pause_overlay.visible, "再按 ESC 关闭暂停菜单")
 	resume_button.pressed.emit()
 	_check(not hud.pause_overlay.visible, "继续按钮同样关闭暂停")
+
+	# —— 设置与退出游戏按钮；设置子视图的 ESC 层级 ——
+	var settings_button := hud.find_child("PauseSettingsButton", true, false) as Button
+	var quit_button := hud.find_child("PauseQuitButton", true, false) as Button
+	_check(settings_button != null and quit_button != null, "暂停菜单含设置与退出游戏按钮")
+	hud._unhandled_key_input(esc)
+	_check(hud.pause_overlay.visible, "再次 ESC 打开暂停")
+	settings_button.pressed.emit()
+	var pause_settings := hud.find_child("PauseSettingsView", true, false) as Control
+	_check(pause_settings.visible, "设置子视图打开（含共用 SettingsView）")
+	hud._unhandled_key_input(esc)
+	_check(not pause_settings.visible and hud.pause_overlay.visible, "设置子视图 ESC 返回暂停主视图（不关暂停）")
+	hud._unhandled_key_input(esc)
+	_check(not hud.pause_overlay.visible, "暂停主视图 ESC 关闭暂停")
 
 	# —— 模态打开时 ESC 让位（不弹暂停）——
 	hud.open_shop()

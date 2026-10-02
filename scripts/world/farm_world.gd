@@ -72,6 +72,7 @@ func _ready() -> void:
 		_save()
 	elif fresh_start:
 		_save()
+	var open_room := GameFlow.open_room_on_entry
 	GameFlow.reset()
 	var market_changed := game.refresh_market(_now())
 	if game.breeder_settle(_now()) or market_changed:
@@ -85,6 +86,9 @@ func _ready() -> void:
 	clock.timeout.connect(_on_clock_tick)
 	add_child(clock)
 	clock.start()
+	if open_room and hud != null:
+		# 主菜单"好友联机"直入：读档/建档完成后自动打开房间页（延迟一帧让 HUD 先完成布局）。
+		hud.call_deferred("open_room")
 
 
 func _process(delta: float) -> void:
@@ -102,7 +106,7 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F9:
+	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.is_action_pressed("debug_mature_all"):
 		_debug_mature_all()
 
 
@@ -899,12 +903,9 @@ func _now() -> int:
 ## 主菜单"重新显示新手引导"：合并 GameFlow（本次会话）与 settings.cfg（跨启动）两个来源，
 ## cfg 标志消费即清除，避免下次进农场再次重播。
 func _consume_tutorial_replay() -> bool:
-	var replay := GameFlow.reset_tutorial
-	var config := ConfigFile.new()
-	if config.load("user://settings.cfg") == OK and bool(config.get_value("tutorial", "replay", false)):
-		replay = true
-		config.set_value("tutorial", "replay", false)
-		config.save("user://settings.cfg")
+	var replay := GameFlow.reset_tutorial or SettingsStore.get_tutorial_replay()
+	if SettingsStore.get_tutorial_replay():
+		SettingsStore.set_tutorial_replay(false)
 	return replay
 
 
