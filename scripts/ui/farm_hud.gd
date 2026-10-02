@@ -29,6 +29,8 @@ signal unlock_formula_requested
 signal sell_batch_to_requested(batch_id: int, count: int, guest_id: int)
 signal debug_mature_requested
 signal expedition_save_requested(dirty: bool)
+## HUD 本地改动需要立即落盘时发出（如跳过引导），世界层执行普通保存＋刷新。
+signal save_requested
 
 const SHOP_ICON := preload("res://assets/sprites/facility_shop.png")
 const WAREHOUSE_ICON := preload("res://assets/sprites/facility_warehouse.png")
@@ -304,7 +306,9 @@ func _build_tutorial_banner() -> void:
 	skip_button.custom_minimum_size.x = 88
 	skip_button.pressed.connect(func():
 		current_state["tutorial_step"] = 99
-		tutorial_panel.visible = false)
+		tutorial_panel.visible = false
+		## F-08：跳过也立即保存——此前只改内存，重开后引导会再次弹出。
+		save_requested.emit())
 	row.add_child(skip_button)
 
 

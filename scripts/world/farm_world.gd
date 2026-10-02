@@ -34,6 +34,12 @@ const STAGE_MODELS := {
 		"growing": preload("res://assets/models/plot_carrot_growing.glb"),
 		"mature": preload("res://assets/models/plot_carrot_mature.glb"),
 	},
+	# 萤果同样先用胡萝卜模型占位（F-05：缺键让地块刷新脚本报错、永远显示空地）。
+	"glow_berry": {
+		"sprout": preload("res://assets/models/plot_carrot_sprout.glb"),
+		"growing": preload("res://assets/models/plot_carrot_growing.glb"),
+		"mature": preload("res://assets/models/plot_carrot_mature.glb"),
+	},
 }
 
 var game: FarmGame
@@ -361,6 +367,7 @@ func _build_hud() -> void:
 	hud.sell_batch_to_requested.connect(_on_sell_batch_to_requested)
 	hud.debug_mature_requested.connect(_debug_mature_all)
 	hud.expedition_save_requested.connect(_on_expedition_save_requested)
+	hud.save_requested.connect(_on_plain_save_requested)
 
 
 func _refresh_all() -> void:
@@ -399,7 +406,14 @@ func _refresh_plot_model(plot_id: int) -> void:
 		elif elapsed >= defn["grow_seconds"] / 3:
 			stage = "growing"
 		model_key = "%s_%s" % [kind, stage]
-		model = STAGE_MODELS[kind][stage]
+		## F-05 兜底：未知植物/阶段缺模型时回退空地并告警，不再让场景刷新抛错。
+		var stages: Dictionary = STAGE_MODELS.get(kind, {})
+		if stages.has(stage):
+			model = stages[stage]
+		else:
+			push_warning("plot model missing: %s（回退空地模型）" % model_key)
+			model_key = "empty_%s" % kind
+			model = PLOT_EMPTY
 	_set_mature_marker(plot_id, model_key.ends_with("_mature"))
 	if plot_model_keys.get(plot_id, "") == model_key:
 		return
@@ -530,15 +544,17 @@ func _on_plant_seed_requested(plot_id: int, seed_id: int) -> void:
 		hud.show_status(result)
 		_refresh_all()
 		return
+	## F-08：成功动作先推进引导再统一保存/刷新——推进本身也会落盘（见 _advance_tutorial），
+	## 保证播种后磁盘与横幅立即到下一步，退出重开不回退。
+	if int(game.state.get("tutorial_step", 99)) == 0:
+		_advance_tutorial(0)
+	elif int(game.state.get("tutorial_step", 99)) == 4:
+		_advance_tutorial(4)
 	if not _save():
 		hud.show_status("存档写入失败，本次播种可能没有保存！")
 	_refresh_all()
 	var plot := game.get_plot(plot_id)
 	var defn := PlantDefs.get_plant(plot["kind"])
-	if int(game.state.get("tutorial_step", 99)) == 0:
-		_advance_tutorial(0)
-	elif int(game.state.get("tutorial_step", 99)) == 4:
-		_advance_tutorial(4)
 	hud.show_status("第 %d 块地已播种%s（品质 %d 分），约 %d 分钟后成熟。" % [plot_id, defn["display_name"], BreedingDefs.quality_score(plot["parent_traits"]), int(defn["grow_seconds"] / 60)])
 	hud.close_modal_after_action()
 
@@ -814,6 +830,13 @@ func _on_sell_batch_to_requested(batch_id: int, count: int, guest_id: int) -> vo
 	hud.show_status("卖给%s %d 个作物，获得 %d 金币。" % [MarketDefs.GUESTS[guest_id]["display_name"], result["sold_count"], result["coins"]])
 
 
+func _on_plain_save_requested() -> void:
+	## HUD 本地改动的立即保存（跳过引导等）：不剔除演示物品，仅整档写入＋刷新。
+	if not _save():
+		hud.show_status("存档写入失败，本次操作可能没有保存！")
+	_refresh_all()
+
+
 func _on_expedition_save_requested(dirty: bool) -> void:
 	## 战备面板关闭：先剔除演示物品再保存（2.1 计划 W6：演示内容不进存档）。
 	var inventory := InventoryGame.new()
@@ -840,9 +863,14 @@ func _debug_mature_all() -> void:
 
 func _advance_tutorial(completed_step: int) -> void:
 	## 首轮引导：动作成功且正处在对应步骤时推进；最后一步完成或跳过后不再打扰。
+	## F-08：推进即落盘并刷新横幅——不依赖玩家再做一次无关操作才可见/持久。
 	if int(game.state.get("tutorial_step", 99)) != completed_step:
 		return
 	game.state["tutorial_step"] = 99 if completed_step >= 4 else completed_step + 1
+	if not _save():
+		hud.show_status("存档写入失败，引导进度可能没有保存！")
+	if is_instance_valid(hud):
+		hud.refresh(game.state)
 
 
 ## 2.5：收获事件进成长统计（第一茬岩芽菜等目标判定）。
