@@ -36,7 +36,12 @@ func _initialize() -> void:
 		hand_after.append(int(card["uid"]))
 	_check(hand_after == hand_before, "强退：手牌一致（不重抽）")
 	_check(int(combat2.state["players"]["p1"]["hp"]) == hp_before, "强退：生命一致")
-	_check(str(combat2.state["enemies"][0]["intent"]) == str(combat.state["enemies"][0]["intent"]), "强退：敌人意图一致")
+	## 意图经 JSON 往返后数值会变 float，逐字比较字符串会误报；按语义比较关键字段。
+	var intent_a: Dictionary = combat.state["enemies"][0]["intent"]
+	var intent_b: Dictionary = combat2.state["enemies"][0]["intent"]
+	_check(str(intent_a.get("kind", "")) == str(intent_b.get("kind", ""))
+		and int(intent_a.get("value", -1)) == int(intent_b.get("value", -1))
+		and int(intent_a.get("times", -1)) == int(intent_b.get("times", -1)), "强退：敌人意图一致")
 
 	## 恢复后继续打完并撤离：结算能正常应用。
 	for enemy in combat2.state["enemies"]:

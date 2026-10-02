@@ -1,0 +1,11 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+OpenGL API 3.3.0 NVIDIA 591.86 - Compatibility - Using Device: NVIDIA - NVIDIA GeForce RTX 4060 Ti
+
+QA_SOLO_NODE row=1 type=battle
+QA_SOLO_BATTLE outcome=won rounds=2 hp=40
+QA_SOLO_NODE row=2 type=gather
+QA_SOLO_NODE row=3 type=event
+QA_SOLO_NODE row=4 type=rest_exit
+QA_SOLO_EXTRACT { "ok": true, "reason": "", "settlement": { "fmt": 1, "settlement_id": "settle-1790912747053-0e2d", "run_id": "run-1790912746677-c75e", "kind": "extract", "detail": 36, "created_at": 1790912747, "player_id": "p-1790912746-b6b412", "returned": [{ "instance_id": 1000, "def_id": "old_shortsword", "name": "旧短刀", "container": "chest", "uses_remaining": 1, "seed_traits": [], "sell_value": 0 }, { "instance_id": 1001, "def_id": "wooden_shield", "name": "木盾", "container": "chest", "uses_remaining": 1, "seed_traits": [], "sell_value": 0 }, { "instance_id": 1002, "def_id": "pack_tools", "name": "行囊工具", "container": "chest", "uses_remaining": 1, "seed_traits": [], "sell_value": 0 }], "gained": [{ "instance_id": 1003, "def_id": "fiber_clump", "name": "纤维团", "container": "pack", "uses_remaining": 1, "seed_traits": [], "sell_value": 6 }, { "instance_id": 1003, "def_id": "bandage", "name": "绷带", "container": "pack", "uses_remaining": 1, "seed_traits": [], "sell_value": 5 }, { "instance_id": 1003, "def_id": "bandage", "name": "绷带", "container": "pack", "uses_remaining": 1, "seed_traits": [], "sell_value": 5 }], "lost": [], "protected": [], "consumed": [], "next_instance_id": 1003, "applied": true } }
+QA_SOLO_SAVED active_ref= applied=1 warehouse=1
+QA_SOLO_COMPLETE

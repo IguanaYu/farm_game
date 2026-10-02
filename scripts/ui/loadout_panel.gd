@@ -7,6 +7,7 @@ extends Control
 signal close_requested
 signal save_requested
 signal demo_battle_requested
+signal depart_requested
 
 
 ## 拖放支持（2.3 D2.3-02）：仓库行与已放置物品可拖，容器盒为放置目标。
@@ -32,7 +33,7 @@ class DropBox extends VBoxContainer:
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
-const TEXT_MUTED := Color("#788678")
+const TEXT_MUTED := Color("#3f4a42")
 const BAD_RED := Color("#a4543f")
 const WARN_GOLD := Color("#9b713a")
 const CELL_EMPTY := Color("#efe8d4")
@@ -73,7 +74,7 @@ func _ready() -> void:
 	var font := SystemFont.new()
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
 	theme_root.default_font = font
-	theme_root.default_font_size = 16
+	theme_root.default_font_size = 18
 	theme = theme_root
 	_build()
 
@@ -186,9 +187,9 @@ func _build() -> void:
 	status_label.custom_minimum_size = Vector2(260, 0)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	bottom.add_child(status_label)
-	var depart := _button("出发", Color("#f0efe6"), Color("#b9b9a6"))
-	depart.disabled = true
-	depart.tooltip_text = "洞窟功能准备中：真实出发在 2.4 接入。"
+	var depart := _button("出发（单人）", Color("#ffd98a"), Color("#9b713a"))
+	depart.tooltip_text = "校验通过后直接出发进洞窟；失败原因会显示在旁边。"
+	depart.pressed.connect(func() -> void: depart_requested.emit())
 	bottom.add_child(depart)
 	var close_button := _button("返回", Color("#eaf4df"), Color("#87b06f"))
 	close_button.pressed.connect(_on_close)
@@ -402,6 +403,9 @@ func _refresh_warehouse() -> void:
 		var demo_mark := "［演示］" if bool(instance.get("demo", false)) else ""
 		row.text = "%s%s  %d×%d → %d 张牌" % [demo_mark, def["name"], def["size"].x, def["size"].y, def["cards"].size()]
 		row.add_theme_font_size_override("font_size", 14)
+		row.add_theme_color_override("font_color", Color("#35513d"))
+		row.add_theme_color_override("font_hover_color", Color("#1f3327"))
+		row.add_theme_color_override("font_pressed_color", Color("#1f3327"))
 		var fill := Color("#fffbea") if int(instance["instance_id"]) != selected_instance_id else Color("#e8f0d8")
 		var style := _style(fill, CATEGORY_COLOR.get(str(def["category"]), Color("#77a76d")), 8)
 		row.add_theme_stylebox_override("normal", style)
@@ -529,7 +533,7 @@ func _refresh_check() -> void:
 		child.queue_free()
 	var check := inventory.loadout_check()
 	if check["hard_blocks"].is_empty() and check["advises"].is_empty():
-		check_column.add_child(_label("准备检查通过：随时可以出发（出发功能 2.4 开放）。", 14, Color("#3f7048")))
+		check_column.add_child(_label("准备检查通过：点左下「出发（单人）」即可进入洞窟。", 14, Color("#3f7048")))
 		return
 	for problem in check["hard_blocks"]:
 		var label := _label("⛔ %s" % problem, 13, BAD_RED)
@@ -589,6 +593,10 @@ func _label(content: String, size: int, color: Color) -> Label:
 func _button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
+	button.add_theme_color_override("font_color", Color("#35513d"))
+	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
+	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
+	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
 	button.add_theme_font_size_override("font_size", 15)
 	var style := _style(fill, border, 12)
 	style.content_margin_left = 12

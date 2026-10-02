@@ -13,7 +13,7 @@ signal resume_requested
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
-const TEXT_MUTED := Color("#788678")
+const TEXT_MUTED := Color("#3f4a42")
 const ACCENT_GOLD := Color("#9b713a")
 const CAVE_DARK := Color("#33424e")
 
@@ -23,6 +23,7 @@ var intro_label: Label
 var intro_panel: PanelContainer
 var status_label: Label
 var depart_button: Button
+var overview_labels: Array = []
 
 
 func _ready() -> void:
@@ -33,7 +34,7 @@ func _ready() -> void:
 	var font := SystemFont.new()
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
 	theme_root.default_font = font
-	theme_root.default_font_size = 18
+	theme_root.default_font_size = 20
 	theme = theme_root
 	_build()
 
@@ -44,9 +45,26 @@ func open(target_game: FarmGame) -> void:
 	inventory.bind(game.state["expedition"])
 	intro_panel.visible = not inventory.basic_kit_missing().is_empty()
 	status_label.text = ""
+	_refresh_overview()
 	var has_run := str(game.state["expedition"].get("active_run_ref", "")) != ""
 	depart_button.text = "继续探险" if has_run else "出发（单人）"
 	visible = true
+
+
+func _refresh_overview() -> void:
+	## 概览两行随存档刷新：携带价值与出发检查（替代旧版静态占位文案）。
+	var has_run := str(game.state["expedition"].get("active_run_ref", "")) != ""
+	var carry_line := "携带可售 %d 金币 ｜ 保险箱保护 %d 金币" % [inventory.carry_sell_value(), inventory.protected_value()]
+	if has_run:
+		carry_line += " ｜ 有一局探险进行中，可随时继续"
+	var check := inventory.loadout_check()
+	var check_line := "出发检查：通过，随时可以出发"
+	if not check["hard_blocks"].is_empty():
+		check_line = "出发检查：未通过（%s）" % "、".join(check["hard_blocks"])
+	elif not check["advises"].is_empty():
+		check_line = "出发检查：通过 ｜ 建议：%s" % "、".join(check["advises"])
+	overview_labels[0].text = carry_line
+	overview_labels[1].text = check_line
 
 
 func _on_depart_clicked() -> void:
@@ -88,8 +106,11 @@ func _build() -> void:
 	var info_column := VBoxContainer.new()
 	info_column.add_theme_constant_override("separation", 6)
 	info.add_child(info_column)
-	info_column.add_child(_label("最高到达层数：尚未解锁", 17, TEXT_DARK))
-	info_column.add_child(_label("当前目标：先配好一套装备，看看它们会变成哪些牌", 17, TEXT_DARK))
+	overview_labels = []
+	for line in ["", ""]:
+		var overview := _label(line, 17, TEXT_DARK)
+		info_column.add_child(overview)
+		overview_labels.append(overview)
 
 	intro_panel = _panel(Color("#33492ef2"), Color("#7fa876"), 14)
 	column.add_child(intro_panel)
@@ -115,7 +136,7 @@ func _build() -> void:
 	warehouse_button.pressed.connect(func() -> void: open_equipment_warehouse_requested.emit())
 	buttons.add_child(warehouse_button)
 
-	var legend := _label("操作说明：点击洞窟入口看这里；战备箱直接打开个人配装；制作台即将开放。探险时携带物品会被本局占用。", 14, TEXT_MUTED)
+	var legend := _label("操作说明：战备配置里领取基础装备、放入容器后出发；装备仓库整理与出售战利品；制作台与装备仓库在农场内打开。探险时携带物品会被本局占用。", 14, TEXT_MUTED)
 	legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	legend.custom_minimum_size = Vector2(520, 0)
 	column.add_child(legend)
@@ -156,6 +177,10 @@ func _label(content: String, size: int, color: Color) -> Label:
 func _button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
+	button.add_theme_color_override("font_color", Color("#35513d"))
+	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
+	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
+	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
 	button.add_theme_font_size_override("font_size", 17)
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill

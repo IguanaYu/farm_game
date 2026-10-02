@@ -1,0 +1,16 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: 回归清单：七大块 31 项测试文件齐全（缺失：无）
+  ok: 不变量：存档版本 7
+  ok: 不变量：规则版本锚点
+  ok: 不变量：v7 crafting 块
+  ok: 不变量：物品/牌定义自洽
+  ok: 不变量：两层定义在
+  ok: 不变量：核心规则类可加载（GDScript）
+  ok: 不变量：核心规则类可加载（GDScript）
+  ok: 不变量：核心规则类可加载（GDScript）
+  ok: 不变量：核心规则类可加载（GDScript）
+  ok: 不变量：核心规则类可加载（GDScript）
+  ok: 不变量：核心规则类可加载（GDScript）
+  ok: 不变量：核心规则类可加载（GDScript）
+D29_REGRESSION_SMOKE_PASS

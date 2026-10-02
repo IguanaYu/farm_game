@@ -463,6 +463,10 @@ func start_battle() -> Dictionary:
 	## 消耗品扣减统一挂主机侧（p1）库存；p2 实体由其抽牌命中时经同一 InventoryGame 接口扣。
 	var encounter_id := _encounter_id(node)
 	var combat := CombatGame.create(players, encounter_id, battle_seed, inventories.get("p1"))
+	## create 只建局（第 0 回合、空手牌）；必须 start() 才会掷意图、发首回合手牌与能量。
+	var started := combat.start()
+	if not bool(started.get("ok", false)):
+		push_error("start_battle: combat.start 失败 %s" % str(started.get("reason", "")))
 	## p2 的消耗品来源走各自库存：为每个玩家挂自己的库存视图。
 	if run["phase"] != null and run.get("coop", false):
 		combat.member_inventories = inventories
@@ -493,6 +497,9 @@ func restore_battle() -> CombatGame:
 	if not combat.load_dict(run["battle"]):
 		return null
 	combat.inventory = run_inventory()
+	## 兼容修复前写入的第 0 回合快照（create 未 start 的旧局）：恢复时补一次开局。
+	if not combat.state.is_empty() and int(combat.state.get("round", -1)) == 0 and str(combat.state.get("phase", "")) == "player":
+		combat.start()
 	return combat
 
 

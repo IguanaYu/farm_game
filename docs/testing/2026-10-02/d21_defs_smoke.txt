@@ -1,0 +1,45 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: 基线：最大生命 40
+  ok: 基线：每回合 3 能量
+  ok: 基线：每回合抽 5 张
+  ok: 基线：手牌上限 10
+  ok: 基线：胸挂 3×4
+  ok: 基线：背包 4×4
+  ok: 基线：保险箱 1×2
+  ok: 基线：容器加入回合 1/2/3
+  ok: 基线：规则版本锚点存在
+  ok: 几何：2×2 占 4 格
+  ok: 几何：1×3 旋转后横放
+  ok: 几何：越界放置被拒绝
+  ok: 几何：与占用格重叠被拒绝
+  ok: 几何：空位可放置
+  ok: 几何：忽略自身实例后可放回原位
+  ok: 定义表：占格数=牌数、牌引用全部有效
+  ok: 基础套装：共 3 件
+  ok: 基础套装：old_shortsword 不可出售
+  ok: 基础套装：old_shortsword 不可放保险箱
+  ok: 基础套装：wooden_shield 不可出售
+  ok: 基础套装：wooden_shield 不可放保险箱
+  ok: 基础套装：pack_tools 不可出售
+  ok: 基础套装：pack_tools 不可放保险箱
+  ok: 基础套装：合计 8 格／8 张牌
+  ok: 演示物品：demo_iron_sword 以 demo_ 前缀隔离
+  ok: 演示物品：demo_ore 以 demo_ 前缀隔离
+  ok: 演示物品：demo_potion 以 demo_ 前缀隔离
+  ok: 演示物品：至少 2 件
+  ok: 演示货物：大体积且值钱（值钱但拖累战斗）
+  ok: 牌模板：17 个效果模板已注册（2.2 的 12＋2.5 的 5）
+  ok: 牌模板：slash 存在
+  ok: 牌模板：heavy_strike 存在
+  ok: 牌模板：shield_up 存在
+  ok: 牌模板：cover 存在
+  ok: 牌模板：brace 存在
+  ok: 牌模板：deep_breath 存在
+  ok: 牌模板：observe 存在
+  ok: 牌模板：expose 存在
+  ok: 牌模板：venom_stab 存在
+  ok: 牌模板：drink_potion 存在
+  ok: 牌模板：heavy_cargo 存在
+  ok: 牌模板：first_aid 存在
+D21_DEFS_SMOKE_PASS

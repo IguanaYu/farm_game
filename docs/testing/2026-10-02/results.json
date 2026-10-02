@@ -1,0 +1,162 @@
+[
+  {
+    "test": "d21_defs_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d21_inventory_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d21_migration_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d21_net_probe.gd",
+    "exit_code": 0,
+    "error_lines": 50
+  },
+  {
+    "test": "d22_rules_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d22_serialize_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d22_worked_example.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d23_combat_worked.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d23_defs_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d23_inventory_worked.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d23_save_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d24_recovery_sim.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d24_run_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d24_settle_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d25_crafting_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d25_goals_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d25_plant_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d26_combat_coop_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d26_session_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d27_recovery_matrix.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d28_content_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d29_arbitrage_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "d29_regression_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "stage1_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "stage2_rules_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 1
+  },
+  {
+    "test": "stage2_worked_example.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "stage3_breeding_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "stage3_warehouse_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "stage4_market_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "stage5_ux_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  },
+  {
+    "test": "stage6_regression_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 3
+  },
+  {
+    "test": "world_picking_smoke.gd",
+    "exit_code": 0,
+    "error_lines": 0
+  }
+]

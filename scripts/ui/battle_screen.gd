@@ -9,7 +9,7 @@ signal inventory_mutated
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
-const TEXT_MUTED := Color("#788678")
+const TEXT_MUTED := Color("#3f4a42")
 const BAD_RED := Color("#a4543f")
 const GOOD_GREEN := Color("#3f7048")
 const WARN_GOLD := Color("#9b713a")
@@ -30,6 +30,8 @@ var player_panel: VBoxContainer
 var pile_panel: HBoxContainer
 var end_button: Button
 var overlay_panel: PanelContainer
+var overlay_center: CenterContainer
+var overlay_column: VBoxContainer
 var overlay_label: Label
 var chooser_column: VBoxContainer
 var battle_column: VBoxContainer
@@ -45,7 +47,7 @@ func _ready() -> void:
 	var font := SystemFont.new()
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
 	theme_root.default_font = font
-	theme_root.default_font_size = 15
+	theme_root.default_font_size = 17
 	theme = theme_root
 	_build()
 
@@ -60,6 +62,7 @@ func open_run(combat: CombatGame) -> void:
 	chooser_column.visible = false
 	battle_column.visible = true
 	overlay_panel.visible = false
+	overlay_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	status_label.text = "洞窟内的战斗——必须分出胜负。"
 	_refresh()
 
@@ -76,6 +79,7 @@ func open_demo(target_game: FarmGame = null) -> void:
 	chooser_column.visible = true
 	battle_column.visible = false
 	overlay_panel.visible = false
+	overlay_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	status_label.text = "演示战斗：牌组按当前战备布局生成；胜利后可搜刮（2.3 样例奖励）。"
 
 
@@ -162,11 +166,18 @@ func _build() -> void:
 	overlay_panel = _panel(Color("#fff9ed"), Color("#d5c9aa"), 16)
 	overlay_panel.visible = false
 	overlay_panel.mouse_filter = Control.MOUSE_FILTER_STOP
+	# PanelContainer 会把所有子节点拉伸铺满同一块矩形（互相覆盖）：
+	# 结算内容必须放进内部 VBox 逐行排列（与地图面板覆盖层同一模式）。
+	overlay_column = VBoxContainer.new()
+	overlay_column.add_theme_constant_override("separation", 8)
+	overlay_panel.add_child(overlay_column)
 	overlay_label = _label("", 22, FOREST)
 	overlay_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	overlay_panel.add_child(overlay_label)
-	var overlay_center := CenterContainer.new()
+	overlay_column.add_child(overlay_label)
+	overlay_center = CenterContainer.new()
 	overlay_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# 覆盖层常驻全屏：隐藏时不设 IGNORE 会挡住底下 chooser/battle 全部按钮的鼠标输入。
+	overlay_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay_center.add_child(overlay_panel)
 	add_child(overlay_center)
 
@@ -319,6 +330,10 @@ func _refresh_hand() -> void:
 " + DeckBuilder.source_summary(_inventory(), int(card["source_instance_id"]))
 		button.tooltip_text = def["desc"] + source_text
 		button.add_theme_font_size_override("font_size", 13)
+		button.add_theme_color_override("font_color", Color("#35513d"))
+		button.add_theme_color_override("font_hover_color", Color("#1f3327"))
+		button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
+		button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
 		var fill := CARD_BACK if int(card["uid"]) != selected_uid else Color("#ffe9b0")
 		var style := _style(fill, Color("#c9a86a") if int(card["uid"]) != selected_uid else Color("#9b713a"), 10)
 		style.content_margin_left = 6
@@ -409,13 +424,15 @@ func _show_outcome() -> void:
 		"战斗胜利！" if won else "战斗失败……",
 		int(combat.state["round"]), int(player["hp"]), int(player["max_hp"]), played_count]
 	overlay_panel.visible = true
-	while overlay_panel.get_child_count() > 1:
-		var extra: Node = overlay_panel.get_child(1)
-		overlay_panel.remove_child(extra)
-		extra.queue_free()
+	# 结算弹出时恢复拦截：点在面板外不应穿透到已结束的战斗按钮。
+	overlay_center.mouse_filter = Control.MOUSE_FILTER_STOP
+	for child in overlay_column.get_children():
+		if child != overlay_label:
+			overlay_column.remove_child(child)
+			child.queue_free()
 	var close_button := _button("返回", Color("#eaf4df"), Color("#87b06f"))
 	close_button.pressed.connect(_on_close)
-	overlay_panel.add_child(close_button)
+	overlay_column.add_child(close_button)
 
 
 # —— 事件反馈（轻量浮动数字）———————————————————————————————
@@ -547,6 +564,10 @@ func _label(content: String, size: int, color: Color) -> Label:
 func _button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
+	button.add_theme_color_override("font_color", Color("#35513d"))
+	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
+	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
+	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
 	button.add_theme_font_size_override("font_size", 15)
 	var style := _style(fill, border, 12)
 	style.content_margin_left = 10

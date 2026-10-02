@@ -1,0 +1,141 @@
+extends SceneTree
+
+var world: Node3D
+var evidence_dir := "C:/Users/86132/.codex/worktrees/eba7/farm/docs/testing/2026-10-02"
+
+func _initialize() -> void:
+	_run.call_deferred()
+
+func _shot(name: String) -> void:
+	await process_frame
+	await RenderingServer.frame_post_draw
+	root.get_viewport().get_texture().get_image().save_png(evidence_dir + "/" + name + ".png")
+
+func _fresh(marker: String) -> FarmGame:
+	var farm := FarmGame.new()
+	farm.new_game(int(Time.get_unix_time_from_system()))
+	farm.state["expedition"]["player_id"] = marker
+	var inventory := InventoryGame.new()
+	inventory.bind(farm.state["expedition"])
+	inventory.grant_basic_kit()
+	for instance in inventory.warehouse_list().duplicate():
+		inventory.move_to_loadout(int(instance["instance_id"]), "chest")
+	return farm
+
+func _run() -> void:
+	world = (load("res://scenes/main.tscn") as PackedScene).instantiate()
+	root.add_child(world)
+	await process_frame
+	world.game.new_game(int(Time.get_unix_time_from_system()))
+	world._refresh_all()
+	var hud: FarmHud = world.hud
+	print("QA_ENV window=", DisplayServer.window_get_size(), " viewport=", root.get_viewport().get_visible_rect().size, " user=", OS.get_user_data_dir())
+
+	# 使用真正的世界层播种处理器，检查展示和磁盘状态。
+	var seed_id := int(world.game.state["seeds"][0]["id"])
+	world._on_plant_seed_requested(1, seed_id)
+	print("QA_TUTORIAL memory=", world.game.state["tutorial_step"], " disk=", SaveStore.load_state().get("tutorial_step"), " banner=", hud.tutorial_label.text)
+	await _shot("tutorial_after_plant")
+	hud.open_expedition_hub()
+	await _shot("cave_hub")
+	hud.expedition_hub_panel.close()
+	hud.open_loadout()
+	hud.loadout_panel._on_grant_kit()
+	await _shot("loadout_legibility")
+	var button := _first_button(hud.loadout_panel)
+	print("QA_BUTTON font_color=", button.get_theme_color("font_color"), " fill=", (button.get_theme_stylebox("normal") as StyleBoxFlat).bg_color)
+	hud.loadout_panel.close()
+
+	# 规则生成真实单人局；强制胜利用于设置战后奖励场景，不测战斗胜率。
+	var farm := _fresh("qa-reward")
+	var depart := ExpeditionGame.depart(farm, int(Time.get_unix_time_from_system()))
+	var expedition: ExpeditionGame = depart["game"]
+	expedition.move_to(1, 0)
+	var battle := expedition.start_battle()
+	for enemy in battle["combat"].state["enemies"]:
+		enemy["hp"] = 0
+		enemy["alive"] = false
+	battle["combat"]._events_check_outcome([])
+	expedition.finish_battle(battle["combat"])
+	hud.map_panel.open(expedition)
+	var key := "r1c0"
+	var reward := str(expedition.run["resolved"][key]["rewards"][0])
+	var inv := expedition.run_inventory()
+	var before := inv.count_of_def(reward)
+	hud.map_panel._on_claim_reward(key, reward, "pack", true)
+	var once := inv.count_of_def(reward)
+	hud.map_panel._on_claim_reward(key, reward, "pack", true)
+	var twice := inv.count_of_def(reward)
+	print("QA_DUP_REWARD def=", reward, " before=", before, " once=", once, " twice=", twice, " candidates_after=", expedition.run["resolved"][key]["rewards"])
+	await _shot("reward_after_twice")
+	hud.map_panel.close()
+
+	# 真正的两套 RoomPanel 节点驱动同机 ENet，不手动调用握手/出发确认。
+	var host_panel := RoomPanel.new()
+	var guest_panel := RoomPanel.new()
+	root.add_child(host_panel)
+	root.add_child(guest_panel)
+	await process_frame
+	host_panel.open(_fresh("qa-room-host"))
+	guest_panel.open(_fresh("qa-room-guest"))
+	guest_panel.address_edit.text = "127.0.0.1"
+	var host_emitted := [false]
+	var guest_emitted := [false]
+	host_panel.coop_run_started_host.connect(func(_exp): host_emitted[0] = true)
+	guest_panel.coop_run_started_client.connect(func(_client): guest_emitted[0] = true)
+	host_panel._on_create()
+	guest_panel._on_join()
+	await create_timer(2.0).timeout
+	print("QA_ROOM members=", host_panel.host.room["members"].size(), " link=", guest_panel.client.link_ready())
+	host_panel._on_ready()
+	guest_panel._on_ready()
+	await create_timer(0.5).timeout
+	guest_panel._on_ready()
+	await create_timer(0.3).timeout
+	print("QA_GUEST_TOGGLE ready_after_two_clicks=", _guest_ready(host_panel.host))
+	host_panel._on_depart()
+	await create_timer(2.0).timeout
+	print("QA_ROOM_DEPART host_started=", host_panel.host.expedition != null, " pending_host=", host_panel.host.pending_run_id, " pending_guest=", guest_panel.client.pending_run_id, " host_signal=", host_emitted[0], " guest_signal=", guest_emitted[0])
+	await _shot("coop_depart_waiting")
+	# 补上缺失调用只用于定位下一层接线问题。
+	var confirmed := guest_panel.client.confirm_depart()
+	await create_timer(0.6).timeout
+	print("QA_MANUAL_CONFIRM ok=", confirmed.get("ok"), " host_started=", host_panel.host.expedition != null, " guest_mirror=", not guest_panel.client.mirror_run.is_empty(), " guest_signal=", guest_emitted[0])
+	if host_panel.host.expedition != null:
+		hud.map_panel.open(host_panel.host.expedition)
+		var row_before := int(host_panel.host.expedition.run["current"]["row"])
+		hud.map_panel._on_move(1, 0)
+		print("QA_HOST_MAP_BYPASS row_before=", row_before, " row_after=", host_panel.host.expedition.run["current"]["row"], " guest_row=", guest_panel.client.mirror_run.get("current", {}).get("row"))
+		hud.map_panel.close()
+	host_panel.host.peer.close()
+	guest_panel.client.disconnect_link()
+	host_panel.queue_free()
+	guest_panel.queue_free()
+	await process_frame
+
+	# 新植物规则可以播种，场景层刷新是否同样可用。
+	world.game.add_seed_with_traits("glow_berry", [])
+	var berry := {}
+	for seed in world.game.state["seeds"]:
+		if str(seed["kind"]) == "glow_berry":
+			berry = seed
+	print("QA_GLOW_PLANT result=", world.game.plant_seed(2, int(berry["id"]), int(Time.get_unix_time_from_system())))
+	world._refresh_plot_model(2)
+	print("QA_GLOW_SCENE key=", world.plot_model_keys.get(2), " plot_kind=", world.game.get_plot(2)["kind"])
+	await _shot("glow_berry_missing_model")
+	quit(0)
+
+func _first_button(node: Node) -> Button:
+	if node is Button:
+		return node
+	for child in node.get_children():
+		var button := _first_button(child)
+		if button != null:
+			return button
+	return null
+
+func _guest_ready(host: SessionHost) -> bool:
+	for id in host.room["members"]:
+		if int(id) != 1:
+			return bool(host.room["members"][id].get("ready", false))
+	return false

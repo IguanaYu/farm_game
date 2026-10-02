@@ -1,0 +1,15 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: 快照：可恢复
+  ok: 恢复：手牌（顺序与 uid）一致
+  ok: 恢复：敌人生命一致
+  ok: 恢复：能量一致
+  ok: 恢复：意图不重掷
+  ok: 恢复：回合一致
+  ok: 恢复：继续出牌结果一致
+  ok: 恢复：敌方阶段结算一致
+  ok: 恢复：回合推进一致
+  ok: 快照：JSON 可往返
+  ok: 快照：JSON 读回可恢复
+  ok: 快照：JSON 读回手牌一致
+D22_SERIALIZE_SMOKE_PASS

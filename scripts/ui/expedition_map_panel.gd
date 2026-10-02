@@ -10,7 +10,10 @@ signal run_finished
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
-const TEXT_MUTED := Color("#788678")
+const TEXT_MUTED := Color("#3f4a42")
+# 暗底面板（主背景 #20332a）上的正文/说明用浅色；TEXT_DARK/TEXT_MUTED 只给奶油色覆盖层用。
+const LIGHT_TEXT := Color("#e8f2d8")
+const LIGHT_MUTED := Color("#a3b59b")
 const BAD_RED := Color("#a4543f")
 const WARN_GOLD := Color("#9b713a")
 const GOOD_GREEN := Color("#3f7048")
@@ -21,6 +24,7 @@ var map_column: VBoxContainer
 var node_column: VBoxContainer
 var log_label: RichTextLabel
 var overlay_panel: PanelContainer
+var overlay_center: CenterContainer
 var overlay_column: VBoxContainer
 
 
@@ -32,7 +36,7 @@ func _ready() -> void:
 	var font := SystemFont.new()
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
 	theme_root.default_font = font
-	theme_root.default_font_size = 15
+	theme_root.default_font_size = 17
 	theme = theme_root
 	_build()
 
@@ -40,6 +44,8 @@ func _ready() -> void:
 func open(instance: ExpeditionGame) -> void:
 	expedition = instance
 	visible = true
+	if not overlay_panel.visible:
+		overlay_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_refresh()
 
 
@@ -66,13 +72,16 @@ func _build() -> void:
 	var title_row := HBoxContainer.new()
 	column.add_child(title_row)
 	var title := _label("洞窟探索", 22, CREAM)
+	# 标题不换行：autowrap 标签在 HBox 里会被压到一字宽，竖排成单字列并把按钮拉高。
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
 	title_row.add_child(title)
 	var pause_button := _button("☰ 菜单", Color("#fff5df"), Color("#d5b87d"))
 	pause_button.pressed.connect(_open_menu)
 	title_row.add_child(pause_button)
 	header_label = _label("", 15, Color("#e8d9a8"))
+	header_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	header_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	titleRow(header_label, title_row)
+	title_row.add_child(header_label)
 
 	var body := HBoxContainer.new()
 	body.add_theme_constant_override("separation", 12)
@@ -83,7 +92,7 @@ func _build() -> void:
 	left.add_theme_constant_override("separation", 4)
 	left.custom_minimum_size = Vector2(420, 0)
 	body.add_child(left)
-	left.add_child(_label("路线（自下向上，不回头）", 14, TEXT_MUTED))
+	left.add_child(_label("路线（自下向上，不回头）", 14, LIGHT_MUTED))
 	map_column = VBoxContainer.new()
 	map_column.add_theme_constant_override("separation", 6)
 	map_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -106,17 +115,17 @@ func _build() -> void:
 	overlay_panel = _panel(CREAM, Color("#d5c9aa"), 14)
 	overlay_panel.visible = false
 	overlay_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	var overlay_center := CenterContainer.new()
+	# 覆盖层内容由 autowrap 标签和按钮组成，不给最小宽度会被压成一条窄柱（文字一字一行）。
+	overlay_panel.custom_minimum_size = Vector2(500, 0)
+	overlay_center = CenterContainer.new()
 	overlay_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	# 覆盖层隐藏时它仍常驻全屏顶层：不设 IGNORE 会挡住底下地图全部按钮的鼠标输入。
+	overlay_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	overlay_center.add_child(overlay_panel)
 	add_child(overlay_center)
 	overlay_column = VBoxContainer.new()
 	overlay_column.add_theme_constant_override("separation", 8)
 	overlay_panel.add_child(overlay_column)
-
-
-func titleRow(label: Label, row: HBoxContainer) -> void:
-	row.add_child(label)
 
 
 # —— 刷新 ————————————————————————————————————————————————————————
@@ -154,7 +163,7 @@ func _refresh_map() -> void:
 		var row_box := HBoxContainer.new()
 		row_box.add_theme_constant_override("separation", 8)
 		map_column.add_child(row_box)
-		var row_label := _label("第 %d 排" % row_index, 13, TEXT_MUTED)
+		var row_label := _label("第 %d 排" % row_index, 13, LIGHT_MUTED)
 		row_label.custom_minimum_size = Vector2(52, 0)
 		row_box.add_child(row_label)
 		for col_index in range(rows[row_index].size()):
@@ -200,6 +209,7 @@ func _refresh_node() -> void:
 	var key := expedition.node_id(int(run["current"]["row"]), int(run["current"]["col"]))
 	var resolved: Dictionary = run["resolved"].get(key, {})
 	var title := _label("当前位置：%s（%s）" % [ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node["type"]), "?"), str(node.get("hint", ""))], 17, CREAM)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	node_column.add_child(title)
 	match str(node["type"]):
 		"start":
@@ -220,7 +230,7 @@ func _refresh_battle_node(node: Dictionary, resolved: Dictionary, key: String) -
 	var run: Dictionary = expedition.run
 	if not bool(resolved.get("battle_won", false)):
 		var warn := str(node.get("risk", "")) == "high"
-		node_column.add_child(_label("高风险：偏向装备与稀有资源，奖励候选更好但不保证都能带走。" if warn else "浅层敌人组合。", 14, BAD_RED if warn else TEXT_MUTED))
+		node_column.add_child(_label("高风险：偏向装备与稀有资源，奖励候选更好但不保证都能带走。" if warn else "浅层敌人组合。", 14, BAD_RED if warn else LIGHT_MUTED))
 		var fight := _button("进入战斗", Color("#ffd98a"), Color("#9b713a"))
 		fight.pressed.connect(_on_start_battle)
 		node_column.add_child(fight)
@@ -229,7 +239,7 @@ func _refresh_battle_node(node: Dictionary, resolved: Dictionary, key: String) -
 
 
 func _refresh_reward_node(_node: Dictionary, resolved: Dictionary, key: String) -> void:
-	node_column.add_child(_label("候选物品（带走需要空间，离开时未带走的放弃）：", 14, TEXT_MUTED))
+	node_column.add_child(_label("候选物品（带走需要空间，离开时未带走的放弃）：", 14, LIGHT_MUTED))
 	_refresh_rewards_area(resolved, key, false)
 
 
@@ -247,7 +257,8 @@ func _refresh_rewards_area(resolved: Dictionary, key: String, choose_one: bool) 
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		var info := _label("%s（%d×%d，%d 张牌，%s）" % [def["name"], def["size"].x, def["size"].y, def["cards"].size(),
-			"可售 %d 金币" % int(def.get("base_value", 0)) if bool(def.get("sellable", false)) else "不可售"], 14, TEXT_DARK)
+			"可售 %d 金币" % int(def.get("base_value", 0)) if bool(def.get("sellable", false)) else "不可售"], 14, LIGHT_TEXT)
+		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(info)
 		var claim_pack := _button("放入背包", Color("#eaf4df"), Color("#87b06f"))
@@ -259,12 +270,12 @@ func _refresh_rewards_area(resolved: Dictionary, key: String, choose_one: bool) 
 			row.add_child(claim_safe)
 		node_column.add_child(row)
 	if not public_items.is_empty():
-		node_column.add_child(_label("公共物资（不占个人选择次数）：", 13, TEXT_MUTED))
+		node_column.add_child(_label("公共物资（不占个人选择次数）：", 13, LIGHT_MUTED))
 		for def_id in public_items:
 			var def := ItemDefs.get_item(str(def_id))
 			var row := HBoxContainer.new()
 			row.add_theme_constant_override("separation", 8)
-			var info := _label("%s" % def["name"], 14, TEXT_DARK)
+			var info := _label("%s" % def["name"], 14, LIGHT_TEXT)
 			info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(info)
 			var claim := _button("领取", Color("#eaf4df"), Color("#87b06f"))
@@ -277,7 +288,7 @@ func _refresh_rewards_area(resolved: Dictionary, key: String, choose_one: bool) 
 			var def := ItemDefs.get_item(str(instance["def_id"]))
 			var row := HBoxContainer.new()
 			row.add_theme_constant_override("separation", 8)
-			var info := _label("%s（丢弃物）" % def["name"], 13, TEXT_MUTED)
+			var info := _label("%s（丢弃物）" % def["name"], 13, LIGHT_MUTED)
 			info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			row.add_child(info)
 			var pick := _button("捡回", Color("#fff5df"), Color("#d5b87d"))
@@ -292,10 +303,12 @@ func _refresh_rewards_area(resolved: Dictionary, key: String, choose_one: bool) 
 func _refresh_event_node(resolved: Dictionary, _key: String) -> void:
 	var event: Dictionary = ExpeditionDefs.EVENTS.get(str(resolved.get("event_id", "")), {})
 	if event.is_empty():
-		node_column.add_child(_label("（这里很安静）", 14, TEXT_MUTED))
+		node_column.add_child(_label("（这里很安静）", 14, LIGHT_MUTED))
 		return
 	node_column.add_child(_label("事件：%s" % event["name"], 16, CREAM))
-	node_column.add_child(_label(str(event["desc"]), 14, Color("#cfe2c2")))
+	var event_desc := _label(str(event["desc"]), 14, Color("#cfe2c2"))
+	event_desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	node_column.add_child(event_desc)
 	if bool(resolved.get("completed", false)):
 		node_column.add_child(_label("已选择：%s（结果已固定）" % str(resolved.get("chosen_option", "")), 13, GOOD_GREEN))
 		var leave := _button("完成并离开本节点", Color("#ffd98a"), Color("#9b713a"))
@@ -311,7 +324,7 @@ func _refresh_event_node(resolved: Dictionary, _key: String) -> void:
 func _refresh_rest_node(resolved: Dictionary, _key: String) -> void:
 	var run: Dictionary = expedition.run
 	if not bool(resolved.get("rest_taken", false)):
-		node_column.add_child(_label("免费小休整（二选一，确认后不能切换）：", 14, TEXT_MUTED))
+		node_column.add_child(_label("免费小休整（二选一，确认后不能切换）：", 14, LIGHT_MUTED))
 		var heal := _button("休息：恢复 8 生命", Color("#eaf4df"), Color("#87b06f"))
 		heal.pressed.connect(_on_rest.bind("heal"))
 		node_column.add_child(heal)
@@ -319,7 +332,7 @@ func _refresh_rest_node(resolved: Dictionary, _key: String) -> void:
 		prepare.pressed.connect(_on_rest.bind("prepare"))
 		node_column.add_child(prepare)
 	else:
-		node_column.add_child(_label("休整已完成。", 13, TEXT_MUTED))
+		node_column.add_child(_label("休整已完成。", 13, LIGHT_MUTED))
 	var extract := _button("在此撤离（带着收获回家）", Color("#ffd98a"), Color("#9b713a"))
 	extract.pressed.connect(_open_extract_confirm)
 	node_column.add_child(extract)
@@ -482,11 +495,17 @@ func _open_extract_confirm() -> void:
 			gained_value += value
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 6)
-	column.add_child(_label("撤离决策", 20, FOREST))
-	column.add_child(_label("带入旧装备：%d 件（可售 %d 金币）——返回时按\"释放占用\"处理，不重复发放" % [brought, brought_value], 14, TEXT_DARK))
-	column.add_child(_label("新增战利品：%d 件（可售 %d 金币）——回家入库后自行出售" % [gained, gained_value], 14, TEXT_DARK))
-	column.add_child(_label("保护区（保险箱，失败也保留）：%d 金币" % protected_value, 14, GOOD_GREEN))
-	column.add_child(_label("当前生命 %d/%d；下一段风险更高、资源倾向更好。" % [int(run["player"]["hp"]), int(run["player"]["max_hp"])], 13, TEXT_MUTED))
+	var decision_title := _label("撤离决策", 20, FOREST)
+	decision_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(decision_title)
+	for line in [
+		_label("带入旧装备：%d 件（可售 %d 金币）——返回时按\"释放占用\"处理，不重复发放" % [brought, brought_value], 14, TEXT_DARK),
+		_label("新增战利品：%d 件（可售 %d 金币）——回家入库后自行出售" % [gained, gained_value], 14, TEXT_DARK),
+		_label("保护区（保险箱，失败也保留）：%d 金币" % protected_value, 14, GOOD_GREEN),
+		_label("当前生命 %d/%d；下一段风险更高、资源倾向更好。" % [int(run["player"]["hp"]), int(run["player"]["max_hp"])], 13, TEXT_MUTED),
+	]:
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		column.add_child(line)
 	var go_home := _button("带着这些回家", Color("#ffd98a"), Color("#9b713a"))
 	go_home.pressed.connect(func() -> void:
 		_close_overlay()
@@ -562,8 +581,12 @@ func _show_settlement(settlement: Dictionary) -> void:
 		var names: Array = []
 		for entry in entries:
 			names.append(str(entry["name"]))
-		column.add_child(_label("%s（%d）：%s" % [group[1], entries.size(), "、".join(names)], 14, TEXT_DARK if group[0] != "lost" else BAD_RED))
-	column.add_child(_label("货物仍是货物，回家后自行出售才变金币。", 12, TEXT_MUTED))
+		var group_line := _label("%s（%d）：%s" % [group[1], entries.size(), "、".join(names)], 14, TEXT_DARK if group[0] != "lost" else BAD_RED)
+		group_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		column.add_child(group_line)
+	var note := _label("货物仍是货物，回家后自行出售才变金币。", 12, TEXT_MUTED)
+	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(note)
 	var done := _button("确认回家", Color("#eaf4df"), Color("#87b06f"))
 	done.pressed.connect(func() -> void:
 		_close_overlay()
@@ -584,16 +607,21 @@ func _show_overlay(content: Control) -> void:
 		child.queue_free()
 	overlay_column.add_child(content)
 	overlay_panel.visible = true
+	# 覆盖层弹出时恢复拦截：点在面板外的点击不应穿透到地图按钮。
+	overlay_center.mouse_filter = Control.MOUSE_FILTER_STOP
 
 
 func _close_overlay() -> void:
 	overlay_panel.visible = false
+	overlay_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
 func _confirm_overlay(message: String, on_yes: Callable) -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 8)
-	column.add_child(_label(message, 15, TEXT_DARK))
+	var message_label := _label(message, 15, TEXT_DARK)
+	message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(message_label)
 	var yes := _button("确认", Color("#ffd98a"), Color("#9b713a"))
 	yes.pressed.connect(func() -> void:
 		_close_overlay()
@@ -608,7 +636,9 @@ func _confirm_overlay(message: String, on_yes: Callable) -> void:
 
 func _flash_overlay(message: String) -> void:
 	var column := VBoxContainer.new()
-	column.add_child(_label(message, 15, BAD_RED))
+	var message_label := _label(message, 15, BAD_RED)
+	message_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(message_label)
 	var ok := _button("知道了", Color("#fff5df"), Color("#d5b87d"))
 	ok.pressed.connect(_close_overlay)
 	column.add_child(ok)
@@ -647,13 +677,17 @@ func _label(content: String, size: int, color: Color) -> Label:
 	label.text = content
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# 默认不换行：autowrap 标签在 HBox 里会被压到一字宽竖排；长文本处显式开启。
 	return label
 
 
 func _button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
+	button.add_theme_color_override("font_color", Color("#35513d"))
+	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
+	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
+	button.add_theme_color_override("font_disabled_color", Color("#b8c6b2"))
 	button.add_theme_font_size_override("font_size", 15)
 	var style := _style(fill, border, 12)
 	style.content_margin_left = 10

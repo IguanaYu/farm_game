@@ -1,0 +1,9 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: 保存：含布局的 v6 档写入
+  ok: 读回：加载成功
+  ok: 布局：牌组重建一致
+  ok: 布局：旋转与格子坐标保留
+  ok: 归属：保险箱内的种子保留
+  ok: 补给：剩余次数保留
+D23_SAVE_SMOKE_PASS

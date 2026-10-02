@@ -1,0 +1,19 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: v5 档可加载（自动迁移）
+  ok: 迁移：版本升为 7（经 v6 中转）
+  ok: 迁移：金币保留
+  ok: 迁移：成长经验保留
+  ok: 迁移：十块地拥有状态保留
+  ok: 迁移：种子数量保留
+  ok: 迁移：种子词条保留
+  ok: 迁移：育种机进度保留
+  ok: 迁移：市场锁定保留
+  ok: 迁移：生成玩家标识
+  ok: 迁移：实例发号器初值
+  ok: 迁移：初始库存为空
+  ok: 迁移：无活动局与已应用结算
+  ok: v6 档直接加载不触发迁移分支
+  ok: 未知版本（8）被拒绝加载
+  ok: 损坏的 expedition 块被拒绝，不静默重建
+D21_MIGRATION_SMOKE_PASS

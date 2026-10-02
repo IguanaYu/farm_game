@@ -12,7 +12,7 @@ signal save_requested
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
-const TEXT_MUTED := Color("#788678")
+const TEXT_MUTED := Color("#3f4a42")
 const BAD_RED := Color("#a4543f")
 
 var game: FarmGame
@@ -34,7 +34,7 @@ func _ready() -> void:
 	var font := SystemFont.new()
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
 	theme_root.default_font = font
-	theme_root.default_font_size = 15
+	theme_root.default_font_size = 17
 	theme = theme_root
 	_build()
 	set_process(true)
@@ -76,7 +76,9 @@ func _build() -> void:
 	column.add_theme_constant_override("separation", 10)
 	panel.add_child(column)
 	column.add_child(_label("好友组队（双人合作）", 22, FOREST))
-	column.add_child(_label("当前连接方式：局域网／本机直连（主机 IP＋端口 31967）。互联网好友直连需主机端口可达，实测记录见交付报告。", 13, TEXT_MUTED))
+	var connect_note := _label("当前连接方式：局域网／本机直连（主机 IP＋端口 31967）。互联网好友直连需主机端口可达，实测记录见交付报告。", 13, TEXT_MUTED)
+	connect_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(connect_note)
 
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -219,13 +221,17 @@ func _label(content: String, size: int, color: Color) -> Label:
 	label.text = content
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# 默认不换行：autowrap 标签在 HBox 里会被压到一字宽竖排；长文本处显式开启。
 	return label
 
 
 func _button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
+	button.add_theme_color_override("font_color", Color("#35513d"))
+	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
+	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
+	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
 	button.add_theme_font_size_override("font_size", 15)
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill

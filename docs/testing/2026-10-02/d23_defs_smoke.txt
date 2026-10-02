@@ -1,0 +1,19 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: 定义表：占格数=牌数、牌引用全部有效
+  ok: 物品池：正式物品 20 种（2.3 的 15＋2.5 的 4＋2.8 的 1）
+  ok: 物品池：演示物品 3 种隔离
+  ok: 值钱但拖累：可售纯货物牌物品 ≥2 种（实际 4）
+  ok: 保险箱白名单：copper_scrap = true
+  ok: 保险箱白名单：iron_ore = true
+  ok: 保险箱白名单：rock_sprout_seed = true
+  ok: 保险箱白名单：antique_ornament = false
+  ok: 保险箱白名单：glow_crystal = false
+  ok: 保险箱白名单：copper_shortsword = false
+  ok: 补给：药水/绷带各 1 次实体
+  ok: 微光晶石：贵且能打（60 金币，稳住＋观察）
+  ok: 牌组：基础套装入胸挂 → 首回合 8 张
+  ok: 牌组：木盾挪背包 → 1/2 回合各 4 张（设计 §9 场景）
+  ok: 牌组：来源牌记录加入回合
+  ok: 牌组：已耗尽的药水不再生成牌
+D23_DEFS_SMOKE_PASS

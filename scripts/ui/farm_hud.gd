@@ -37,10 +37,15 @@ const COIN_ICON := preload("res://assets/sprites/item_coin.png")
 const SEED_ICONS := {
 	"cabbage": preload("res://assets/sprites/seed_cabbage.png"),
 	"carrot": preload("res://assets/sprites/seed_carrot.png"),
+	# 萤果／岩芽菜暂用胡萝卜贴图占位：缺键会让商店、播种、收获弹窗直接脚本报错、卡片消失。
+	"glow_berry": preload("res://assets/sprites/seed_carrot.png"),
+	"rock_sprout": preload("res://assets/sprites/seed_carrot.png"),
 }
 const CROP_ICONS := {
 	"cabbage": preload("res://assets/sprites/crop_cabbage.png"),
 	"carrot": preload("res://assets/sprites/crop_carrot.png"),
+	"glow_berry": preload("res://assets/sprites/crop_carrot.png"),
+	"rock_sprout": preload("res://assets/sprites/crop_carrot.png"),
 }
 const FERTILIZER_ICONS := {
 	"basic": preload("res://assets/sprites/fertilizer_basic.png"),
@@ -54,7 +59,7 @@ const FOREST := Color("#294f3c")
 const LEAF := Color("#477b52")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
-const TEXT_MUTED := Color("#788678")
+const TEXT_MUTED := Color("#3f4a42")
 const ACCENT_GOLD := Color("#9b713a")
 const LOCK_RED := Color("#a4543f")
 
@@ -103,7 +108,7 @@ func _ready() -> void:
 	var chinese_font := SystemFont.new()
 	chinese_font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
 	hud_theme.default_font = chinese_font
-	hud_theme.default_font_size = 18
+	hud_theme.default_font_size = 20
 	theme = hud_theme
 	_build_brand()
 	_build_counters()
@@ -443,8 +448,8 @@ func _build_modal() -> void:
 	modal_panel.anchor_right = 0.5
 	modal_panel.anchor_top = 0.5
 	modal_panel.anchor_bottom = 0.5
-	modal_panel.offset_left = -345
-	modal_panel.offset_right = 345
+	modal_panel.offset_left = -440
+	modal_panel.offset_right = 440
 	modal_panel.offset_top = -240
 	modal_panel.offset_bottom = 240
 	modal_overlay.add_child(modal_panel)
@@ -474,6 +479,8 @@ func _build_modal() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.name = "ModalScroll"
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	# 只允许纵向滚动：长行靠换行收窄，横向溢出会把卡片右侧的按钮挤出可视区。
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	layout.add_child(scroll)
 	modal_content = VBoxContainer.new()
 	modal_content.name = "ModalContent"
@@ -821,13 +828,17 @@ func _seed_product_card(kind: String) -> PanelContainer:
 	details.add_theme_constant_override("separation", 2)
 	row.add_child(details)
 	details.add_child(_label("%s种子" % defn["display_name"], 20, TEXT_DARK))
-	details.add_child(_label("%d 分钟成熟 · 每作物基准 %d 分 · 每地每轮 2~3 粒新种子" % [int(defn["grow_seconds"] / 60), defn["base_score"]], 14, TEXT_MUTED))
+	var seed_info := _label("%d 分钟成熟 · 每作物基准 %d 分 · 每地每轮 2~3 粒新种子" % [int(defn["grow_seconds"] / 60), defn["base_score"]], 14, TEXT_MUTED)
+	seed_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	details.add_child(seed_info)
 	var lock_reason := game.seed_lock_reason(kind)
 	var buttons := VBoxContainer.new()
 	buttons.add_theme_constant_override("separation", 6)
 	row.add_child(buttons)
 	if lock_reason != "":
-		details.add_child(_label("🔒 %s" % lock_reason, 14, LOCK_RED))
+		var lock_label := _label("🔒 %s" % lock_reason, 14, LOCK_RED)
+		lock_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		details.add_child(lock_label)
 		var one := _solid_button("买 1 粒 · %d 金币" % defn["seed_price"], Color("#9aa392"))
 		one.disabled = true
 		buttons.add_child(one)
@@ -864,7 +875,9 @@ func _fertilizer_product_card(kind: String) -> PanelContainer:
 		effect += "；提高亲本词条的保留与升档机会（保留 80%，升档翻倍）"
 	elif kind == "golden":
 		effect += "；带金克拉效果的批次出售倍率 +0.2（默认与客人报价都生效）"
-	details.add_child(_label(effect, 13, TEXT_MUTED))
+	var effect_label := _label(effect, 13, TEXT_MUTED)
+	effect_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	details.add_child(effect_label)
 	var owned: int = int(current_state["fertilizers"].get(kind, 0))
 	var required_level := PlantDefs.FERTILIZER_UNLOCK_FARMING_LEVEL
 	var lock_note := ""
@@ -1357,11 +1370,13 @@ func _market_batch_card(batch: Dictionary, market: Dictionary) -> PanelContainer
 	stack.add_theme_constant_override("separation", 4)
 	margin.add_child(stack)
 	var attributes: Dictionary = batch.get("attributes", {})
-	stack.add_child(_label("第 %d 块地 · %s ×%d · 每作物 %d 分 · 属性 含水量 %d / 纤维 %d / 色泽 %d" % [
+	var batch_info := _label("第 %d 块地 · %s ×%d · 每作物 %d 分 · 属性 含水量 %d / 纤维 %d / 色泽 %d" % [
 		batch["plot_id"], PlantDefs.get_plant(batch.get("kind", "cabbage"))["display_name"], batch["count"],
 		int(batch.get("per_crop_score", batch["base_score"])),
 		int(attributes.get("water", 0)), int(attributes.get("fiber", 0)), int(attributes.get("color", 0)),
-	], 16, TEXT_DARK))
+	], 16, TEXT_DARK)
+	batch_info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	stack.add_child(batch_info)
 	var controls := HBoxContainer.new()
 	controls.add_theme_constant_override("separation", 10)
 	stack.add_child(controls)
@@ -1449,6 +1464,7 @@ func _build_expedition_panels() -> void:
 	loadout_panel.name = "LoadoutPanel"
 	loadout_panel.close_requested.connect(_on_loadout_close)
 	loadout_panel.demo_battle_requested.connect(open_battle_demo)
+	loadout_panel.depart_requested.connect(_on_loadout_depart_requested)
 	add_child(loadout_panel)
 	battle_screen = preload("res://scenes/battle_screen.tscn").instantiate()
 	battle_screen.name = "BattleScreen"
@@ -1541,6 +1557,26 @@ func _on_depart_requested() -> void:
 	_close_modal()
 	if expedition_hub_panel != null:
 		expedition_hub_panel.close()
+	map_panel.open(active_expedition)
+
+
+func _on_loadout_depart_requested() -> void:
+	## 战备页直接出发：先剔除演示物品（与关闭保存同一规则），失败原因留在战备页。
+	var inventory := InventoryGame.new()
+	inventory.bind(game.state["expedition"])
+	inventory.strip_demo_instances()
+	var result := ExpeditionGame.depart(game, int(Time.get_unix_time_from_system()))
+	if not result["ok"]:
+		loadout_panel.status_label.text = str(result["reason"])
+		return
+	loadout_panel.close()
+	loadout_panel.mark_saved()
+	if battle_screen != null:
+		battle_screen.carried_hp = -1
+	active_expedition = result["game"]
+	expedition_save_requested.emit(true)
+	_close_modal()
+	expedition_hub_panel.close()
 	map_panel.open(active_expedition)
 
 

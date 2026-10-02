@@ -10,7 +10,7 @@ signal open_loadout_requested
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
-const TEXT_MUTED := Color("#788678")
+const TEXT_MUTED := Color("#3f4a42")
 const BAD_RED := Color("#a4543f")
 const WARN_GOLD := Color("#9b713a")
 
@@ -31,7 +31,7 @@ func _ready() -> void:
 	var font := SystemFont.new()
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
 	theme_root.default_font = font
-	theme_root.default_font_size = 14
+	theme_root.default_font_size = 16
 	theme = theme_root
 	_build()
 
@@ -68,11 +68,15 @@ func _build() -> void:
 
 	var title_row := HBoxContainer.new()
 	column.add_child(title_row)
-	title_row.add_child(_label("装备／材料仓库", 22, FOREST))
+	var title := _label("装备／材料仓库", 22, FOREST)
+	# 标题不换行：autowrap 标签在 HBox 里会被压到一字宽，竖排成单字列并把按钮拉高。
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	title_row.add_child(title)
 	var close_button := _button("返回", Color("#eaf4df"), Color("#87b06f"))
 	close_button.pressed.connect(_on_close)
 	title_row.add_child(close_button)
 	header_label = _label("", 13, TEXT_DARK)
+	header_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(header_label)
 
 	var filter_row := HBoxContainer.new()
@@ -128,6 +132,7 @@ func _refresh() -> void:
 			def["name"], int(entry["count"]), def["size"].x, def["size"].y, def["cards"].size(),
 			"可售 %d" % int(def.get("base_value", 0)) if bool(def.get("sellable", false)) else "不可售",
 			"装备区" if str(entry["zone"]) == "equipment" else "资源区"], 13, TEXT_DARK)
+		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(info)
 		var loadout_button := _small_button("移入战备", Color("#eaf4df"), Color("#87b06f"))
@@ -148,6 +153,7 @@ func _refresh() -> void:
 		for entry in pending:
 			names.append("%s×%d" % [ItemDefs.get_item(str(entry["def_id"]))["name"], int(entry.get("count", 1))])
 		var info := _label("待领取区：%s" % "、".join(names), 13, WARN_GOLD)
+		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		pending_row.add_child(info)
 		var claim := _small_button("领取", Color("#ffd98a"), Color("#9b713a"))
@@ -222,7 +228,7 @@ func _label(content: String, size: int, color: Color) -> Label:
 	label.text = content
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# 默认不换行：autowrap 标签在 HBox 里会被压到一字宽竖排；长文本处显式开启。
 	return label
 
 
@@ -235,6 +241,10 @@ func _button(content: String, fill: Color, border: Color) -> Button:
 func _small_button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
+	button.add_theme_color_override("font_color", Color("#35513d"))
+	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
+	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
+	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
 	button.add_theme_font_size_override("font_size", 13)
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill

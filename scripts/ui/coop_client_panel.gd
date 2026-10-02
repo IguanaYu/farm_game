@@ -8,7 +8,7 @@ signal close_requested
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
-const TEXT_MUTED := Color("#788678")
+const TEXT_MUTED := Color("#3f4a42")
 const BAD_RED := Color("#a4543f")
 const WARN_GOLD := Color("#9b713a")
 
@@ -26,7 +26,7 @@ func _ready() -> void:
 	var font := SystemFont.new()
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
 	theme_root.default_font = font
-	theme_root.default_font_size = 15
+	theme_root.default_font_size = 17
 	theme = theme_root
 	_build()
 	set_process(true)
@@ -209,6 +209,10 @@ func _small(content: String, fill: Color, border: Color) -> Button:
 func _button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
+	button.add_theme_color_override("font_color", Color("#35513d"))
+	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
+	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
+	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
 	button.add_theme_font_size_override("font_size", 14)
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill

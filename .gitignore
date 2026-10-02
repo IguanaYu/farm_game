@@ -6,3 +6,4 @@ playtest_shots/*
 !playtest_shots/.gdignore
 build/*
 !build/.gdignore
+.audit_backup/

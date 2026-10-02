@@ -1,0 +1,208 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: ENet：本机创建 host 与 client 无错误
+  ok: ENet：连接在 3 秒内建立
+  ok: ENet：主机收到客户端消息（127.0.0.1 往返）
+  ok: ENet：客户端收到主机回复
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+ERROR: The multiplayer instance isn't currently active.
+   at: poll (modules/enet/enet_multiplayer_peer.cpp:165)
+   GDScript backtrace (most recent call first):
+       [0] _initialize (res://tests/d21_net_probe.gd:40)
+  ok: ENet：主动断开后连接关闭
+D21_NET_PROBE_PASS

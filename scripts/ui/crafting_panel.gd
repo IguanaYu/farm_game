@@ -9,7 +9,7 @@ signal save_requested
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
-const TEXT_MUTED := Color("#788678")
+const TEXT_MUTED := Color("#3f4a42")
 const BAD_RED := Color("#a4543f")
 const WARN_GOLD := Color("#9b713a")
 const GOOD_GREEN := Color("#3f7048")
@@ -32,7 +32,7 @@ func _ready() -> void:
 	var font := SystemFont.new()
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
 	theme_root.default_font = font
-	theme_root.default_font_size = 14
+	theme_root.default_font_size = 16
 	theme = theme_root
 	_build()
 
@@ -67,7 +67,10 @@ func _build() -> void:
 
 	var title_row := HBoxContainer.new()
 	column.add_child(title_row)
-	title_row.add_child(_label("制作台与成长", 22, FOREST))
+	var title := _label("制作台与成长", 22, FOREST)
+	# 标题不换行：autowrap 标签在 HBox 里会被压到一字宽，竖排成单字列并把按钮拉高。
+	title.autowrap_mode = TextServer.AUTOWRAP_OFF
+	title_row.add_child(title)
 	var info := _label("", 14, TEXT_DARK)
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(info)
@@ -76,8 +79,10 @@ func _build() -> void:
 	close_button.pressed.connect(_on_close)
 	title_row.add_child(close_button)
 	pending_label = _label("", 13, WARN_GOLD)
+	pending_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(pending_label)
 	status_label = _label("", 13, BAD_RED)
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(status_label)
 
 	var body := HBoxContainer.new()
@@ -161,7 +166,9 @@ func _refresh_recipes() -> void:
 				display = ItemDefs.get_item(str(material["id"])).get("name", display)
 			materials_text += "%s %d/%d  " % [display, int(counts.get(key, 0)), int(material["count"])]
 		materials_text += "｜ 金币 %d（拥有 %d）" % [int(recipe["coins"]), int(game.state["coins"])]
-		column.add_child(_label(materials_text, 12, TEXT_MUTED))
+		var materials := _label(materials_text, 12, TEXT_MUTED)
+		materials.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		column.add_child(materials)
 
 
 func _refresh_upgrades() -> void:
@@ -173,7 +180,9 @@ func _refresh_upgrades() -> void:
 		var upgrade: Dictionary = CraftingDefs.UPGRADES[upgrade_id]
 		var gated := str(upgrade["target"]) == "chest"
 		if gated and not unlocked_upgrades.has(upgrade_id):
-			upgrades_column.add_child(_label("%s：需先达成「深层材料」目标" % upgrade["desc"], 12, TEXT_MUTED))
+			var gated_note := _label("%s：需先达成「深层材料」目标" % upgrade["desc"], 12, TEXT_MUTED)
+			gated_note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			upgrades_column.add_child(gated_note)
 			continue
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
@@ -199,6 +208,7 @@ func _refresh_goals() -> void:
 		row.add_theme_constant_override("separation", 6)
 		var info := _label("%s\n%s" % [goal["name"], str(goal["reward_text"])], 12, GOOD_GREEN if goal["done"] else TEXT_MUTED)
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		row.add_child(info)
 		if goal["done"] and not goal["claimed"]:
 			var button := _button("领奖", Color("#ffd98a"), Color("#9b713a"))
@@ -267,13 +277,17 @@ func _label(content: String, size: int, color: Color) -> Label:
 	label.text = content
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	# 默认不换行：autowrap 标签在 HBox 里会被压到一字宽竖排；长文本处显式开启。
 	return label
 
 
 func _button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
+	button.add_theme_color_override("font_color", Color("#35513d"))
+	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
+	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
+	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
 	button.add_theme_font_size_override("font_size", 14)
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill

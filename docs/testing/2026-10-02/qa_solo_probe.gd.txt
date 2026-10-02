@@ -1,0 +1,108 @@
+extends SceneTree
+
+var world: Node3D
+var hud: FarmHud
+var evidence_dir := "C:/Users/86132/.codex/worktrees/eba7/farm/docs/testing/2026-10-02"
+
+func _initialize() -> void:
+	_run.call_deferred()
+
+func _run() -> void:
+	world = (load("res://scenes/main.tscn") as PackedScene).instantiate()
+	root.add_child(world)
+	await process_frame
+	hud = world.hud
+	world.game.new_game(int(Time.get_unix_time_from_system()))
+	var inventory := InventoryGame.new()
+	inventory.bind(world.game.state["expedition"])
+	inventory.grant_basic_kit()
+	for instance in inventory.warehouse_list().duplicate():
+		inventory.move_to_loadout(int(instance["instance_id"]), "chest")
+	world._refresh_all()
+	hud._on_depart_requested()
+	var expedition: ExpeditionGame = hud.active_expedition
+	if expedition == null:
+		push_error("QA_SOLO_DEPART_FAIL")
+		quit(1)
+		return
+	for row in [1, 2, 3, 4]:
+		hud.map_panel._on_move(row, 0)
+		print("QA_SOLO_NODE row=", row, " type=", expedition.current_node()["type"])
+		if str(expedition.current_node()["type"]) in ["battle", "elite", "gate"]:
+			hud.map_panel._on_start_battle()
+			var combat: CombatGame = hud.battle_screen.combat
+			await process_frame
+			await RenderingServer.frame_post_draw
+			root.get_viewport().get_texture().get_image().save_png(evidence_dir + "/solo_battle_start.png")
+			for round_guard in range(60):
+				if str(combat.state["outcome"]) != "":
+					break
+				for action_guard in range(40):
+					if str(combat.state["outcome"]) != "":
+						break
+					var picked := _pick(combat)
+					if picked.is_empty():
+						break
+					hud.battle_screen._on_card_clicked(int(picked["uid"]))
+					hud.battle_screen._on_target_clicked(str(picked["target"]))
+					await process_frame
+				if str(combat.state["outcome"]) == "":
+					hud.battle_screen._on_end_turn()
+					await process_frame
+			print("QA_SOLO_BATTLE outcome=", combat.state["outcome"], " rounds=", combat.state["round"], " hp=", combat.state["players"]["p1"]["hp"])
+			if str(combat.state["outcome"]) != "won":
+				quit(1)
+				return
+			hud.battle_screen._on_close()
+			await process_frame
+		if row == 4:
+			break
+		var key := "r%dc0" % row
+		var resolved: Dictionary = expedition.run["resolved"][key]
+		var rewards: Array = resolved.get("rewards", []).duplicate()
+		if not rewards.is_empty():
+			hud.map_panel._on_claim_reward(key, str(rewards[0]), "pack", str(expedition.current_node()["type"]) == "battle")
+		if not (resolved.get("public", []) as Array).is_empty():
+			hud.map_panel._on_claim_public(key, str(resolved["public"][0]))
+		if str(expedition.current_node()["type"]) == "event":
+			var event: Dictionary = ExpeditionDefs.EVENTS.get(str(resolved.get("event_id", "")), {})
+			if not (event.get("options", []) as Array).is_empty():
+				hud.map_panel._on_choose_event(str(event["options"][0]["id"]))
+		expedition.leave_node()
+		hud.map_panel._refresh()
+	print("QA_SOLO_EXTRACT ", expedition.extract())
+	world._save()
+	var saved := SaveStore.load_state()
+	print("QA_SOLO_SAVED active_ref=", saved["expedition"]["active_run_ref"], " applied=", saved["expedition"]["applied_settlements"].size(), " warehouse=", saved["expedition"]["inventory"]["warehouse"].size())
+	hud.map_panel.close()
+	hud.crafting_panel.open(world.game)
+	await process_frame
+	await RenderingServer.frame_post_draw
+	root.get_viewport().get_texture().get_image().save_png(evidence_dir + "/solo_crafting_after_extract.png")
+	print("QA_SOLO_COMPLETE")
+	quit(0)
+
+func _pick(combat: CombatGame) -> Dictionary:
+	var player: Dictionary = combat.state["players"]["p1"]
+	var selected := {}
+	var best := -100
+	for card in player["hand"]:
+		var def := CardDefs.get_card(str(card["card_id"]))
+		if int(def["cost"]) > int(player["energy"]):
+			continue
+		var target := "p1"
+		var score := 10
+		if str(def["target"]) == "enemy":
+			score = 30
+			for enemy in combat.state["enemies"]:
+				if bool(enemy["alive"]):
+					target = str(enemy["id"])
+					break
+		if int(def["cost"]) == 0:
+			score = 40
+		if str(card["card_id"]) == "observe":
+			score = 5
+		if score > best and bool(combat.preview_play("p1", int(card["uid"]), target).get("ok", false)):
+			best = score
+			selected = {"uid": card["uid"], "target": target}
+	return selected
