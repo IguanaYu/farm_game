@@ -2,11 +2,11 @@
 
 点击式种田游戏：在立体农场里直接点击地块与建筑操作，作物按现实时间生长（关游戏也继续）。完整循环：**选种 → 播种与照料 → 成熟收获 → 育种或复制 → 比价出售 → 购买、扩地与升级 → 下一轮**。
 
-第二大阶段“农场与合作洞窟”已开发完成（2026-10-01）：战备箱配装 → 下洞（一层苔石浅洞／二层铁根矿窟）→ 卡牌战斗与搜刮 → 撤离或深入 → 回家制作/种植/成长；双人合作支持局域网直连（互联网方式未实测）。计划与设计文档见 [docs](docs/README.md)；各子阶段交付报告在 `docs/archive/`。
+第二大阶段“农场与合作洞窟”：规则与单人/双人基本流程已实现并通过自动化回归（2026-10-02 修复轮批次 A~E，F-01～F-06 全部 P1 缺陷清零）；战备箱配装 → 下洞（一层苔石浅洞／二层铁根矿窟）→ 卡牌战斗与搜刮 → 撤离或深入 → 回家制作/种植/成长；双人合作走主机裁定（同进程面板级回归通过）。**双机实测、互联网直连、真断网演练与导出包验收仍未完成**，进行中记录见 [docs/testing](docs/testing/)；修复清单与批次见 [修复计划](docs/Godot_第二大阶段_测试反馈修复计划_v0.1.md)。
 
 ## 启动
 
-- 玩家：直接运行 `build/小小农场.exe`（Windows 导出包），或用 Godot 4.6.1 打开本目录按 F5。
+- 玩家：直接运行 `build/Farm.exe`（Windows 导出包），或用 Godot 4.6.1 打开本目录按 F5。
 - 开发者（PowerShell）：
 
 ```powershell
@@ -26,21 +26,24 @@ $godot = 'E:\其他\chorme_download\Godot_v4.6.1-stable_win64.exe\Godot_v4.6.1-s
 
 ## 已知限制
 
-1. 单人本地存档（`user://farm_save_v1.json`，内容版本 v5），无云存档；设备时钟可被修改，会影响离线成熟、每日客人与育种机结算。
+1. 单人本地存档（`user://farm_save_v1.json`，内容版本 v7，含洞窟/制作进度），无云存档；设备时钟可被修改，会影响离线成熟、每日客人与育种机结算。
 2. 胡萝卜为暂名（正式名未定）；六位客人为造型草案。
 3. 调试按键 F9（全部立即成熟）只在开发构建可用，导出包无效。
 
 ## 验证（开发者）
 
+一键全量（推荐，覆盖全部非截图测试，含合作/资产/场景专项 d30~d33；通过口径＝退出码 0 且无未预期 ERROR 行）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File 'E:\gpt\godot\farm\tests\run_regression.ps1'
+# 或 bash：bash tests/run_regression.sh
+```
+
+单个测试示例：
+
 ```powershell
 & $godot --headless --path 'E:\gpt\godot\farm' --script 'res://tests/stage1_smoke.gd'
-& $godot --headless --path 'E:\gpt\godot\farm' --script 'res://tests/world_picking_smoke.gd'
-& $godot --headless --path 'E:\gpt\godot\farm' --script 'res://tests/stage2_rules_smoke.gd'
-& $godot --headless --path 'E:\gpt\godot\farm' --script 'res://tests/stage3_breeding_smoke.gd'
-& $godot --headless --path 'E:\gpt\godot\farm' --script 'res://tests/stage3_warehouse_smoke.gd'
-& $godot --headless --path 'E:\gpt\godot\farm' --script 'res://tests/stage4_market_smoke.gd'
-& $godot --headless --path 'E:\gpt\godot\farm' --script 'res://tests/stage5_ux_smoke.gd'
-& $godot --headless --path 'E:\gpt\godot\farm' --script 'res://tests/stage6_regression_smoke.gd'
+& $godot --headless --path 'E:\gpt\godot\farm' --script 'res://tests/d32_coop_play_ui_smoke.gd'
 ```
 
 规则数值集中在 `scripts/domain/plant_defs.gd`（种植）、`breeding_defs.gd`（育种/仓库/育种机）、`market_defs.gd`（客人/经济）。素材原件在 `art/lowpoly/`（`.gdignore` 隔离），运行时副本与盘点见 `assets/stage1_manifest.json`。文档结构：`docs/` 顶层是第二大阶段（农场与合作洞窟）的总体开发计划，设计文档在 `docs/design/`，第一大阶段（单人首版）的全部已完成文档在 `docs/archive/`，界面截图在 `screenshots/`，索引见 [docs/README.md](docs/README.md)。
