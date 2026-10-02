@@ -122,6 +122,14 @@ func confirm_depart() -> Dictionary:
 	return {"ok": true, "reason": ""}
 
 
+## 明确拒绝本次出发（如存档写入失败）：主机收到后放弃开局，可再次发起（F-03）。
+func decline_depart(reason: String) -> void:
+	if pending_run_id == "":
+		return
+	pending_run_id = ""
+	_send({"t": "depart_declined", "run_id": "", "reason": reason})
+
+
 func send_action(kind: String, args: Dictionary = {}) -> String:
 	next_action_seq += 1
 	var action_id := ExpeditionStore.new_action_id(2, next_action_seq)

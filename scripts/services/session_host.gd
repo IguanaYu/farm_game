@@ -92,6 +92,13 @@ func _handle(sender: int, message: Dictionary) -> void:
 			_on_ready(sender, message)
 		"depart_saved":
 			_on_depart_saved(sender, message)
+		"depart_declined":
+			## 客机保存失败等明确拒绝：本次出发作废（不开局），主机可再次发起。
+			pending_run_id = ""
+			var declined_member: Dictionary = room["members"].get(sender, {})
+			if not declined_member.is_empty():
+				declined_member["depart_saved"] = false
+			_send(sender, {"t": "depart_failed", "reason": "客机未能确认出发：%s" % str(message.get("reason", "未知原因"))})
 		"action":
 			_on_action(sender, message)
 		"settlement_applied":
@@ -232,6 +239,11 @@ func host_set_ready(ready: bool) -> void:
 func begin_depart() -> Dictionary:
 	if expedition != null:
 		return {"ok": false, "reason": "已在局中"}
+	if pending_run_id != "":
+		## 已有一次出发在等客机确认：不覆盖局 ID 重复发起（F-03 附带守卫）。
+		return {"ok": true, "reason": "已发起出发，等待客机保存确认", "waiting": true}
+	if (room["members"] as Dictionary).size() < 2:
+		return {"ok": false, "reason": "客机尚未加入房间"}
 	for member_id in room["members"]:
 		var member: Dictionary = room["members"][member_id]
 		if not bool(member.get("ready", false)):

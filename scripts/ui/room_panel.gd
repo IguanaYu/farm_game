@@ -7,23 +7,32 @@ extends Control
 signal close_requested
 signal coop_run_started_host(expedition: ExpeditionGame)
 signal coop_run_started_client(client: SessionClient)
-signal save_requested
 
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
 const TEXT_MUTED := Color("#3f4a42")
 const BAD_RED := Color("#a4543f")
+## 加入超时提示（毫秒）：链路一直不 ready 时给出可读原因。
+const JOIN_TIMEOUT_MS := 5000
 
 var game: FarmGame
 var host: SessionHost = null
 var client: SessionClient = null
 var is_host := false
+## 连接端口可覆盖（默认 31967；面板级测试用独立端口避免撞上正在运行的游戏）。
+var listen_port := SessionHost.DEFAULT_PORT
 var status_label: Label
 var members_label: Label
 var address_edit: LineEdit
 var ready_button: Button
 var depart_button: Button
+## 客机准备状态以主机广播为准（F-11：据此切换而不是固定 true）。
+var client_ready_state := false
+var _hello_sent := false
+var _join_started_ms := 0
+## 已处理过的出发局 ID：同一局只确认一次；拒绝后主机再次发起（新 ID）仍会确认。
+var _handled_run_id := ""
 
 
 func _ready() -> void:
@@ -43,6 +52,9 @@ func _ready() -> void:
 func open(target_game: FarmGame) -> void:
 	game = target_game
 	visible = true
+	client_ready_state = false
+	_hello_sent = false
+	_handled_run_id = ""
 	status_label.text = "选择「创建房间」（主机）或输入主机地址后「加入房间」（客机）。"
 
 
@@ -59,6 +71,20 @@ func _process(_delta: float) -> void:
 			coop_run_started_host.emit(expedition)
 	if client != null:
 		client.poll()
+		if not _hello_sent:
+			if client.link_ready():
+				## 握手不再挂一次性定时器：链路就绪即发，慢连接不丢 hello（F-03 附带）。
+				_hello_sent = true
+				var inventory := InventoryGame.new()
+				inventory.bind(game.state["expedition"])
+				client.hello_with(str(game.state["expedition"].get("player_id", "")), inventory)
+				status_label.text = "已连接，正在握手……"
+			elif Time.get_ticks_msec() - _join_started_ms > JOIN_TIMEOUT_MS:
+				status_label.text = "连不上主机：检查地址与端口（31967）。"
+		## 出发指令到达：本机保存→写占用→回执（F-03；保存失败阻止开局）。
+		if client.pending_run_id != "" and client.pending_run_id != _handled_run_id:
+			_handled_run_id = client.pending_run_id
+			_on_depart_begin()
 
 
 func _build() -> void:
@@ -113,32 +139,43 @@ func _build() -> void:
 
 func _on_create() -> void:
 	host = SessionHost.new()
-	if not host.listen(game):
+	if not host.listen(game, listen_port):
 		status_label.text = "监听失败：端口被占用？"
 		host = null
 		return
 	is_host = true
 	client = null
 	ready_button.disabled = false
-	depart_button.disabled = false
 	host.packet_received.connect(_on_host_packet)
 	_refresh_room()
 	status_label.text = "房间已创建。把你的局域网地址告诉好友来加入。"
 
 
 func _on_host_packet(_peer_id: int, message: Dictionary) -> void:
-	if str(message.get("t", "")) in ["hello", "ready"]:
-		_refresh_room()
+	match str(message.get("t", "")):
+		"hello", "ready":
+			_refresh_room()
+		"depart_declined":
+			## 客机保存失败等：本次出发作废，提示后可再次发起。
+			status_label.text = "出发被客机拒绝：%s（问题解决后可再次点出发）" % str(message.get("reason", "未知原因"))
+			_refresh_room()
 
 
 func _refresh_room() -> void:
 	if host == null:
 		return
 	var names: Array = []
+	var member_count := 0
+	var all_ready := true
 	for member_id in host.room["members"]:
 		var member: Dictionary = host.room["members"][member_id]
+		member_count += 1
+		if not bool(member.get("ready", false)):
+			all_ready = false
 		names.append("%s%s%s" % [member.get("name", "?"), "（主机）" if bool(member.get("is_host", false)) else "", " ✓已准备" if bool(member.get("ready", false)) else ""])
 	members_label.text = "成员：%s" % "、".join(names)
+	## 出发按钮只在两人齐且全员准备时可用（F-11 验收：客机取消准备后主机不能出发）。
+	depart_button.disabled = host.expedition != null or member_count < 2 or not all_ready
 
 
 func _on_join() -> void:
@@ -146,26 +183,45 @@ func _on_join() -> void:
 	if address == "":
 		address = "127.0.0.1"
 	client = SessionClient.new()
-	if not client.connect_to_host(address, game):
+	if not client.connect_to_host(address, game, listen_port):
 		status_label.text = "连接发起失败。"
 		client = null
 		return
 	is_host = false
 	host = null
+	_hello_sent = false
+	_handled_run_id = ""
+	_join_started_ms = Time.get_ticks_msec()
 	ready_button.disabled = false
 	depart_button.disabled = true
+	client.room_updated.connect(_on_room_updated)
+	client.run_received.connect(_on_client_depart)
+	client.welcome_received.connect(_on_client_welcome)
 	status_label.text = "连接中……（主机确认后这里会更新）"
-	var timer := get_tree().create_timer(1.0)
-	timer.timeout.connect(func() -> void:
-		if client != null and client.link_ready():
-			var inventory := InventoryGame.new()
-			inventory.bind(game.state["expedition"])
-			client.hello_with(str(game.state["expedition"].get("player_id", "")), inventory)
-			client.room_updated.connect(func(_room: Dictionary) -> void: status_label.text = "已加入房间（成员状态随主机广播更新）。")
-			status_label.text = "已连接，正在握手……"
-		elif client != null:
-			status_label.text = "连不上主机：检查地址与端口（31967）。"
-	)
+
+
+func _on_client_welcome(ok: bool, reason: String) -> void:
+	if not ok and reason != "":
+		status_label.text = "主机拒绝：%s" % reason
+
+
+## 主机广播的房间视图：刷新成员列表，并记住本机（客机）的准备状态（F-11）。
+func _on_room_updated(room: Dictionary) -> void:
+	var names: Array = []
+	for member_id in room.get("members", {}):
+		var member: Dictionary = room["members"][member_id]
+		var mark := ""
+		if not bool(member.get("online", true)):
+			mark = "（离线）"
+		elif bool(member.get("ready", false)):
+			mark = " ✓已准备"
+		names.append("%s%s%s" % [member.get("name", "?"), "（主机）" if bool(member.get("is_host", false)) else "", mark])
+		if not bool(member.get("is_host", false)):
+			client_ready_state = bool(member.get("ready", false))
+	members_label.text = "成员：%s" % "、".join(names)
+	if _hello_sent:
+		ready_button.disabled = false
+		status_label.text = "已加入房间（成员状态随主机广播更新）。"
 
 
 func _on_ready() -> void:
@@ -173,8 +229,9 @@ func _on_ready() -> void:
 		host.host_set_ready(not bool(host.room["members"][1]["ready"]))
 		_refresh_room()
 	elif client != null:
-		client.set_ready(true)
-		status_label.text = "已准备，等待主机出发。"
+		## 按主机广播的本机状态切换（F-11：第二次点击是取消，不是再准备一次）。
+		client.set_ready(not client_ready_state)
+		status_label.text = "已取消准备，可继续调整战备。" if client_ready_state else "已准备，等待主机出发。"
 
 
 func _on_depart() -> void:
@@ -182,12 +239,39 @@ func _on_depart() -> void:
 		return
 	var result := host.begin_depart()
 	status_label.text = str(result.get("reason", ""))
+	if bool(result.get("waiting", false)):
+		status_label.text = "已发起出发：等待客机保存确认……"
 	if host.expedition != null:
 		visible = false
 		coop_run_started_host.emit(host.expedition)
 
 
+## 收到主机出发指令（F-03）：先落盘本机存档 → 写占用并回执 → 再落盘一次占用状态；
+## 任一步失败都不回执/明确拒绝，主机收不到确认就不会开局。
+func _on_depart_begin() -> void:
+	if not _save_farm():
+		status_label.text = "出发暂停：本机存档写入失败（检查磁盘空间与权限）。"
+		client.decline_depart("存档写入失败")
+		return
+	var confirmed := client.confirm_depart()
+	if not confirmed["ok"]:
+		status_label.text = "出发暂停：%s" % str(confirmed["reason"])
+		client.decline_depart(str(confirmed["reason"]))
+		return
+	if not _save_farm():
+		status_label.text = "警告：占用已写入但落盘失败；重启后可能需要重新占用，请联系主机。"
+		return
+	status_label.text = "已确认出发，等待主机开局……"
+
+
+## 客机侧落盘（与 farm_world._save 同一规则：育种结算→整档写入）。
+func _save_farm() -> bool:
+	game.breeder_settle(int(Time.get_unix_time_from_system()))
+	return SaveStore.save_state(game.state)
+
+
 func _on_client_depart(_run: Dictionary) -> void:
+	## 正式局快照到达：切到客机局界面（F-03 的界面切换半边，此前从未接线）。
 	visible = false
 	coop_run_started_client.emit(client)
 
