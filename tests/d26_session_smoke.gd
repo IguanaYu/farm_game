@@ -78,12 +78,20 @@ func _initialize() -> void:
 	_check(bool(finish_result.get("ok", false)), "战斗：胜利收尾")
 	_check(str(host.expedition.run["phase"]) == "node", "战斗：进入搜刮")
 
-	# —— 搜刮：双方各自领取（主机原子裁定）——
+	# —— 搜刮：双方各自领取（主机原子裁定；F-02 重复领取被拒、F-01 编号不冲突）——
 	var resolved: Dictionary = host.expedition.run["resolved"]["r1c0"]
 	if not (resolved.get("rewards", []) as Array).is_empty():
-		host.host_action("claim_reward", {"def_id": str(resolved["rewards"][0]), "container": "pack"})
+		var host_first: Dictionary = host.host_action("claim_reward", {"def_id": str(resolved["rewards"][0]), "container": "pack"})
+		_check(bool(host_first.get("ok", false)), "搜刮：主机领取成功")
+		var host_id := int(host_first.get("instance_id", -1))
+		var host_again: Dictionary = host.host_action("claim_reward", {"def_id": str(resolved["rewards"][0]), "container": "pack"})
+		_check(not bool(host_again.get("ok", false)), "搜刮：主机重复领取同一候选被拒（F-02）")
 		client.send_action("claim_reward", {"def_id": str(resolved["rewards"][0]), "container": "pack"})
 		_pump(60)
+		var guest_items: Array = host.expedition.member_inventory("p2").loadout_list("pack")
+		_check(guest_items.size() >= 1, "搜刮：客机领到自己的一份")
+		if not guest_items.is_empty():
+			_check(int(guest_items[0]["instance_id"]) != host_id, "搜刮：双端实例编号不冲突（F-01）")
 	var host_pack: int = host.expedition.member_inventory("p1").loadout_list("pack").size()
 	var guest_pack: int = host.expedition.member_inventory("p2").loadout_list("pack").size()
 	_check(host_pack >= 1 and guest_pack >= 1, "搜刮：双方各得一件（按到达序裁定）")

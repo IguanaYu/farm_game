@@ -245,29 +245,33 @@ func _refresh_reward_node(_node: Dictionary, resolved: Dictionary, key: String) 
 
 func _refresh_rewards_area(resolved: Dictionary, key: String, choose_one: bool) -> void:
 	## choose_one：普通战斗个人奖励二选一（选中后另一件消失）；宝箱/采集全部可领。
+	## 领取状态以规则层 resolved.claimed 为准（F-02）：本人已领的不再出按钮。
 	var run: Dictionary = expedition.run
 	var inventory := expedition.run_inventory()
 	var rewards: Array = resolved.get("rewards", [])
 	var public_items: Array = resolved.get("public", [])
-	var chosen := str(resolved.get("personal_choice", ""))
-	if choose_one and chosen != "":
-		rewards = [chosen]
+	var claimed: Dictionary = resolved.get("claimed", {})
+	var mine: Array = claimed.get("p1", [])
+	var choice_locked := choose_one and not mine.is_empty()
 	for def_id in rewards:
 		var def := ItemDefs.get_item(str(def_id))
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
-		var info := _label("%s（%d×%d，%d 张牌，%s）" % [def["name"], def["size"].x, def["size"].y, def["cards"].size(),
-			"可售 %d 金币" % int(def.get("base_value", 0)) if bool(def.get("sellable", false)) else "不可售"], 14, LIGHT_TEXT)
+		var already := choice_locked or mine.has(str(def_id))
+		var suffix := "✓ 已领取" if already else ("已放弃（本节点选择已锁定）" if choice_locked else "")
+		var info := _label("%s（%d×%d，%d 张牌，%s）%s" % [def["name"], def["size"].x, def["size"].y, def["cards"].size(),
+			"可售 %d 金币" % int(def.get("base_value", 0)) if bool(def.get("sellable", false)) else "不可售", suffix], 14, LIGHT_TEXT)
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(info)
-		var claim_pack := _button("放入背包", Color("#eaf4df"), Color("#87b06f"))
-		claim_pack.pressed.connect(_on_claim_reward.bind(key, str(def_id), "pack", choose_one))
-		row.add_child(claim_pack)
-		if bool(def.get("safe_allowed", false)):
-			var claim_safe := _button("放保险箱", Color("#fff5df"), Color("#d5b87d"))
-			claim_safe.pressed.connect(_on_claim_reward.bind(key, str(def_id), "safe", choose_one))
-			row.add_child(claim_safe)
+		if not already:
+			var claim_pack := _button("放入背包", Color("#eaf4df"), Color("#87b06f"))
+			claim_pack.pressed.connect(_on_claim_reward.bind(key, str(def_id), "pack", choose_one))
+			row.add_child(claim_pack)
+			if bool(def.get("safe_allowed", false)):
+				var claim_safe := _button("放保险箱", Color("#fff5df"), Color("#d5b87d"))
+				claim_safe.pressed.connect(_on_claim_reward.bind(key, str(def_id), "safe", choose_one))
+				row.add_child(claim_safe)
 		node_column.add_child(row)
 	if not public_items.is_empty():
 		node_column.add_child(_label("公共物资（不占个人选择次数）：", 13, LIGHT_MUTED))
@@ -379,37 +383,20 @@ func report_battle_result(combat: CombatGame) -> void:
 	expedition_battle_result = combat
 
 
-func _on_claim_reward(key: String, def_id: String, container: String, choose_one: bool) -> void:
-	var run: Dictionary = expedition.run
-	var resolved: Dictionary = run["resolved"].get(key, {})
-	var inventory := expedition.run_inventory()
-	if choose_one:
-		resolved["personal_choice"] = def_id
-		run["resolved"][key] = resolved
-	var result := inventory.claim_reward(def_id, container)
+func _on_claim_reward(key: String, def_id: String, container: String, _choose_one: bool) -> void:
+	## 领取走规则层事务（F-02）：校验候选→放置→记录领取在 ExpeditionGame 内一次完成。
+	var result := expedition.claim_node_reward("p1", key, def_id, container)
 	if not result["ok"]:
-		_flash_overlay(result["reason"])
-		expedition.save()
+		_flash_overlay(str(result["reason"]))
 		_refresh()
 		return
-	if choose_one:
-		resolved["rewards"] = [def_id]
-		run["resolved"][key] = resolved
-	expedition.save()
 	_refresh()
 
 
 func _on_claim_public(key: String, def_id: String) -> void:
-	var run: Dictionary = expedition.run
-	var resolved: Dictionary = run["resolved"].get(key, {})
-	var inventory := expedition.run_inventory()
-	var result := inventory.claim_reward(def_id, "pack")
-	if result["ok"]:
-		resolved["public"] = []
-		run["resolved"][key] = resolved
-		expedition.save()
-	else:
-		_flash_overlay(result["reason"])
+	var result := expedition.claim_node_public("p1", key, def_id)
+	if not result["ok"]:
+		_flash_overlay(str(result["reason"]))
 	_refresh()
 
 

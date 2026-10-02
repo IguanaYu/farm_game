@@ -50,17 +50,21 @@ func _initialize() -> void:
 	_check(finish["ok"] and str(finish.get("outcome", "")) == "won", "战斗：胜利回到节点")
 	_check(str(expedition.run["phase"]) == "node", "战斗：进入搜刮")
 
-	# —— 搜刮：二选一 + 公共物资 ——
+	# —— 搜刮：二选一 + 公共物资（F-02：领取事务化，重复领取被拒）——
 	var key := expedition.node_id(1, 0)
 	var resolved: Dictionary = expedition.run["resolved"][key]
 	_check(resolved["rewards"].size() == 2 and resolved["public"].size() == 1, "奖励：个人二选一＋公共 1 件")
-	var inventory := expedition.run_inventory()
 	var first_reward := str(resolved["rewards"][0])
-	_check(inventory.claim_reward(first_reward, "pack")["ok"], "搜刮：领取候选之一")
-	resolved = expedition.run["resolved"][key]
-	resolved["rewards"] = [first_reward]
-	expedition.run["resolved"][key] = resolved
-	var before_count := inventory.loadout_list("pack").size()
+	var second_reward := str(resolved["rewards"][1])
+	var claim1: Dictionary = expedition.claim_node_reward("p1", key, first_reward, "pack")
+	_check(claim1["ok"], "搜刮：领取候选之一")
+	var claim_id := int(claim1["instance_id"])
+	_check(not expedition.claim_node_reward("p1", key, first_reward, "pack")["ok"], "搜刮：同一候选不能领两次")
+	_check(not expedition.claim_node_reward("p1", key, second_reward, "pack")["ok"], "搜刮：二选一锁定后另一件不能领")
+	var public_def := str(resolved["public"][0])
+	_check(expedition.claim_node_public("p1", key, public_def)["ok"], "搜刮：公共物资可领")
+	_check(not expedition.claim_node_public("p1", key, public_def)["ok"], "搜刮：公共物资领完即止")
+	var before_count := expedition.run_inventory().loadout_list("pack").size()
 	_check(expedition.leave_node()["ok"], "节点：完成并离开（其余候选放弃）")
 	_check(str(expedition.run["phase"]) == "map", "节点：回到地图")
 
@@ -94,6 +98,14 @@ func _initialize() -> void:
 	var again := ExpeditionGame.apply_settlement(game, settlement)
 	_check(again["ok"] and again.get("duplicate", false), "幂等：重复结算只回执")
 	_check(game.state["expedition"]["inventory"]["warehouse"].size() == warehouse_after, "幂等：不重复发放")
+
+	# —— F-01：局内领取的实例 ID 唯一并入库 ——
+	var gained_ids := {}
+	for entry in settlement["gained"]:
+		gained_ids[int(entry["instance_id"])] = true
+	_check(gained_ids.has(claim_id), "F-01：领取实例进入结算清单")
+	_check(gained_ids.size() == settlement["gained"].size(), "F-01：结算内获得物 ID 无重复")
+	_check(int(expedition.run["next_instance_id"]) > claim_id, "F-01：局状态计数已越过已分配编号")
 
 	# —— 出发装备不重复发放：返还的是原实例 ——
 	var chest_after: Array = game.state["expedition"]["inventory"]["loadout"]["chest"]

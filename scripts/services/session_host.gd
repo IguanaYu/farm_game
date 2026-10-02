@@ -325,10 +325,14 @@ func _execute_action(member_key: String, kind: String, args: Dictionary) -> Dict
 			r["run_changed"] = true
 			return r
 		"claim_reward":
-			var inv := expedition.member_inventory(member_key)
-			var r: Dictionary = inv.claim_reward(str(args.get("def_id", "")), str(args.get("container", "pack")))
-			if r["ok"]:
-				expedition.save()
+			## 领取走规则层事务（F-02）：校验→放置→按成员记录领取；满包失败不消费候选。
+			var node_key := expedition.node_id(int(run["current"]["row"]), int(run["current"]["col"]))
+			var r: Dictionary = expedition.claim_node_reward(member_key, node_key, str(args.get("def_id", "")), str(args.get("container", "pack")))
+			r["run_changed"] = true
+			return r
+		"claim_public":
+			var public_key := expedition.node_id(int(run["current"]["row"]), int(run["current"]["col"]))
+			var r: Dictionary = expedition.claim_node_public(member_key, public_key, str(args.get("def_id", "")))
 			r["run_changed"] = true
 			return r
 		"take_rest":

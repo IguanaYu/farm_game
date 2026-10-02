@@ -6,10 +6,14 @@ extends RefCounted
 
 
 var expedition: Dictionary
+## 实例编号权威池（F-01 修复）：局内视图与农场块的库存结构不同，但编号必须落在
+## 同一份字典上。空字典＝编号就在 expedition 块自身（农场侧用法）。
+var id_pool: Dictionary = {}
 
 
-func bind(expedition_block: Dictionary) -> void:
+func bind(expedition_block: Dictionary, pool: Dictionary = {}) -> void:
 	expedition = expedition_block
+	id_pool = pool
 
 
 func _inventory() -> Dictionary:
@@ -50,8 +54,10 @@ func owner_of(instance_id: int) -> String:
 
 
 func next_instance_id() -> int:
-	var result: int = int(expedition.get("next_instance_id", ExpeditionBaseline.FIRST_INSTANCE_ID))
-	expedition["next_instance_id"] = result + 1
+	## 编号从权威池分配并立即递增；池缺键时按基线起点补齐，保证全局单调。
+	var pool := expedition if id_pool.is_empty() else id_pool
+	var result: int = int(pool.get("next_instance_id", ExpeditionBaseline.FIRST_INSTANCE_ID))
+	pool["next_instance_id"] = result + 1
 	return result
 
 

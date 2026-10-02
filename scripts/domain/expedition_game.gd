@@ -215,7 +215,8 @@ func _write_member_hp(member_key: String, hp: int) -> void:
 func member_inventory(member_key: String) -> InventoryGame:
 	var info := member(member_key)
 	var inventory := InventoryGame.new()
-	inventory.bind({"inventory": info["inventory"], "next_instance_id": run["next_instance_id"]})
+	## 编号池＝局状态：两名成员与结算共用同一计数，杜绝跨视图重复 ID（F-01）。
+	inventory.bind({"inventory": info["inventory"]}, run)
 	return inventory
 
 
@@ -331,6 +332,10 @@ static func resume(farm_game: FarmGame) -> Dictionary:
 	var instance := ExpeditionGame.new()
 	instance.game = farm_game
 	instance.run = saved
+	## JSON 往返会把整数变 float；Godot 的数组 has() 对 int/float 不相等，
+	## 带入与消耗清单必须归一成 int，否则恢复后的结算把带入物误判为获得物。
+	instance.run["carried_from_farm"] = (saved.get("carried_from_farm", []) as Array).map(func(v): return int(v))
+	instance.run["consumed"] = (saved.get("consumed", []) as Array).map(func(v): return int(v))
 	instance.rng.seed = int(saved.get("rng_seed", 0))
 	instance.rng.state = int(saved.get("rng_state", "0"))
 	return {"ok": true, "reason": "", "run": saved, "game": instance}
@@ -341,7 +346,8 @@ static func resume(farm_game: FarmGame) -> Dictionary:
 
 func run_inventory() -> InventoryGame:
 	var inventory := InventoryGame.new()
-	inventory.bind({"inventory": run["inventory"], "next_instance_id": run["next_instance_id"]})
+	## 绑定局状态本身作编号池：每次新建视图都从最新计数分配，不再复用旧号（F-01）。
+	inventory.bind({"inventory": run["inventory"]}, run)
 	return inventory
 
 
@@ -391,7 +397,8 @@ func _resolve_node(node: Dictionary) -> void:
 		return
 	if str(run["layer_id"]) == "iron_root_deeps":
 		node["deep"] = true
-	var resolved: Dictionary = {"type": str(node["type"]), "rewards": [], "public": [], "event_id": "", "event_rolls": {}, "rest_taken": false, "completed": false}
+	var resolved: Dictionary = {"type": str(node["type"]), "rewards": [], "public": [], "event_id": "", "event_rolls": {}, "rest_taken": false, "completed": false,
+		"choose_one": str(node["type"]) in ["battle", "elite", "gate"]}
 	var pools: Array = ExpeditionDefs.battle_pools(str(run["layer_id"]))
 	match str(node["type"]):
 		"battle":
@@ -638,12 +645,76 @@ func _add_run_reward(def_id: String) -> void:
 	run["resolved"][key] = resolved
 
 
+# —— 节点奖励领取事务（F-02 修复：校验候选 → 放置 → 记录领取，失败不消费）——————
+# 二选一节点（battle/elite/gate）：每个成员首件领取即锁定本人选择，其余候选对本人作废；
+# 多件节点（gather/chest）：每个成员每条候选各可领一次。合作局两位成员各自计领（2.6 语义）。
+
+
+func claim_node_reward(member_key: String, key: String, def_id: String, container: String) -> Dictionary:
+	if not member_keys().has(member_key):
+		return _fail("未知成员")
+	var resolved: Dictionary = run["resolved"].get(key, {})
+	var rewards: Array = resolved.get("rewards", [])
+	if rewards.is_empty():
+		return _fail("本节点没有可领取的候选")
+	if not rewards.has(def_id):
+		return _fail("该奖励不在候选列表或已不可领取")
+	var claimed: Dictionary = resolved.get("claimed", {})
+	var mine: Array = claimed.get(member_key, [])
+	if not mine.is_empty() and _reward_choose_one(resolved):
+		return _fail("本节点的奖励选择已确定，不能重复领取")
+	if mine.has(def_id):
+		return _fail("已领取过「%s」" % str(ItemDefs.get_item(def_id).get("name", def_id)))
+	var inventory := member_inventory(member_key)
+	var result := inventory.claim_reward(def_id, container)
+	if not result["ok"]:
+		## 满包/白名单拒绝：候选保留，腾出空间后可重试（不产生半领取状态）。
+		return result
+	mine.append(def_id)
+	claimed[member_key] = mine
+	resolved["claimed"] = claimed
+	if member_key == "p1":
+		resolved["personal_choice"] = def_id
+	run["resolved"][key] = resolved
+	save()
+	return {"ok": true, "reason": "", "instance_id": int(result["instance_id"])}
+
+
+func claim_node_public(member_key: String, key: String, def_id: String) -> Dictionary:
+	## 公共物资：全队一份、先到先得（领取成功即从列表移除，与修复前语义一致）。
+	if not member_keys().has(member_key):
+		return _fail("未知成员")
+	var resolved: Dictionary = run["resolved"].get(key, {})
+	var public_items: Array = resolved.get("public", [])
+	if not public_items.has(def_id):
+		return _fail("公共物资不在列表或已被领走")
+	var inventory := member_inventory(member_key)
+	var result := inventory.claim_reward(def_id, "pack")
+	if not result["ok"]:
+		return result
+	public_items.erase(def_id)
+	resolved["public"] = public_items
+	run["resolved"][key] = resolved
+	save()
+	return {"ok": true, "reason": "", "instance_id": int(result["instance_id"])}
+
+
+func _reward_choose_one(resolved: Dictionary) -> bool:
+	## 旧档 resolved 没有 choose_one 键：按节点类型回退推导。
+	return bool(resolved.get("choose_one", ["battle", "elite", "gate"].has(str(resolved.get("type", "")))))
+
+
 func _record_consumed() -> void:
 	## 记录本节点战斗中耗尽的补给（结算报告用；uses 在实体上已扣）。
+	## 消耗清单跨 JSON 往返会变 float：按 int 归一后查重，避免重复登记。
+	var consumed: Dictionary = {}
+	for id in run["consumed"]:
+		consumed[int(id)] = true
 	for container in ExpeditionBaseline.CONTAINERS:
 		for instance in run["inventory"]["loadout"][container]:
 			if int(instance.get("uses_remaining", 1)) == 0 and int(instance["instance_id"]) > 0:
-				if not run["consumed"].has(int(instance["instance_id"])):
+				if not consumed.has(int(instance["instance_id"])):
+					consumed[int(instance["instance_id"])] = true
 					run["consumed"].append(int(instance["instance_id"]))
 
 
@@ -657,7 +728,9 @@ func _settle_run(kind: String, detail: int, member_key := "") -> Dictionary:
 		return _settle_coop(kind, detail)
 	var settlement_id := ExpeditionStore.new_settlement_id(int(Time.get_unix_time_from_system() * 1000.0))
 	var inventory := run_inventory()
-	var carried: Array = run["carried_from_farm"]
+	var carried: Dictionary = {}
+	for id in run["carried_from_farm"]:
+		carried[int(id)] = true
 	var returned_items: Array = []
 	var gained_items: Array = []
 	var lost_items: Array = []
@@ -675,7 +748,7 @@ func _settle_run(kind: String, detail: int, member_key := "") -> Dictionary:
 		## 撤离/通关：全部仍持有的物品返还（带入＝返还，新增＝获得）。
 		for instance in held:
 			var entry := _settle_entry(instance)
-			if int(instance["instance_id"]) in carried:
+			if carried.has(int(instance["instance_id"])):
 				returned_items.append(entry)
 				kept_ids[int(instance["instance_id"])] = true
 			else:
@@ -761,7 +834,9 @@ func _settle_one_member(kind: String, detail: int, member_key: String, is_host: 
 	var settlement_id := ExpeditionStore.new_settlement_id(int(Time.get_unix_time_from_system() * 1000.0) + (0 if is_host else 1))
 	var info := member(member_key)
 	var inv := member_inventory(member_key)
-	var carried: Array = info["carried"]
+	var carried: Dictionary = {}
+	for id in info["carried"]:
+		carried[int(id)] = true
 	var returned_items: Array = []
 	var gained_items: Array = []
 	var lost_items: Array = []
@@ -775,7 +850,7 @@ func _settle_one_member(kind: String, detail: int, member_key: String, is_host: 
 	if kind == "extract" or kind == "gate_clear":
 		for instance in held:
 			var entry := _settle_entry(instance)
-			if int(instance["instance_id"]) in carried:
+			if carried.has(int(instance["instance_id"])):
 				returned_items.append(entry)
 			else:
 				gained_items.append(entry)
