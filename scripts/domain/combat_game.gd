@@ -61,6 +61,40 @@ const ENEMIES := {
 			{"kind": "attack", "value": 9},
 		],
 	},
+	# —— 第三层晶脉矿窟（内容扩展轮）——
+	"vein_crawler": {
+		"name": "晶脉爬虫", "hp": 28,
+		"cycle": [
+			{"kind": "attack", "value": 6, "times": 2},
+			{"kind": "attack", "value": 9},
+			{"kind": "block", "value": 6},
+		],
+	},
+	"void_moth": {
+		"name": "暗渊蛾", "hp": 32,
+		"cycle": [
+			{"kind": "attack", "value": 5, "status": "vulnerable", "status_stacks": 1},
+			{"kind": "attack", "value": 7, "times": 2},
+			{"kind": "attack", "value": 10},
+		],
+	},
+	"prism_golem": {
+		"name": "棱镜魔像", "hp": 42,
+		"cycle": [
+			{"kind": "block", "value": 10},
+			{"kind": "attack", "value": 12},
+			{"kind": "attack", "value": 12, "status": "weak", "status_stacks": 1},
+		],
+	},
+	"crystal_tyrant": {
+		"name": "晶暴君（首领）", "hp": 90,
+		"cycle": [
+			{"kind": "attack", "value": 7, "times": 2},
+			{"kind": "block", "value": 12},
+			{"kind": "attack", "value": 16},
+			{"kind": "attack", "value": 6, "status": "poison", "status_stacks": 3},
+		],
+	},
 }
 
 ## 双人敌人生命缩放（2.6 设计 §5 初值）。
@@ -75,6 +109,10 @@ const ENCOUNTERS := {
 	"deep_hard": {"name": "深层硬仗（矿偶＋蝠）", "enemies": ["ore_golem", "deep_bat"]},
 	"layer2_elite": {"name": "深层精英（矿偶＋晶蛛）", "enemies": ["ore_golem", "crystal_spider"]},
 	"layer2_guardian": {"name": "首领：根须守卫", "enemies": ["root_guardian"]},
+	"deep3_pair": {"name": "晶脉巡逻（爬虫＋蛾）", "enemies": ["vein_crawler", "void_moth"]},
+	"deep3_hard": {"name": "晶脉硬仗（魔像＋爬虫）", "enemies": ["prism_golem", "vein_crawler"]},
+	"layer3_elite": {"name": "晶脉精英（魔像＋蛾）", "enemies": ["prism_golem", "void_moth"]},
+	"layer3_guardian": {"name": "首领：晶暴君", "enemies": ["crystal_tyrant"]},
 }
 
 

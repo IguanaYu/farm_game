@@ -85,6 +85,16 @@ const CARDS := {
 		"effects": [{"kind": "damage", "value": 15}],
 		"desc": "对一名敌人造成 15 点伤害。",
 	},
+	"slash8": {
+		"name": "晶刃斩", "cost": 1, "target": "enemy", "after": "discard",
+		"effects": [{"kind": "damage", "value": 8}],
+		"desc": "对一名敌人造成 8 点伤害。",
+	},
+	"heavy_strike17": {
+		"name": "裂石一击", "cost": 2, "target": "enemy", "after": "discard",
+		"effects": [{"kind": "damage", "value": 17}],
+		"desc": "对一名敌人造成 17 点伤害。",
+	},
 	"rescue_signal": {
 		"name": "救援信号", "cost": 1, "target": "rescue", "after": "exhaust_source",
 		"effects": [{"kind": "rescue", "value": 8}],

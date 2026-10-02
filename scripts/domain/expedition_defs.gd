@@ -22,6 +22,7 @@ const NODE_TYPE_DISPLAY := {
 const LAYERS := {
 	"iron_root_deeps": {
 		"name": "铁根矿窟（第二层）",
+		"depth": 2,
 		"rows": 9,
 		"map": [
 			[{"type": "start", "risk": "none", "hint": "层间入口"}],
@@ -42,6 +43,7 @@ const LAYERS := {
 	},
 	"moss_stone_shallow": {
 		"name": "苔石浅洞",
+		"depth": 1,
 		"rows": 9,
 		## 固定图：每排 1~3 个候选；相邻排全连通（任意路线可达第 4、7 排撤离站，无断路；
 		## 每条路线至少一处非战斗资源来源——第 2 排起各路线都有宝箱/采集/事件）。
@@ -62,7 +64,39 @@ const LAYERS := {
 			[{"type": "gate", "risk": "high", "hint": "守门战·层末出口", "encounter": "gate"}],
 		],
 	},
+	## 第三层（内容扩展轮）：更险的排布——战斗在前宝箱在后、第 6 排精英；遭遇 deep3_*。
+	"crystal_vein_deeps": {
+		"name": "晶脉矿窟（第三层）",
+		"depth": 3,
+		"rows": 9,
+		"map": [
+			[{"type": "start", "risk": "none", "hint": "层间入口"}],
+			[{"type": "battle", "risk": "high", "hint": "晶脉敌人", "encounter": "deep3_pair"},
+				{"type": "gather", "risk": "none", "hint": "辉晶矿脉"}],
+			[{"type": "event", "risk": "mid", "hint": "晶脉取舍"},
+				{"type": "battle", "risk": "high", "hint": "晶脉敌人", "encounter": "deep3_hard"}],
+			[{"type": "battle", "risk": "high", "hint": "晶脉敌人", "encounter": "deep3_pair"},
+				{"type": "chest", "risk": "none", "hint": "晶脉装备与货物"}],
+			[{"type": "rest_exit", "risk": "none", "hint": "休整·撤离站"}],
+			[{"type": "gather", "risk": "none", "hint": "辉晶与铁矿"},
+				{"type": "event", "risk": "mid", "hint": "晶脉取舍"}],
+			[{"type": "battle", "risk": "high", "hint": "晶脉敌人", "encounter": "deep3_hard"},
+				{"type": "elite", "risk": "high", "hint": "高风险·晶脉精英"}],
+			[{"type": "exit", "risk": "none", "hint": "撤离或继续"}],
+			[{"type": "gate", "risk": "high", "hint": "首领：晶暴君", "encounter": "layer3_guardian"}],
+		],
+	},
 }
+
+## 层间衔接顺序（2.8 两层 → 内容扩展轮三层）：末层守门战胜利后整局 gate_clear 结算。
+const LAYER_ORDER := ["moss_stone_shallow", "iron_root_deeps", "crystal_vein_deeps"]
+
+
+static func next_layer(layer_id: String) -> String:
+	var index := LAYER_ORDER.find(layer_id)
+	if index < 0 or index + 1 >= LAYER_ORDER.size():
+		return ""
+	return str(LAYER_ORDER[index + 1])
 
 ## 战斗遭遇：浅层组合（gate 用强化组合；精英用双敌）。
 const ENCOUNTER_TABLE := {
@@ -93,7 +127,14 @@ const DEEP_ELITE_POOL := ["iron_shortsword", "glow_crystal", "antique_ornament",
 const DEEP_GATHER_POOL := ["iron_ore", "iron_ore", "copper_scrap"]
 const DEEP_CHEST_POOL := ["iron_shortsword", "glow_crystal", "reinforced_shield", "antique_ornament"]
 const DEEP_GATE_REWARDS := ["glow_berry_seed", "iron_shortsword"]
-## 深层事件表（2.8 新增 4 个）。
+## 第三层（晶脉矿窟）：辉晶簇在此层出现；星瓣花种子与辉晶装备。
+const L3_BATTLE_POOL := ["radiant_cluster", "iron_ore", "glow_crystal", "small_potion", "radiant_cluster"]
+const L3_PUBLIC_POOL := ["radiant_cluster", "iron_ore", "bandage"]
+const L3_ELITE_POOL := ["crystal_blade", "glow_crystal", "antique_ornament", "rescue_kit"]
+const L3_GATHER_POOL := ["radiant_cluster", "radiant_cluster", "iron_ore"]
+const L3_CHEST_POOL := ["crystal_blade", "glow_crystal", "radiant_cluster", "antique_ornament"]
+const L3_GATE_REWARDS := ["star_bloom_seed", "crystal_blade"]
+## 深层事件表（2.8 四个＋内容扩展轮两个）。
 const DEEP_EVENTS := {
 	"collapsed_shaft": {
 		"name": "塌陷的竖井",
@@ -126,6 +167,23 @@ const DEEP_EVENTS := {
 		"options": [
 			{"id": "cut", "label": "割断根须（失去 6 生命，本层探索无事发生……或有一点收获）", "hp_cost": 6, "grants": []},
 			{"id": "leave", "label": "不去招惹", "hp_cost": 0, "grants": []},
+		],
+	},
+	"resonant_vein": {
+		"name": "晶脉共振",
+		"desc": "辉晶在岩壁里嗡鸣，敲开岩壳能拿到完整的晶簇，震波会伤人。",
+		"options": [
+			{"id": "crack", "label": "敲开岩壳（失去 6 生命，获得辉晶簇×2）", "hp_cost": 6, "grants": ["radiant_cluster", "radiant_cluster"]},
+			{"id": "leave", "label": "离开", "hp_cost": 0, "grants": []},
+		],
+	},
+	"star_plant": {
+		"name": "深渊花圃",
+		"desc": "石缝里生着一株星瓣花，种子比花更珍贵。",
+		"options": [
+			{"id": "seed", "label": "取种子（星瓣花种子）", "hp_cost": 0, "grants": ["star_bloom_seed"]},
+			{"id": "crystal", "label": "敲周边晶石（微光晶石）", "hp_cost": 0, "grants": ["glow_crystal"]},
+			{"id": "leave", "label": "不动", "hp_cost": 0, "grants": []},
 		],
 	},
 }
@@ -176,6 +234,14 @@ static func events_for_node(node_row: int, layer_id := "moss_stone_shallow") -> 
 				return ["old_campsite", "guardian_root"]
 			_:
 				return ["collapsed_shaft", "old_campsite"]
+	if layer_id == "crystal_vein_deeps":
+		match node_row:
+			2:
+				return ["resonant_vein", "star_plant"]
+			5:
+				return ["star_plant", "resonant_vein"]
+			_:
+				return ["resonant_vein", "star_plant"]
 	match node_row:
 		3:
 			return ["narrow_crevice", "wall_sprout"]
@@ -186,17 +252,37 @@ static func events_for_node(node_row: int, layer_id := "moss_stone_shallow") -> 
 
 
 static func encounter_for(node: Dictionary) -> String:
+	## 精英/守门按层深分派（depth≥2 用 layer<N>_ 前缀遭遇）；普通战斗用图上 encounter 字段。
+	var depth := int(node.get("depth", 1))
 	match str(node.get("type", "")):
 		"elite":
-			return "layer2_elite" if bool(node.get("deep", false)) else "elite_double"
+			if depth >= 2:
+				return "layer%d_elite" % depth
+			return "elite_double"
 		"gate":
-			return "layer2_guardian" if bool(node.get("deep", false)) else "gate_keeper"
+			if depth >= 2:
+				return "layer%d_guardian" % depth
+			return "gate_keeper"
 		_:
 			return str(node.get("encounter", "shallow_pair"))
 
 
-## 按层取奖励池（2.8）：[个人, 公共, 精英, 采集, 宝箱]。
+## 按层取奖励池：[个人, 公共, 精英, 采集, 宝箱]。
+const LAYER_POOLS := {
+	"moss_stone_shallow": [BATTLE_PERSONAL_POOL, BATTLE_PUBLIC_POOL, ELITE_POOL, GATHER_POOL, CHEST_POOL],
+	"iron_root_deeps": [DEEP_BATTLE_POOL, DEEP_PUBLIC_POOL, DEEP_ELITE_POOL, DEEP_GATHER_POOL, DEEP_CHEST_POOL],
+	"crystal_vein_deeps": [L3_BATTLE_POOL, L3_PUBLIC_POOL, L3_ELITE_POOL, L3_GATHER_POOL, L3_CHEST_POOL],
+}
+
+
 static func battle_pools(layer_id: String) -> Array:
+	return LAYER_POOLS.get(layer_id, LAYER_POOLS["moss_stone_shallow"])
+
+
+## 守门战固定奖励（每层一份：浅层摆件向／第二层萤果＋铁剑／第三层星瓣花＋辉晶刃）。
+static func gate_rewards(layer_id: String) -> Array:
 	if layer_id == "iron_root_deeps":
-		return [DEEP_BATTLE_POOL, DEEP_PUBLIC_POOL, DEEP_ELITE_POOL, DEEP_GATHER_POOL, DEEP_CHEST_POOL]
-	return [BATTLE_PERSONAL_POOL, BATTLE_PUBLIC_POOL, ELITE_POOL, GATHER_POOL, CHEST_POOL]
+		return DEEP_GATE_REWARDS
+	if layer_id == "crystal_vein_deeps":
+		return L3_GATE_REWARDS
+	return GATE_REWARDS

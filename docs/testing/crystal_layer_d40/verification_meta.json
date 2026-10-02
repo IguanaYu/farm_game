@@ -1,0 +1,15 @@
+{
+  "date": "2026-10-02",
+  "head_commit_at_start": "c8e5731e024b2fda2a13e4b222073284f8a9ad2a",
+  "engine": "Godot 4.6.1 stable (14d19694e)",
+  "round": "第三层晶脉矿窟内容扩展（d28 更新＋d40 新增）",
+  "total": 46,
+  "exit_nonzero": 0,
+  "script_errors": 3,
+  "evidence": [
+    "regression_output.txt",
+    "d40_crystal_layer_smoke.txt",
+    "d28_content_smoke.txt",
+    "results.json"
+  ]
+}

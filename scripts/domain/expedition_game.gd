@@ -395,8 +395,10 @@ func _resolve_node(node: Dictionary) -> void:
 	var key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
 	if run["resolved"].has(key):
 		return
-	if str(run["layer_id"]) == "iron_root_deeps":
+	var layer_depth := int(ExpeditionDefs.layer(str(run["layer_id"])).get("depth", 1))
+	if layer_depth >= 2:
 		node["deep"] = true
+		node["depth"] = layer_depth
 	var resolved: Dictionary = {"type": str(node["type"]), "rewards": [], "public": [], "event_id": "", "event_rolls": {}, "rest_taken": false, "completed": false,
 		"choose_one": str(node["type"]) in ["battle", "elite", "gate"]}
 	var pools: Array = ExpeditionDefs.battle_pools(str(run["layer_id"]))
@@ -416,7 +418,7 @@ func _resolve_node(node: Dictionary) -> void:
 			resolved["event_id"] = str(events[col_to_event_index(int(run["current"]["col"]), events.size())])
 			resolved["event_rolls"] = {"dig_outcome": _roll_dig_outcome()}
 		"gate":
-			resolved["rewards"] = (ExpeditionDefs.DEEP_GATE_REWARDS if str(run["layer_id"]) == "iron_root_deeps" else ExpeditionDefs.GATE_REWARDS).duplicate()
+			resolved["rewards"] = ExpeditionDefs.gate_rewards(str(run["layer_id"])).duplicate()
 	run["resolved"][key] = resolved
 
 
@@ -608,16 +610,17 @@ func leave_node() -> Dictionary:
 		run["log"].append("离开节点：公共区 %d 件物品被放弃" % run["node_drops"].size())
 		run["node_drops"] = []
 	if int(run["current"]["row"]) == ExpeditionDefs.GATE_ROW:
-		if str(run["layer_id"]) == "moss_stone_shallow":
-			## 层间衔接（2.8）：第一层守门战胜利 → 进入第二层，同一局继续。
-			run["layer_id"] = "iron_root_deeps"
-			run["map"] = _build_map("iron_root_deeps")
+		## 层间衔接（2.8 两层 → 内容扩展轮三层）：非末层守门战胜利 → 下一层，同一局继续。
+		var next_layer := ExpeditionDefs.next_layer(str(run["layer_id"]))
+		if next_layer != "":
+			run["layer_id"] = next_layer
+			run["map"] = _build_map(next_layer)
 			run["current"] = {"row": 0, "col": 0}
 			run["resolved"] = {}
 			run["phase"] = "map"
-			run["log"].append("击败守门战：进入第二层「铁根矿窟」（携带与生命延续）")
+			run["log"].append("击败守门战：进入「%s」（携带与生命延续）" % str(ExpeditionDefs.layer(next_layer).get("name", next_layer)))
 			save()
-			return {"ok": true, "reason": "", "layer_changed": "iron_root_deeps"}
+			return {"ok": true, "reason": "", "layer_changed": next_layer}
 		return _settle_run("gate_clear", int(run["player"]["hp"]))
 	run["phase"] = "map"
 	save()

@@ -146,6 +146,31 @@ const ITEMS := {
 		"safe_allowed": false, "cards": ["first_aid", "rescue_signal"], "uses": 1,
 		"desc": "共享一次使用的恢复＋救援（救援牌在 2.6 合作接入；单人可自用恢复）。",
 	},
+	# —— 第三层晶脉矿窟（内容扩展轮）：辉晶材料、三阶装备与星瓣花种子 ——
+	"radiant_cluster": {
+		"name": "辉晶簇", "category": "material", "size": Vector2i(1, 2), "quality": 2,
+		"base_value": 40, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": true, "cards": ["heavy_cargo", "heavy_cargo"],
+		"desc": "第三层制作材料，可放保险箱；占 2 格＝2 张笨重货物。",
+	},
+	"crystal_blade": {
+		"name": "辉晶刃", "category": "weapon", "size": Vector2i(1, 3), "quality": 2,
+		"base_value": 170, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["slash8", "slash8", "heavy_strike17"],
+		"desc": "第三层装备：晶刃斩(8)×2＋裂石一击(17)。",
+	},
+	"crystal_aegis": {
+		"name": "辉晶盾", "category": "armor", "size": Vector2i(2, 2), "quality": 2,
+		"base_value": 100, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["shield_up", "shield_up", "cover", "brace"],
+		"desc": "第三层品质防具：牌构成与加固盾相同，价值更高。",
+	},
+	"star_bloom_seed": {
+		"name": "星瓣花种子", "category": "rare_seed", "size": Vector2i(1, 1), "quality": 1,
+		"base_value": 8, "sellable": false, "basic_kit": false, "demo": false,
+		"safe_allowed": true, "cards": ["heavy_cargo"],
+		"desc": "第三层植物的种子：保险箱可保护；回家转为种子（种植解锁后进市场）。",
+	},
 }
 
 

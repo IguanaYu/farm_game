@@ -1,28 +1,38 @@
 extends SceneTree
 ## 2.8：第二层内容——层间衔接、深层奖励池、新敌人/首领、萤果全链、内容预算核对。
+## 内容扩展轮：预算扩到第三层（晶脉矿窟），通关断言移到第三层守门后。
 
 
 var failed := false
 
 
 func _initialize() -> void:
-	# —— 内容预算核对（总计划 §10-2.8）——
-	_check(ItemDefs.ITEMS.size() - 3 == 20, "预算：正式物品 20 种（低于 24~32 下沿：机制完整优先，试玩后按需扩充）")
-	_check(CardDefs.CARDS.size() == 17, "预算：牌效果模板 %d 个（18~24 区间，后续扩）" % CardDefs.CARDS.size())
+	# —— 内容预算核对（总计划 §10-2.8 ＋ 内容扩展轮）——
+	_check(ItemDefs.ITEMS.size() - 3 == 24, "预算：正式物品 24 种（20＋扩展轮 4）")
+	_check(CardDefs.CARDS.size() == 19, "预算：牌效果模板 %d 个（17＋扩展轮 2）" % CardDefs.CARDS.size())
 	var enemy_count := 0
 	for def_id in CombatGame.ENEMIES:
 		if str(CombatGame.ENEMIES[def_id]["name"]).find("首领") < 0:
 			enemy_count += 1
-	_check(enemy_count == 6, "预算：普通敌人 6 种（含深层 3 种）")
-	_check(ExpeditionDefs.DEEP_EVENTS.size() == 4 and ExpeditionDefs.EVENTS.size() == 3, "预算：事件 7 个（浅 3＋深 4，6~8 区间）")
-	_check(PlantDefs.is_known_plant("glow_berry"), "预算：稀有植物第 2 种（萤果）")
-	_check(CombatGame.ENCOUNTERS.has("layer2_guardian"), "预算：首领遭遇（根须守卫 60 血）")
+	_check(enemy_count == 9, "预算：普通敌人 9 种（浅 3＋深 3＋晶脉 3）")
+	_check(ExpeditionDefs.DEEP_EVENTS.size() == 6 and ExpeditionDefs.EVENTS.size() == 3, "预算：事件 9 个（浅 3＋深 6）")
+	_check(PlantDefs.is_known_plant("glow_berry") and PlantDefs.is_known_plant("star_bloom"), "预算：稀有植物第 2/3 种（萤果/星瓣花）")
+	_check(CombatGame.ENCOUNTERS.has("layer2_guardian") and CombatGame.ENCOUNTERS.has("layer3_guardian"), "预算：两层首领遭遇（根须守卫/晶暴君）")
 
 	# —— 第二层图与连通 ——
 	var layer2 := ExpeditionDefs.layer("iron_root_deeps")
 	_check(not layer2.is_empty() and int(layer2["rows"]) == 9, "第二层：9 排（0~8）")
 	_check(str(layer2["map"][4][0]["type"]) == "rest_exit" and str(layer2["map"][7][0]["type"]) == "exit", "第二层：4/7 排撤离站")
 	_check(str(layer2["map"][8][0]["type"]) == "gate", "第二层：第 8 排首领")
+
+	# —— 第三层图与连通 ——
+	var layer3 := ExpeditionDefs.layer("crystal_vein_deeps")
+	_check(not layer3.is_empty() and int(layer3["rows"]) == 9, "第三层：9 排（0~8）")
+	_check(str(layer3["map"][4][0]["type"]) == "rest_exit" and str(layer3["map"][7][0]["type"]) == "exit", "第三层：4/7 排撤离站")
+	_check(str(layer3["map"][8][0]["type"]) == "gate", "第三层：第 8 排首领")
+	_check(ExpeditionDefs.next_layer("moss_stone_shallow") == "iron_root_deeps" \
+			and ExpeditionDefs.next_layer("iron_root_deeps") == "crystal_vein_deeps" \
+			and ExpeditionDefs.next_layer("crystal_vein_deeps") == "", "第三层：层间顺序链 moss→iron→crystal→结算")
 
 	# —— 层间衔接：第一层守门战胜利 → 同局进入第二层 ——
 	var game := _fresh_game()
@@ -52,20 +62,37 @@ func _initialize() -> void:
 	if str(expedition.run["phase"]) == "node":
 		expedition.leave_node()
 
-	# —— 第二层首领战 → 通关结算 ——
+	# —— 第二层首领战 → 衔接第三层（同一局）——
 	_advance_all(expedition, 8)
-	_check(str(expedition.run["outcome"]) == "gate_clear", "通关：第二层首领胜利 → gate_clear 结算")
-	var settlement: Dictionary = {}
-	for entry in [expedition.run.get("settlement_id", "")]:
-		_check(entry != "", "通关：结算 ID 已生成")
+	_check(str(expedition.run["layer_id"]) == "crystal_vein_deeps", "衔接：第二层通关后进入第三层（同一局）")
+	_check(int(expedition.run["current"]["row"]) == 0 and str(expedition.run["phase"]) == "map", "衔接：第三层从第 0 排重新出发")
+	## 第三层节点裁定走晶脉池（采集三件候选全为辉晶/铁矿类）。
+	expedition.move_to(1, 1)  # 第三层第 1 排候选 1 是采集（辉晶矿脉）
+	var l3_key := expedition.node_id(1, 1)
+	if str(expedition.run["map"]["rows"][1][1]["type"]) == "gather":
+		var l3_rewards: Array = expedition.run["resolved"][l3_key]["rewards"]
+		_check(l3_rewards.has("radiant_cluster"), "第三层：采集节点按晶脉池裁定（辉晶簇）")
+		var radiant_claim := expedition.run_inventory().claim_reward("radiant_cluster", "pack")
+		_check(radiant_claim["ok"], "第三层：领取辉晶簇（入背包）")
+	if str(expedition.run["phase"]) == "node":
+		expedition.leave_node()
 
-	# —— 深层奖励含铁矿：目标解锁链（深层材料）——
+	# —— 第三层首领战 → 整局通关结算 ——
+	_advance_all(expedition, 8)
+	_check(str(expedition.run["outcome"]) == "gate_clear", "通关：第三层首领胜利 → gate_clear 结算（打穿三层）")
+	_check(str(expedition.run.get("settlement_id", "")) != "", "通关：结算 ID 已生成")
+
+	# —— 深层奖励含铁矿/辉晶：目标与配方解锁链 ——
 	var stats: Dictionary = game.state["expedition"]["crafting"]["stats"]
 	var iron_brought := 0
+	var radiant_brought := 0
 	for entry in stats.get("brought", []):
 		if str(entry.get("id", "")) == "iron_ore":
 			iron_brought = int(entry.get("count", 0))
+		if str(entry.get("id", "")) == "radiant_cluster":
+			radiant_brought = int(entry.get("count", 0))
 	_check(iron_brought >= 1, "成长：铁矿带回计入「深层材料」目标")
+	_check(radiant_brought >= 1, "成长：辉晶簇带回解锁辉晶配方（stat 口径）")
 
 	# —— 萤果全链：种子转换 → 解锁 → 种植 ——
 	var game2 := FarmGame.new()
@@ -99,6 +126,10 @@ func _initialize() -> void:
 	_check(int(boss.state["enemies"][0]["hp"]) == 60, "首领：根须守卫 60 血")
 	var intent_text := str(boss.enemy_intents()[0]["text"])
 	_check(intent_text.find("攻击 6×2") >= 0, "首领：首意图为 6×2 双段攻击")
+	var tyrant := CombatGame.create([{"key": "p1", "name": "农夫", "max_hp": 40, "deck": CombatGame.basic_kit_demo_deck()}], "layer3_guardian", 85, null, [])
+	tyrant.start()
+	_check(int(tyrant.state["enemies"][0]["hp"]) == 90, "晶脉首领：晶暴君 90 血")
+	_check(str(tyrant.enemy_intents()[0]["text"]).find("攻击 7×2") >= 0, "晶脉首领：首意图为 7×2 双段攻击")
 
 	_finish()
 

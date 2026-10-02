@@ -48,6 +48,7 @@ const CROP_ICONS := {
 	"carrot": preload("res://assets/sprites/crop_carrot.png"),
 	"glow_berry": preload("res://assets/sprites/crop_carrot.png"),
 	"rock_sprout": preload("res://assets/sprites/crop_carrot.png"),
+	"star_bloom": preload("res://assets/sprites/crop_carrot.png"),
 }
 const FERTILIZER_ICONS := {
 	"basic": preload("res://assets/sprites/fertilizer_basic.png"),

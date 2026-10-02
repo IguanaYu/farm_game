@@ -829,6 +829,8 @@ static func seed_item_to_plant(def_id: String) -> String:
 			return "rock_sprout"
 		"glow_berry_seed":
 			return "glow_berry"
+		"star_bloom_seed":
+			return "star_bloom"
 	return ""
 
 
@@ -1066,8 +1068,8 @@ func refresh_market(now: int) -> bool:
 	picked.sort()
 	market["guest_ids"] = picked
 	var market_kinds: Array = ["cabbage", "carrot"]
-	# 2.5/2.8：解锁的洞窟植物进入市场（偏好倍率 1.0，公式沿用现有池）。
-	for cave_kind in ["rock_sprout", "glow_berry"]:
+	# 2.5/2.8/内容扩展轮：解锁的洞窟植物进入市场（偏好倍率 1.0，公式沿用现有池）。
+	for cave_kind in ["rock_sprout", "glow_berry", "star_bloom"]:
 		if state.get("expedition", {}).get("crafting", {}).get("plant_unlocks", []).has(cave_kind):
 			market_kinds.append(cave_kind)
 	for kind in market_kinds:

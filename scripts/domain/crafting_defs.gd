@@ -53,6 +53,18 @@ const RECIPES := {
 		"unlock": {"type": "goal", "goal": "together_home"},
 		"desc": "恢复＋救援，共享一次使用（救援 2.6 接入）。",
 	},
+	"crystal_blade": {
+		"name": "辉晶刃", "output": "crystal_blade", "coins": 45,
+		"materials": [{"kind": "item", "id": "radiant_cluster", "count": 3}, {"kind": "item", "id": "iron_ore", "count": 2}],
+		"unlock": {"type": "stat", "stat": "brought_total", "id": "radiant_cluster", "value": 1},
+		"desc": "第三层装备：晶刃斩(8)×2＋裂石一击(17)。",
+	},
+	"crystal_aegis": {
+		"name": "辉晶盾", "output": "crystal_aegis", "coins": 30,
+		"materials": [{"kind": "item", "id": "radiant_cluster", "count": 2}, {"kind": "item", "id": "fiber_clump", "count": 2}],
+		"unlock": {"type": "stat", "stat": "brought_total", "id": "radiant_cluster", "value": 1},
+		"desc": "第三层品质防具（带回辉晶簇解锁）。",
+	},
 }
 
 
@@ -75,7 +87,7 @@ const GOALS := {
 	"first_rock_harvest": {"name": "第一茬岩芽", "reward_unlock_recipes": ["rock_elixir"], "reward_shop_seed": "rock_sprout", "reward_text": "解锁药剂配方与商店基础种子"},
 	"together_home": {"name": "一起回家", "reward_unlock_recipes": ["rescue_kit"], "reward_text": "解锁救援包配方（2.6 实物可用）"},
 	"deep_material": {"name": "深层材料", "reward_unlock_recipes": ["iron_shortsword"], "reward_unlock_upgrades": ["chest_expand"], "reward_text": "解锁铁剑与胸挂扩展"},
-	"beat_guardian": {"name": "击败守护者", "reward_text": "第二层里程碑（2.8 接入，不送无限战力）"},
+	"beat_guardian": {"name": "击穿晶脉矿窟", "reward_items": ["star_bloom_seed"], "reward_text": "打穿第三层：星瓣花种子一颗"},
 }
 
 

@@ -2,7 +2,7 @@ class_name ExpeditionBaseline
 extends RefCounted
 ## 第二大阶段共用规则基线（2.1 详细设计 §2）。数值是设计初值，试玩后统一在此调整。
 
-const PROTO_RULES_VERSION := "d2-baseline-v0.1"
+const PROTO_RULES_VERSION := "d2-baseline-v0.2"
 
 const MAX_HP := 40
 const ENERGY_PER_TURN := 3
