@@ -18,6 +18,7 @@ foreach ($path in Get-ChildItem tests -Filter *.gd | Sort-Object Name) {
     $name = $path.Name
     if ($name.StartsWith("capture_")) { continue }  # 截图类需真实窗口，另跑
     if ($name.StartsWith("m0_")) { continue }  # M0 探针需编排器起服务端，见 tools/m0_local_verify.py
+    if ($name.StartsWith("m1_")) { continue }  # M1 公网探针需真实服务器与真实凭据
     $total++
     $out = & $Godot --headless --path . --script "res://tests/$name" 2>&1 | Out-String
     $ec = $LASTEXITCODE
