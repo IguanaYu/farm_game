@@ -1,8 +1,10 @@
 class_name OnlineLoginPanel
-extends Control
+extends VBoxContainer
 ## M1 线上农场登录面板（计划 §5.4，W02 UI）：邀请码激活（首次）/一键登录（本机有凭据）/
 ## 撤销本机凭据（N02）。成功后发 entered_online(token)，由主菜单切 farm_world（Mode.ONLINE）。
 ## 服务器地址可改（SettingsStore [online] server_url），默认内置腾讯云直连。
+## 直接继承 VBoxContainer：主菜单卡片是定宽 VBox，普通 Control 塞进去高度不参与布局、
+## 内部控件会溢出卡片重叠（实测 UI 错位事故，勿改回 Control）。
 
 signal entered_online(token: String)
 
@@ -23,51 +25,48 @@ var _busy := false
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(520, 0)
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation", 10)
-	add_child(box)
+	add_theme_constant_override("separation", 10)
 
 	var title := Label.new()
 	title.text = "线上农场"
 	title.add_theme_font_size_override("font_size", 24)
 	title.add_theme_color_override("font_color", FOREST)
-	box.add_child(title)
+	add_child(title)
 
 	var hint := Label.new()
 	hint.text = "线上进度由服务器实时保存；操作需要联网。与本地存档完全独立。"
 	hint.add_theme_font_size_override("font_size", 13)
 	hint.add_theme_color_override("font_color", TEXT_MUTED)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(hint)
+	add_child(hint)
 
 	nick_edit = _line_edit("昵称（首次激活时填写，1～16 字符）")
-	box.add_child(nick_edit)
+	add_child(nick_edit)
 	invite_edit = _line_edit("邀请码（FARM-XXXX-XXXX，找开发者领取）")
-	box.add_child(invite_edit)
+	add_child(invite_edit)
 
 	activate_button = _button("激活并创建线上农场")
 	activate_button.pressed.connect(_on_activate)
-	box.add_child(activate_button)
+	add_child(activate_button)
 
 	login_button = _button("进入我的线上农场")
 	login_button.pressed.connect(_on_login)
-	box.add_child(login_button)
+	add_child(login_button)
 
 	revoke_button = _button("清除本机登录凭据")
 	revoke_button.pressed.connect(_on_revoke)
-	box.add_child(revoke_button)
+	add_child(revoke_button)
 
 	address_edit = _line_edit("服务器地址")
 	address_edit.text = SettingsStore.get_online_server_url()
 	address_edit.text_changed.connect(_on_address_changed)
-	box.add_child(address_edit)
+	add_child(address_edit)
 
 	status_label = Label.new()
 	status_label.add_theme_font_size_override("font_size", 14)
 	status_label.add_theme_color_override("font_color", TEXT_MUTED)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	box.add_child(status_label)
+	add_child(status_label)
 
 	_refresh_session()
 
@@ -193,6 +192,7 @@ func _line_edit(placeholder: String) -> LineEdit:
 	var edit := LineEdit.new()
 	edit.placeholder_text = placeholder
 	edit.add_theme_font_size_override("font_size", 15)
+	edit.custom_minimum_size = Vector2(0, 34)
 	return edit
 
 

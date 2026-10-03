@@ -185,6 +185,20 @@ func _body() -> void:
 	var fail_text: String = panel._fail_text(OnlineProtocol.ERR_INVITE_USED, {})
 	_check(fail_text.find("已被使用") >= 0, "邀请码复用错误文案正确")
 	_check(panel._server_url().begins_with("wss://"), "服务器地址回退默认值")
+	# 布局回归（实测事故：面板曾用普通 Control 导致子控件溢出卡片互相重叠）
+	await _sleep_frames(3)
+	var panel_widgets: Array = []
+	for child in panel.find_children("*", "Control", true, false):
+		if child.is_visible_in_tree() and (child is Label or child is LineEdit or child is Button):
+			panel_widgets.append(child)
+			_check(panel.get_global_rect().encloses(child.get_global_rect()), "面板包住子控件（%s）" % child.name)
+	var panel_overlap := false
+	for i in range(panel_widgets.size()):
+		for j in range(i + 1, panel_widgets.size()):
+			if (panel_widgets[i] as Control).get_global_rect().intersects((panel_widgets[j] as Control).get_global_rect()):
+				panel_overlap = true
+				print("D43-OVERLAP ", (panel_widgets[i] as Control).name, "×", (panel_widgets[j] as Control).name)
+	_check(not panel_overlap and panel_widgets.size() >= 5, "登录面板布局无重叠（%d 控件，VBox 生效）" % panel_widgets.size())
 	panel.queue_free()
 
 	# 会话清理与恢复（不污染本机凭据）
