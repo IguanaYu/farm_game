@@ -29,6 +29,8 @@ func _initialize() -> void:
 			_step_play()
 		"resume":
 			_step_resume()
+		"m2":
+			_step_m2()
 		_:
 			_check(false, "未知 step: %s" % step)
 	_finish()
@@ -158,6 +160,47 @@ func _step_resume() -> void:
 	if early != null:
 		_check(str(early.get("code", "")) == OnlineProtocol.ERR_OP_FAILED, "未成熟收获被拒（规则一致）")
 	_result({"step": "resume", "farm_seq": int(welcome["farm_seq"]), "latencies_ms": latencies})
+	peer.close()
+
+
+## M2 公网冒烟：已有 token 的账户上验装备/商店命令组在真实服务器可达。
+func _step_m2() -> void:
+	if token == "":
+		_check(false, "m2 需要 --token")
+		return
+	var peer := _connect(true)
+	if peer == null:
+		_check(false, "公网连接失败")
+		return
+	var welcome := _request(peer, {
+		"t": "hello", "token": token,
+		"proto": OnlineProtocol.PROTO_VERSION, "rules": OnlineProtocol.RULES_VERSION,
+		"build": OnlineProtocol.CLIENT_BUILD,
+	}, "welcome")
+	if welcome == null:
+		return
+	_check(true, "M2 冒烟登录")
+	_check(welcome.get("features", []).has(OnlineProtocol.FEATURE_FARM_SHOP), "特性含 farm_shop（M2 已上生产）")
+	_check(welcome.get("features", []).has(OnlineProtocol.FEATURE_FARM_INVENTORY), "特性含 farm_inventory")
+	var kit := _request(peer, {"t": "req", "req_id": "m2-kit-1", "op": "inv.grant_basic_kit", "args": {}}, "req_ok")
+	if kit == null:
+		return
+	var warehouse: Array = kit["snapshot"]["farm"]["expedition"]["inventory"]["warehouse"]
+	_check(not warehouse.is_empty(), "grant_basic_kit 公网生效（仓库 %d 件）" % warehouse.size())
+	var first_id := int(warehouse[0]["instance_id"])
+	var moved := _request(peer, {"t": "req", "req_id": "m2-move-1", "op": "inv.move_to_loadout", "args": {"instance_id": first_id, "container": "chest"}}, "req_ok")
+	if moved == null:
+		return
+	_check(bool(moved["result"].get("ok", false)), "move_to_loadout 公网生效")
+	var cleared := _request(peer, {"t": "req", "req_id": "m2-clear-1", "op": "inv.clear_loadout", "args": {}}, "req_ok")
+	if cleared == null:
+		return
+	_check(bool(cleared["result"].get("ok", false)), "clear_loadout 公网生效")
+	OS.delay_msec(80)
+	var poor := _request(peer, {"t": "req", "req_id": "m2-buy-neg", "op": "farm.buy_seeds", "args": {"kind": "cabbage", "quantity": 99}}, "req_err")
+	if poor != null:
+		_check(str(poor.get("code", "")) == OnlineProtocol.ERR_OP_FAILED, "金币不足购买 → op_failed（规则在服务器裁定）")
+	_result({"step": "m2", "latencies_ms": latencies})
 	peer.close()
 
 

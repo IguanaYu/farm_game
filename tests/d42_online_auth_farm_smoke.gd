@@ -204,11 +204,11 @@ func _run() -> void:
 		_check(b_own["snapshot"]["farm"]["crop_batches"].size() == 1, "乙收获入自己的批次（账户隔离再证）")
 		b2.close()
 
-	# —— N05 限速：新鲜连接连发 40 ping ——
+	# —— N05 限速：新鲜连接连发 100 ping（阈值 90/3s，须超窗触发且恢复后可通信） ——
 	var r := _client()
 	if r.connect_to(PORT):
 		var saw_limited := false
-		for i in range(40):
+		for i in range(100):
 			r.send_json({"t": "ping"})
 		var deadline := Time.get_ticks_msec() + 3000
 		while Time.get_ticks_msec() < deadline:

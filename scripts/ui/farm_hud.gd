@@ -98,6 +98,9 @@ var status_label: Label
 ## M1 线上模式（计划 §5.6）：状态角标 + 未联网化入口的门控。
 var online_mode := false
 var online_badge: Label = null
+## M2：线上命令发送口，farm_world 在线模式注入 Callable(online, "request")；
+## 空 Callable = 单机。制作/装备仓库/战备三个面板经它发命令而不直改本地档。
+var online_request: Callable = Callable()
 var modal_overlay: Control
 var modal_panel: PanelContainer
 var modal_title: Label
@@ -1559,12 +1562,14 @@ func _build_expedition_panels() -> void:
 func open_crafting() -> void:
 	## 2.5：制作台（2.1 占位转正）。
 	_close_modal()
+	crafting_panel.online_request = online_request
 	crafting_panel.open(game)
 
 
 func open_equipment_warehouse() -> void:
 	## 2.5：装备／材料仓库（与作物/种子仓库分开）。
 	_close_modal()
+	equipment_warehouse_panel.online_request = online_request
 	equipment_warehouse_panel.open(game)
 
 
@@ -1716,11 +1721,9 @@ func open_expedition_hub() -> void:
 
 
 func open_loadout() -> void:
-	## M2 开放装备/战备的线上命令前，先维持只读不可入（与洞窟同批解禁）。
-	if _online_blocked("战备与装备仓库将在联机版后续更新开放。"):
-		return
 	_close_modal()
 	expedition_hub_panel.close()
+	loadout_panel.online_request = online_request
 	loadout_panel.open(game)
 
 

@@ -535,6 +535,7 @@ func _online_bootstrap() -> void:
 	_build_farm()
 	_build_hud()
 	hud.set_online_mode(true)
+	hud.online_request = Callable(online, "request")
 	_refresh_all()
 	_start_clock()
 	AudioKit.play_music(self)
@@ -571,6 +572,18 @@ func _start_clock() -> void:
 	clock.timeout.connect(_on_clock_tick)
 	add_child(clock)
 	clock.start()
+
+
+## M2：线上命令提交助手。返回 {done, result}：done=false=未送出/规则失败（提示已给）；
+## result=服务器转发的规则返回值（String 型命令是消息串，""=成功）。
+func _online_cmd(op: String, args: Dictionary) -> Dictionary:
+	var reply: Dictionary = await online.request(op, args)
+	if reply.is_empty() or reply.get("t", "") == "req_err":
+		if not reply.is_empty():
+			AudioKit.play(self, "warn")
+			hud.show_status(str(reply.get("msg", "操作失败")))
+		return {"done": false}
+	return {"done": true, "result": reply.get("result", null)}
 
 
 ## M1 未联网化的入口统一拦截：提示后直接返回，绝不落入本地路径（F09 禁止混合两套存档归属）。
@@ -740,12 +753,19 @@ func _finish_fertilize(plot_id: int, result: Dictionary) -> void:
 
 
 func _on_buy_seed_requested(kind: String, quantity: int) -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.buy_seeds", {"kind": kind, "quantity": quantity})
+		if not r["done"]:
+			return
+		_finish_buy_seed(kind, quantity, str(r["result"]))
 		return
-	var result := game.buy_seeds(quantity, kind)
-	if result != "":
+	_finish_buy_seed(kind, quantity, game.buy_seeds(quantity, kind))
+
+
+func _finish_buy_seed(kind: String, quantity: int, message: String) -> void:
+	if message != "":
 		AudioKit.play(self, "warn")
-		hud.show_status(result)
+		hud.show_status(message)
 		return
 	AudioKit.play(self, "buy")
 	if not _save():
@@ -756,12 +776,19 @@ func _on_buy_seed_requested(kind: String, quantity: int) -> void:
 
 
 func _on_buy_fertilizer_requested(kind: String, quantity: int) -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.buy_fertilizer", {"kind": kind, "quantity": quantity})
+		if not r["done"]:
+			return
+		_finish_buy_fertilizer(kind, quantity, str(r["result"]))
 		return
-	var result := game.buy_fertilizer(kind, quantity)
-	if result != "":
+	_finish_buy_fertilizer(kind, quantity, game.buy_fertilizer(kind, quantity))
+
+
+func _finish_buy_fertilizer(kind: String, quantity: int, message: String) -> void:
+	if message != "":
 		AudioKit.play(self, "warn")
-		hud.show_status(result)
+		hud.show_status(message)
 		return
 	AudioKit.play(self, "buy")
 	if not _save():
@@ -773,12 +800,19 @@ func _on_buy_fertilizer_requested(kind: String, quantity: int) -> void:
 
 
 func _on_upgrade_shop_requested() -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.upgrade_shop", {})
+		if not r["done"]:
+			return
+		_finish_upgrade_shop(str(r["result"]))
 		return
-	var result := game.upgrade_shop()
-	if result != "":
+	_finish_upgrade_shop(game.upgrade_shop())
+
+
+func _finish_upgrade_shop(message: String) -> void:
+	if message != "":
 		AudioKit.play(self, "warn")
-		hud.show_status(result)
+		hud.show_status(message)
 		return
 	AudioKit.play(self, "buy")
 	if not _save():
@@ -817,9 +851,16 @@ func _finish_harvest_all(summary: Dictionary) -> void:
 
 
 func _on_sell_batch_requested(batch_id: int) -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.sell_batch", {"batch_id": batch_id})
+		if not r["done"]:
+			return
+		_finish_sell_batch(r["result"])
 		return
-	var result := game.sell_batch(batch_id)
+	_finish_sell_batch(game.sell_batch(batch_id))
+
+
+func _finish_sell_batch(result: Dictionary) -> void:
 	if not result["ok"]:
 		AudioKit.play(self, "warn")
 		hud.show_status(result["message"])
@@ -833,14 +874,21 @@ func _on_sell_batch_requested(batch_id: int) -> void:
 
 
 func _on_sell_all_requested() -> void:
-	if _online_refused():
-		return
 	if game.state["crop_batches"].is_empty():
 		AudioKit.play(self, "warn")
 		hud.show_status("仓库里没有可出售的作物。")
 		return
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.sell_all_batches", {})
+		if not r["done"]:
+			return
+		_finish_sell_all(int(r["result"]))
+		return
+	_finish_sell_all(game.sell_all_batches())
+
+
+func _finish_sell_all(earned: int) -> void:
 	AudioKit.play(self, "coins")
-	var earned := game.sell_all_batches()
 	_advance_tutorial(3)
 	if not _save():
 		hud.show_status("存档写入失败，本次出售可能没有保存！")
@@ -849,9 +897,16 @@ func _on_sell_all_requested() -> void:
 
 
 func _on_recycle_seed_requested(seed_id: int) -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.recycle_seed", {"seed_id": seed_id})
+		if not r["done"]:
+			return
+		_finish_recycle_seed(r["result"])
 		return
-	var result := game.recycle_seed(seed_id)
+	_finish_recycle_seed(game.recycle_seed(seed_id))
+
+
+func _finish_recycle_seed(result: Dictionary) -> void:
 	if result["ok"]:
 		AudioKit.play(self, "coins")
 	hud.show_status("回收 1 粒种子，获得 %d 金币。" % result["coins"] if result["ok"] else result["message"])
@@ -861,9 +916,16 @@ func _on_recycle_seed_requested(seed_id: int) -> void:
 
 
 func _on_recycle_pending_seed_requested(seed_id: int) -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.recycle_pending_seed", {"seed_id": seed_id})
+		if not r["done"]:
+			return
+		_finish_recycle_pending_seed(r["result"])
 		return
-	var result := game.recycle_pending_seed(seed_id)
+	_finish_recycle_pending_seed(game.recycle_pending_seed(seed_id))
+
+
+func _finish_recycle_pending_seed(result: Dictionary) -> void:
 	hud.show_status("回收 1 粒待领取种子，获得 %d 金币。" % result["coins"] if result["ok"] else result["message"])
 	if result["ok"] and not _save():
 		hud.show_status("存档写入失败，本次回收可能没有保存！")
@@ -871,9 +933,16 @@ func _on_recycle_pending_seed_requested(seed_id: int) -> void:
 
 
 func _on_sell_pending_crop_requested(batch_id: int) -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.sell_pending_crop", {"batch_id": batch_id})
+		if not r["done"]:
+			return
+		_finish_sell_pending_crop(r["result"])
 		return
-	var result := game.sell_pending_crop(batch_id)
+	_finish_sell_pending_crop(game.sell_pending_crop(batch_id))
+
+
+func _finish_sell_pending_crop(result: Dictionary) -> void:
 	hud.show_status("出售一批待领取作物，获得 %d 金币。" % result["coins"] if result["ok"] else result["message"])
 	if result["ok"] and not _save():
 		hud.show_status("存档写入失败，本次出售可能没有保存！")
@@ -881,9 +950,16 @@ func _on_sell_pending_crop_requested(batch_id: int) -> void:
 
 
 func _on_claim_pending_requested() -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.claim_pending", {})
+		if not r["done"]:
+			return
+		_finish_claim_pending(r["result"])
 		return
-	var moved := game.claim_pending()
+	_finish_claim_pending(game.claim_pending())
+
+
+func _finish_claim_pending(moved: Dictionary) -> void:
 	if moved["crops"] == 0 and moved["seeds"] == 0:
 		AudioKit.play(self, "warn")
 		hud.show_status("仓库空间仍然不足，先出售或回收一些存货。")
@@ -897,11 +973,18 @@ func _on_claim_pending_requested() -> void:
 
 
 func _on_upgrade_warehouse_requested() -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.upgrade_warehouse", {})
+		if not r["done"]:
+			return
+		_finish_upgrade_warehouse(str(r["result"]))
 		return
-	var result := game.upgrade_warehouse()
-	if result != "":
-		hud.show_status(result)
+	_finish_upgrade_warehouse(game.upgrade_warehouse())
+
+
+func _finish_upgrade_warehouse(message: String) -> void:
+	if message != "":
+		hud.show_status(message)
 		_refresh_all()
 		return
 	if not _save():
@@ -911,11 +994,18 @@ func _on_upgrade_warehouse_requested() -> void:
 
 
 func _on_buy_breeder_requested() -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.buy_breeder", {})
+		if not r["done"]:
+			return
+		_finish_buy_breeder(str(r["result"]))
 		return
-	var result := game.buy_breeder(_now())
-	if result != "":
-		hud.show_status(result)
+	_finish_buy_breeder(game.buy_breeder(_now()))
+
+
+func _finish_buy_breeder(message: String) -> void:
+	if message != "":
+		hud.show_status(message)
 		_refresh_all()
 		return
 	if not _save():
@@ -925,11 +1015,18 @@ func _on_buy_breeder_requested() -> void:
 
 
 func _on_upgrade_breeder_requested() -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.upgrade_breeder", {})
+		if not r["done"]:
+			return
+		_finish_upgrade_breeder(str(r["result"]))
 		return
-	var result := game.upgrade_breeder()
-	if result != "":
-		hud.show_status(result)
+	_finish_upgrade_breeder(game.upgrade_breeder())
+
+
+func _finish_upgrade_breeder(message: String) -> void:
+	if message != "":
+		hud.show_status(message)
 		_refresh_all()
 		return
 	if not _save():
@@ -939,9 +1036,16 @@ func _on_upgrade_breeder_requested() -> void:
 
 
 func _on_set_template_requested(seed_id: int) -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.set_breeder_template", {"seed_id": seed_id})
+		if not r["done"]:
+			return
+		_finish_set_template(r["result"])
 		return
-	var result := game.set_breeder_template(seed_id, _now())
+	_finish_set_template(game.set_breeder_template(seed_id, _now()))
+
+
+func _finish_set_template(result: Dictionary) -> void:
 	if not result["ok"]:
 		hud.show_status(result["message"])
 		_refresh_all()
@@ -953,20 +1057,34 @@ func _on_set_template_requested(seed_id: int) -> void:
 
 
 func _on_clear_template_requested() -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.clear_breeder_template", {})
+		if not r["done"]:
+			return
+		_finish_clear_template(str(r["result"]))
 		return
-	var result := game.clear_breeder_template(_now())
-	if result != "":
-		hud.show_status(result)
+	_finish_clear_template(game.clear_breeder_template(_now()))
+
+
+func _finish_clear_template(message: String) -> void:
+	if message != "":
+		hud.show_status(message)
 	_refresh_all()
 	if not _save():
 		hud.show_status("存档写入失败，模板解除可能没有保存！")
 
 
 func _on_collect_breeder_requested() -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.collect_breeder", {})
+		if not r["done"]:
+			return
+		_finish_collect_breeder(r["result"])
 		return
-	var result := game.collect_breeder(_now())
+	_finish_collect_breeder(game.collect_breeder(_now()))
+
+
+func _finish_collect_breeder(result: Dictionary) -> void:
 	if not result["ok"]:
 		hud.show_status(result["message"])
 		_refresh_all()
@@ -978,11 +1096,18 @@ func _on_collect_breeder_requested() -> void:
 
 
 func _on_buy_plot_requested() -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.buy_plot", {})
+		if not r["done"]:
+			return
+		_finish_buy_plot(str(r["result"]))
 		return
-	var result := game.buy_plot()
-	if result != "":
-		hud.show_status(result)
+	_finish_buy_plot(game.buy_plot())
+
+
+func _finish_buy_plot(message: String) -> void:
+	if message != "":
+		hud.show_status(message)
 		_refresh_all()
 		return
 	if not _save():
@@ -992,11 +1117,18 @@ func _on_buy_plot_requested() -> void:
 
 
 func _on_buy_can2_requested() -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.buy_can2", {})
+		if not r["done"]:
+			return
+		_finish_buy_can2(str(r["result"]))
 		return
-	var result := game.buy_can2()
-	if result != "":
-		hud.show_status(result)
+	_finish_buy_can2(game.buy_can2())
+
+
+func _finish_buy_can2(message: String) -> void:
+	if message != "":
+		hud.show_status(message)
 		_refresh_all()
 		return
 	if not _save():
@@ -1006,49 +1138,84 @@ func _on_buy_can2_requested() -> void:
 
 
 func _on_lock_guest_requested(guest_id: int) -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.lock_guest", {"guest_id": guest_id})
+		if not r["done"]:
+			return
+		_finish_lock_guest(str(r["result"]))
 		return
-	var result := game.request_lock_guest(guest_id)
-	hud.show_status(result if result != "" else "锁定请求已记录，明天零点生效。")
-	if result == "" and not _save():
+	_finish_lock_guest(game.request_lock_guest(guest_id))
+
+
+func _finish_lock_guest(message: String) -> void:
+	hud.show_status(message if message != "" else "锁定请求已记录，明天零点生效。")
+	if message == "" and not _save():
 		hud.show_status("存档写入失败，锁定可能没有保存！")
 	_refresh_all()
 
 
 func _on_unlock_guest_requested() -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.lock_guest", {"guest_id": 0})
+		if not r["done"]:
+			return
+		_finish_unlock_guest(str(r["result"]))
 		return
-	var result := game.request_lock_guest(0)
-	hud.show_status(result if result != "" else "解锁请求已记录，明天零点生效。")
-	if result == "" and not _save():
+	_finish_unlock_guest(game.request_lock_guest(0))
+
+
+func _finish_unlock_guest(message: String) -> void:
+	hud.show_status(message if message != "" else "解锁请求已记录，明天零点生效。")
+	if message == "" and not _save():
 		hud.show_status("存档写入失败，解锁可能没有保存！")
 	_refresh_all()
 
 
 func _on_lock_formula_requested(kind: String) -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.lock_formula", {"kind": kind})
+		if not r["done"]:
+			return
+		_finish_lock_formula(str(r["result"]))
 		return
-	var result := game.request_lock_formula(kind)
-	hud.show_status(result if result != "" else "公式锁定已记录，明天零点生效（系数仍每日重抽）。")
-	if result == "" and not _save():
+	_finish_lock_formula(game.request_lock_formula(kind))
+
+
+func _finish_lock_formula(message: String) -> void:
+	hud.show_status(message if message != "" else "公式锁定已记录，明天零点生效（系数仍每日重抽）。")
+	if message == "" and not _save():
 		hud.show_status("存档写入失败，公式锁定可能没有保存！")
 	_refresh_all()
 
 
 func _on_unlock_formula_requested() -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.unlock_formula", {})
+		if not r["done"]:
+			return
+		_finish_unlock_formula(str(r["result"]))
 		return
-	var result := game.request_unlock_formula()
-	hud.show_status(result if result != "" else "公式解锁已记录，明天零点生效。")
-	if result == "" and not _save():
+	_finish_unlock_formula(game.request_unlock_formula())
+
+
+func _finish_unlock_formula(message: String) -> void:
+	hud.show_status(message if message != "" else "公式解锁已记录，明天零点生效。")
+	if message == "" and not _save():
 		hud.show_status("存档写入失败，公式解锁可能没有保存！")
 	_refresh_all()
 
 
 func _on_sell_batch_to_requested(batch_id: int, count: int, guest_id: int) -> void:
-	if _online_refused():
+	if online != null:
+		var r: Dictionary = await _online_cmd("farm.sell_batch_to", {"batch_id": batch_id, "count": count, "guest_id": guest_id})
+		if not r["done"]:
+			return
+		_finish_sell_batch_to(guest_id, r["result"])
 		return
-	var result := game.sell_batch_to(batch_id, count, guest_id, _now())
+	_finish_sell_batch_to(guest_id, game.sell_batch_to(batch_id, count, guest_id, _now()))
+
+
+func _finish_sell_batch_to(guest_id: int, result: Dictionary) -> void:
 	if not result["ok"]:
 		hud.show_status(result["message"])
 		_refresh_all()

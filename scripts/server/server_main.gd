@@ -17,7 +17,15 @@ var tag := "m1"
 var port := 31971
 var bind := "127.0.0.1"
 var db_path := ""
-var features: Array = [OnlineProtocol.FEATURE_FARM_BASIC]
+## 默认开放全部已实现命令组（M1 基础 + M2 全量）；需要灰度时用 --features 显式收紧。
+var features: Array = [
+	OnlineProtocol.FEATURE_FARM_BASIC,
+	OnlineProtocol.FEATURE_FARM_SHOP,
+	OnlineProtocol.FEATURE_FARM_BREEDING,
+	OnlineProtocol.FEATURE_FARM_MARKET,
+	OnlineProtocol.FEATURE_FARM_CRAFT,
+	OnlineProtocol.FEATURE_FARM_INVENTORY,
+]
 var dev_mode := false
 
 var store: ServerDB

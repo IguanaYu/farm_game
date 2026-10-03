@@ -54,8 +54,10 @@ const ERR_BUSY := "busy"
 ## 单包上限（N05：超大包直接断开）。
 const MAX_PACKET_BYTES := 65536
 ## 限速窗口：窗口内超过该条数回 rate_limited（不踢）。
+## 阈值依据：客户端桥接按"一命令一往返"串行，正常节奏 ≈ 每命令 35～60ms（实测 d44 均值 36ms），
+## 连续点击/批量 UI 的合法突发可达 ~28 条/秒；旧值 30/3s 会误伤该突发（d44 实测丢包）。
 const RATE_WINDOW_SECONDS := 3.0
-const RATE_WINDOW_MESSAGES := 30
+const RATE_WINDOW_MESSAGES := 90
 ## 畸形包容忍度：3 次断开。
 const MAX_MALFORMED := 3
 ## 昵称约束。
