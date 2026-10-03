@@ -1,7 +1,6 @@
 class_name ExpeditionHubPanel
 extends Control
-## 洞窟入口概览面板（2.1 设计 D2.1-01）。2.1 只实现"无活动局／功能未开放"两态，
-## 概览状态表的其余状态随 2.4／2.6 接入。
+## 探险营地：层级介绍、牌组与出发检查、整备和继续探险入口。
 
 signal close_requested
 signal open_loadout_requested
@@ -10,12 +9,7 @@ signal open_room_requested
 signal depart_requested
 signal resume_requested
 
-const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
-const TEXT_DARK := Color("#35513d")
-const TEXT_MUTED := Color("#3f4a42")
-const ACCENT_GOLD := Color("#9b713a")
-const CAVE_DARK := Color("#33424e")
 
 var game: FarmGame
 var inventory: InventoryGame
@@ -24,18 +18,14 @@ var intro_panel: PanelContainer
 var status_label: Label
 var depart_button: Button
 var overview_labels: Array = []
+var deck_label: Label
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
-	var theme_root := Theme.new()
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
-	theme_root.default_font = font
-	theme_root.default_font_size = 20
-	theme = theme_root
+	theme = ExpeditionUI.make_theme()
 	_build()
 
 
@@ -47,7 +37,12 @@ func open(target_game: FarmGame) -> void:
 	status_label.text = ""
 	_refresh_overview()
 	var has_run := str(game.state["expedition"].get("active_run_ref", "")) != ""
-	depart_button.text = "继续探险" if has_run else "出发（单人）"
+	depart_button.text = "继续探险   →" if has_run else "出发（单人）   →"
+	var check := inventory.loadout_check()
+	depart_button.disabled = not has_run and not check["hard_blocks"].is_empty()
+	depart_button.tooltip_text = "、".join(check["hard_blocks"]) if depart_button.disabled else "从苔石浅洞开始探险"
+	var deck := DeckBuilder.build(inventory)
+	deck_label.text = "牌组 %d 张   /   首回合可用 %d 张   /   初始生命 %d" % [deck["entries"].size(), int(deck["totals"][1]), ExpeditionBaseline.MAX_HP]
 	visible = true
 
 
@@ -63,6 +58,8 @@ func _refresh_overview() -> void:
 		check_line = "出发检查：未通过（%s）" % "、".join(check["hard_blocks"])
 	elif not check["advises"].is_empty():
 		check_line = "出发检查：通过 ｜ 建议：%s" % "、".join(check["advises"])
+	if has_run:
+		check_line = "探险进行中：继续当前路线，或在探险菜单中返回农场。"
 	overview_labels[0].text = carry_line
 	overview_labels[1].text = check_line
 
@@ -79,91 +76,94 @@ func close() -> void:
 
 
 func _build() -> void:
-	var shade := ColorRect.new()
-	shade.color = Color(0.11, 0.20, 0.14, 0.51)
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(shade)
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
-	var panel := _panel(Color("#fff9ed"), Color("#d5c9aa"), 20)
-	panel.custom_minimum_size = Vector2(560, 0)
-	center.add_child(panel)
+	ExpeditionUI.backdrop(self)
+	var frame := ExpeditionUI.frame(self, 36)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	frame.add_child(scroll)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 12)
-	panel.add_child(column)
+	column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	column.add_theme_constant_override("separation", 18)
+	scroll.add_child(column)
+	var top := HBoxContainer.new()
+	column.add_child(top)
+	var overline := _label("THE CAVERN   /   探险营地", 14, ExpeditionUI.GOLD)
+	overline.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(overline)
+	var close_button := ExpeditionUI.button("返回农场   ×")
+	close_button.pressed.connect(func() -> void: close_requested.emit())
+	top.add_child(close_button)
+	column.add_child(_label("矿洞深处，藏着下一次收获。", 34, CREAM))
+	column.add_child(_label("整备你的牌组，选择一条路，带着战利品回家。", 17, ExpeditionUI.MUTED))
 
-	var title_row := HBoxContainer.new()
-	column.add_child(title_row)
-	var title := _label("洞窟入口", 26, FOREST)
-	title_row.add_child(title)
-	var subtitle := _label("农场边缘的黑洞洞的入口，风里有矿石的味道。", 15, TEXT_MUTED)
-	title_row.add_child(subtitle)
-	subtitle.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	var chapters := HBoxContainer.new()
+	chapters.add_theme_constant_override("separation", 16)
+	column.add_child(chapters)
+	var layer_number := 0
+	for layer_id in ExpeditionDefs.LAYER_ORDER:
+		layer_number += 1
+		var chapter := ExpeditionUI.panel(Color("#1b3038dd"), ExpeditionUI.LINE, 18)
+		chapter.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		chapters.add_child(chapter)
+		var details := VBoxContainer.new()
+		details.add_theme_constant_override("separation", 8)
+		chapter.add_child(details)
+		details.add_child(_label("DEPTH  0%d" % layer_number, 12, ExpeditionUI.GOLD))
+		var art := ExpeditionArt.new()
+		art.subject = ["start", "ore_golem", "crystal"][layer_number - 1]
+		art.tint = [ExpeditionUI.TEAL, Color("#a9b7a5"), Color("#b4a6d2")][layer_number - 1]
+		art.custom_minimum_size.y = 105
+		details.add_child(art)
+		var title := _label(str(ExpeditionDefs.layer(layer_id)["name"]).replace("（第三层）", ""), 21, CREAM)
+		details.add_child(title)
+		var note := _label(["苔石与铜屑 · 从这里出发", "铁矿与根须 · 通关浅层后深入", "辉晶与古物 · 通关铁根后深入"][layer_number - 1], 13, ExpeditionUI.MUTED)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		details.add_child(note)
 
-	var info := _panel(Color("#f2ecd9"), Color("#e2e4d4"), 12)
-	column.add_child(info)
-	var info_column := VBoxContainer.new()
-	info_column.add_theme_constant_override("separation", 6)
-	info.add_child(info_column)
+	var overview := ExpeditionUI.panel(Color("#162931ee"), ExpeditionUI.LINE, 18)
+	column.add_child(overview)
+	var details := VBoxContainer.new()
+	details.add_theme_constant_override("separation", 10)
+	overview.add_child(details)
+	details.add_child(_label("出发准备", 21, CREAM))
+	deck_label = _label("", 16, ExpeditionUI.GOLD)
+	details.add_child(deck_label)
 	overview_labels = []
-	for line in ["", ""]:
-		var overview := _label(line, 17, TEXT_DARK)
-		info_column.add_child(overview)
-		overview_labels.append(overview)
-
-	intro_panel = _panel(Color("#33492ef2"), Color("#7fa876"), 14)
-	column.add_child(intro_panel)
-	intro_label = _label("建议先配好装备：到战备箱领取基础装备，再考虑出发。", 16, Color("#e8f5df"))
+	for i in range(2):
+		var line := _label("", 14, ExpeditionUI.MUTED)
+		line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		details.add_child(line)
+		overview_labels.append(line)
+	intro_panel = ExpeditionUI.panel(Color("#2b4144"), ExpeditionUI.TEAL, 10)
+	intro_label = _label("首次探险：打开战备配置，领取基础装备并放入胸挂。", 14, ExpeditionUI.TEXT)
+	intro_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	intro_panel.add_child(intro_label)
-
+	details.add_child(intro_panel)
 	var buttons := HBoxContainer.new()
-	buttons.add_theme_constant_override("separation", 10)
-	column.add_child(buttons)
-	var loadout_button := _button("战备配置", Color("#eaf4df"), Color("#87b06f"))
-	loadout_button.pressed.connect(func() -> void:
-		open_loadout_requested.emit()
-	)
-	buttons.add_child(loadout_button)
-	depart_button = _button("出发（单人）", Color("#eaf4df"), Color("#87b06f"))
+	buttons.add_theme_constant_override("separation", 12)
+	details.add_child(buttons)
+	var loadout := ExpeditionUI.button("战备配置")
+	loadout.pressed.connect(func() -> void: open_loadout_requested.emit())
+	buttons.add_child(loadout)
+	var warehouse := ExpeditionUI.button("装备仓库")
+	warehouse.pressed.connect(func() -> void: open_equipment_warehouse_requested.emit())
+	buttons.add_child(warehouse)
+	var team := ExpeditionUI.button("好友组队")
+	team.pressed.connect(func() -> void: open_room_requested.emit())
+	buttons.add_child(team)
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	buttons.add_child(spacer)
+	depart_button = ExpeditionUI.button("出发（单人）   →", true)
 	depart_button.pressed.connect(_on_depart_clicked)
 	buttons.add_child(depart_button)
-	var team_button := _button("好友组队", Color("#eaf4df"), Color("#87b06f"))
-	team_button.tooltip_text = "双人合作（局域网／本机直连）。"
-	team_button.pressed.connect(func() -> void: open_room_requested.emit())
-	buttons.add_child(team_button)
-	var warehouse_button := _button("装备仓库", Color("#fff5df"), Color("#d5b87d"))
-	warehouse_button.pressed.connect(func() -> void: open_equipment_warehouse_requested.emit())
-	buttons.add_child(warehouse_button)
-
-	var legend := _label("操作说明：战备配置里领取基础装备、放入容器后出发；装备仓库整理与出售战利品；制作台与装备仓库在农场内打开。探险时携带物品会被本局占用。", 14, TEXT_MUTED)
+	status_label = _label("", 14, ExpeditionUI.RED)
+	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	column.add_child(status_label)
+	var legend := _label("胸挂第 1 回合入牌 · 背包第 2 回合入牌 · 保险箱第 3 回合入牌，失败仍保留。\n在休整站或出口撤离；继续深入前，记得衡量生命与收获。", 13, ExpeditionUI.MUTED)
 	legend.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	legend.custom_minimum_size = Vector2(520, 0)
 	column.add_child(legend)
 
-	status_label = _label("", 14, Color("#a4543f"))
-	column.add_child(status_label)
-
-	var close_button := _button("关闭", Color("#fff5df"), Color("#d5b87d"))
-	close_button.pressed.connect(func() -> void:
-		close_requested.emit()
-	)
-	column.add_child(close_button)
-
-
-func _panel(fill: Color, border: Color, radius: int) -> PanelContainer:
-	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = fill
-	style.border_color = border
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(radius)
-	style.content_margin_left = 18
-	style.content_margin_right = 18
-	style.content_margin_top = 14
-	style.content_margin_bottom = 14
-	panel.add_theme_stylebox_override("panel", style)
-	return panel
 
 
 func _label(content: String, size: int, color: Color) -> Label:
@@ -174,23 +174,8 @@ func _label(content: String, size: int, color: Color) -> Label:
 	return label
 
 
-func _button(content: String, fill: Color, border: Color) -> Button:
-	var button := Button.new()
-	button.text = content
-	button.add_theme_color_override("font_color", Color("#35513d"))
-	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
-	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
-	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
-	button.add_theme_font_size_override("font_size", 17)
-	var style := StyleBoxFlat.new()
-	style.bg_color = fill
-	style.border_color = border
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(12)
-	style.content_margin_left = 14
-	style.content_margin_right = 14
-	button.add_theme_stylebox_override("normal", style)
-	button.add_theme_stylebox_override("hover", style)
-	button.add_theme_stylebox_override("pressed", style)
-	button.add_theme_stylebox_override("disabled", style)
-	return button
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if visible and event is InputEventKey and event.pressed and not event.echo and event.is_action_pressed("pause"):
+		close_requested.emit()
+		get_viewport().set_input_as_handled()
