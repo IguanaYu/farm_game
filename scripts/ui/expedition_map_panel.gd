@@ -30,18 +30,21 @@ var log_label: RichTextLabel
 var overlay_panel: PanelContainer
 var overlay_center: CenterContainer
 var overlay_column: VBoxContainer
+var route_view: ExpeditionRoute
+var selected_route := Vector2i(-1, -1)
+var log_box: VBoxContainer
+var capacity_label: Label
+var layer_title: Label
+var overlay_scroll: ScrollContainer
+var modal_shade: ColorRect
+var settlement_visible := false
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
-	var theme_root := Theme.new()
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
-	theme_root.default_font = font
-	theme_root.default_font_size = 17
-	theme = theme_root
+	theme = ExpeditionUI.make_theme()
 	_build()
 
 
@@ -59,80 +62,96 @@ func close() -> void:
 
 
 func _build() -> void:
-	var shade := ColorRect.new()
-	shade.color = Color(0.08, 0.12, 0.10, 0.92)
-	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(shade)
-	var center := CenterContainer.new()
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(center)
-	var panel := _panel(Color("#20332a"), Color("#6f9b71"), 16)
-	panel.custom_minimum_size = Vector2(1080, 700)
-	center.add_child(panel)
+	ExpeditionUI.backdrop(self)
+	var frame := ExpeditionUI.frame(self, 20)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 8)
-	panel.add_child(column)
-
+	column.add_theme_constant_override("separation", 10)
+	frame.add_child(column)
 	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 16)
 	column.add_child(title_row)
-	var title := _label("洞窟探索", 22, CREAM)
-	# 标题不换行：autowrap 标签在 HBox 里会被压到一字宽，竖排成单字列并把按钮拉高。
-	title.autowrap_mode = TextServer.AUTOWRAP_OFF
-	title_row.add_child(title)
-	var pause_button := _button("☰ 菜单", Color("#fff5df"), Color("#d5b87d"))
-	pause_button.pressed.connect(_open_menu)
-	title_row.add_child(pause_button)
-	header_label = _label("", 15, Color("#e8d9a8"))
+	layer_title = _label("矿洞探索", 27, CREAM)
+	layer_title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title_row.add_child(layer_title)
+	var journal := ExpeditionUI.button("探险记录")
+	journal.pressed.connect(func() -> void: log_box.visible = not log_box.visible)
+	title_row.add_child(journal)
+	var pause := ExpeditionUI.button("☰  菜单")
+	pause.pressed.connect(_open_menu)
+	title_row.add_child(pause)
+	header_label = _label("", 15, ExpeditionUI.GOLD)
 	header_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	header_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_row.add_child(header_label)
-
+	column.add_child(header_label)
 	var body := HBoxContainer.new()
-	body.add_theme_constant_override("separation", 12)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 16)
 	column.add_child(body)
-
-	var left := VBoxContainer.new()
-	left.add_theme_constant_override("separation", 4)
-	left.custom_minimum_size = Vector2(420, 0)
+	var left := ExpeditionUI.panel(Color("#172a33dd"), ExpeditionUI.LINE, 14)
+	left.custom_minimum_size.x = 370
+	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left.size_flags_stretch_ratio = 0.9
 	body.add_child(left)
-	left.add_child(_label("路线（自下向上，不回头）", 14, LIGHT_MUTED))
 	map_column = VBoxContainer.new()
 	map_column.add_theme_constant_override("separation", 6)
-	map_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	left.add_child(map_column)
-
+	map_column.add_child(_label("路线图  /  向上深入", 16, CREAM))
+	route_view = ExpeditionRoute.new()
+	route_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	route_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	route_view.node_selected.connect(_select_route)
+	map_column.add_child(route_view)
+	map_column.add_child(_label("◆ 当前位置   ✓ 已完成   金色连线：下一步", 12, ExpeditionUI.MUTED))
+	var right := ExpeditionUI.panel(Color("#1b2d35ed"), ExpeditionUI.LINE, 18)
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(right)
+	var right_column := VBoxContainer.new()
+	right_column.add_theme_constant_override("separation", 12)
+	right.add_child(right_column)
+	var scroll := ScrollContainer.new()
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	right_column.add_child(scroll)
 	node_column = VBoxContainer.new()
-	node_column.add_theme_constant_override("separation", 6)
-	node_column.custom_minimum_size = Vector2(560, 0)
+	node_column.add_theme_constant_override("separation", 12)
 	node_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_child(node_column)
-
+	scroll.add_child(node_column)
+	capacity_label = _label("", 12, ExpeditionUI.MUTED)
+	capacity_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	right_column.add_child(capacity_label)
+	log_box = VBoxContainer.new()
+	log_box.visible = false
+	column.add_child(log_box)
 	log_label = RichTextLabel.new()
-	log_label.bbcode_enabled = false
 	log_label.scroll_following = true
-	log_label.custom_minimum_size = Vector2(0, 90)
+	log_label.custom_minimum_size.y = 70
 	log_label.add_theme_font_size_override("normal_font_size", 13)
-	log_label.add_theme_color_override("default_color", Color("#cfe2c2"))
-	column.add_child(log_label)
-
-	overlay_panel = _panel(CREAM, Color("#d5c9aa"), 14)
-	overlay_panel.visible = false
-	overlay_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-	# 覆盖层内容由 autowrap 标签和按钮组成，不给最小宽度会被压成一条窄柱（文字一字一行）。
-	overlay_panel.custom_minimum_size = Vector2(500, 0)
+	log_label.add_theme_color_override("default_color", ExpeditionUI.MUTED)
+	log_box.add_child(log_label)
+	modal_shade = ColorRect.new()
+	modal_shade.color = Color(0.02, 0.05, 0.07, 0.62)
+	modal_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	modal_shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	modal_shade.visible = false
+	modal_shade.z_index = 90
+	add_child(modal_shade)
 	overlay_center = CenterContainer.new()
+	overlay_center.z_index = 100
 	overlay_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	# 覆盖层隐藏时它仍常驻全屏顶层：不设 IGNORE 会挡住底下地图全部按钮的鼠标输入。
 	overlay_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	overlay_center.add_child(overlay_panel)
 	add_child(overlay_center)
+	overlay_panel = ExpeditionUI.panel(CREAM, ExpeditionUI.GOLD, 22)
+	overlay_panel.custom_minimum_size.x = 520
+	overlay_panel.visible = false
+	overlay_center.add_child(overlay_panel)
+	overlay_scroll = ScrollContainer.new()
+	overlay_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	overlay_scroll.custom_minimum_size = Vector2(470, 0)
+	overlay_panel.add_child(overlay_scroll)
 	overlay_column = VBoxContainer.new()
-	overlay_column.add_theme_constant_override("separation", 8)
-	overlay_panel.add_child(overlay_column)
-
-
-# —— 刷新 ————————————————————————————————————————————————————————
+	overlay_column.add_theme_constant_override("separation", 10)
+	overlay_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	overlay_scroll.add_child(overlay_column)
+	overlay_column.minimum_size_changed.connect(func() -> void: _fit_overlay.call_deferred())
 
 
 func _refresh() -> void:
@@ -145,19 +164,29 @@ func _refresh() -> void:
 		for instance in run["inventory"]["loadout"][container]:
 			if str(ItemDefs.get_item(str(instance["def_id"])).get("category", "")) == "supply" and int(instance.get("uses_remaining", 1)) > 0:
 				supplies += 1
-	header_label.text = "%s ｜ 第 %d/%d 排 ｜ 生命 %d/%d ｜ 补给 %d ｜ 携带可售 %d 金币 ｜ 保护区 %d 金币%s%s" % [
-		ExpeditionDefs.layer(str(run["layer_id"])).get("name", "?"),
+	layer_title.text = str(ExpeditionDefs.layer(str(run["layer_id"])).get("name", "矿洞探索"))
+	header_label.text = "深度 %02d / %02d   ·   生命 %d/%d   ·   补给 %d   ·   携带价值 %d 金币   ·   保险箱 %d 金币%s%s" % [
 		int(run["current"]["row"]), int(ExpeditionDefs.layer(str(run["layer_id"])).get("rows", 9)) - 1,
-		int(run["player"]["hp"]), int(run["player"]["max_hp"]),
-		supplies, inventory.carry_sell_value(), inventory.protected_value(),
-		_coop_note(run), _vote_note(run)]
+		int(run["player"]["hp"]), int(run["player"]["max_hp"]), supplies,
+		inventory.carry_sell_value(), inventory.protected_value(), _coop_note(run), _vote_note(run)]
+	if selected_route.x != int(run["current"]["row"]) + 1 or str(run["phase"]) != "map":
+		selected_route = Vector2i(-1, -1)
 	_refresh_map()
 	_refresh_node()
+	var capacities: Array[String] = []
+	for container in ["pack", "safe"]:
+		var dimensions := ExpeditionBaseline.size_for(inventory.expedition, container)
+		var used := 0
+		for instance in inventory.loadout_list(container):
+			var item: Dictionary = ItemDefs.get_item(str(instance["def_id"]))
+			used += int(item["size"].x * item["size"].y)
+		var free := ExpeditionBaseline.largest_free_rect(container, inventory.loadout_list(container), inventory.expedition)
+		capacities.append("%s %d/%d 格 · 最大空位 %d×%d" % [ExpeditionBaseline.CONTAINER_DISPLAY[container], used, dimensions.x * dimensions.y, free.x, free.y])
+	capacity_label.text = "\n".join(capacities)
 	var entries: Array = run.get("log", [])
 	log_label.text = "\n".join(entries.slice(maxi(0, entries.size() - 8), entries.size()))
 
 
-## 合作局队友一行提示（单人局返回空）。
 func _coop_note(run: Dictionary) -> String:
 	if not bool(run.get("coop", false)):
 		return ""
@@ -184,46 +213,11 @@ func _vote_note(run: Dictionary) -> String:
 
 
 func _refresh_map() -> void:
-	for child in map_column.get_children():
-		map_column.remove_child(child)
-		child.queue_free()
-	var run: Dictionary = expedition.run
-	var rows: Array = run["map"]["rows"]
-	var current_row := int(run["current"]["row"])
-	for row_index in range(rows.size() - 1, -1, -1):
-		var row_box := HBoxContainer.new()
-		row_box.add_theme_constant_override("separation", 8)
-		map_column.add_child(row_box)
-		var row_label := _label("第 %d 排" % row_index, 13, LIGHT_MUTED)
-		row_label.custom_minimum_size = Vector2(52, 0)
-		row_box.add_child(row_label)
-		for col_index in range(rows[row_index].size()):
-			var node: Dictionary = rows[row_index][col_index]
-			var key := expedition.node_id(row_index, col_index)
-			var resolved: Dictionary = run["resolved"].get(key, {})
-			var button := Button.new()
-			var mark := ""
-			if bool(resolved.get("completed", false)):
-				mark = "✓"
-			if row_index == current_row:
-				mark += "▶"
-			button.text = "%s%s" % [mark, ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node["type"]), "?")]
-			button.tooltip_text = "风险：%s ｜ %s" % [str(node.get("risk", "?")), str(node.get("hint", ""))]
-			button.add_theme_font_size_override("font_size", 14)
-			var fill := Color("#3a4a3c") if row_index != current_row else Color("#5d7a55")
-			if str(node.get("risk", "")) == "high":
-				fill = Color("#6b3f35")
-			if row_index == current_row:
-				fill = Color("#6d8f5d")
-			var style := _style(fill, Color("#9db894"), 8)
-			style.content_margin_left = 8
-			style.content_margin_right = 8
-			button.add_theme_stylebox_override("normal", style)
-			button.add_theme_stylebox_override("hover", style)
-			button.add_theme_stylebox_override("pressed", style)
-			button.disabled = row_index != current_row + 1 or str(run["phase"]) != "map"
-			button.pressed.connect(_on_move.bind(row_index, col_index))
-			row_box.add_child(button)
+	route_view.display(expedition.run)
+
+func _select_route(row: int, col: int) -> void:
+	selected_route = Vector2i(row, col)
+	_refresh_node()
 
 
 func _refresh_node() -> void:
@@ -232,14 +226,19 @@ func _refresh_node() -> void:
 		child.queue_free()
 	var run: Dictionary = expedition.run
 	if str(run["phase"]) == "map":
-		node_column.add_child(_label("选择下一排的节点继续前进。", 15, Color("#cfe2c2")))
+		_refresh_route_preview()
 		return
 	var node := expedition.current_node()
 	if node.is_empty():
 		return
 	var key := expedition.node_id(int(run["current"]["row"]), int(run["current"]["col"]))
 	var resolved: Dictionary = run["resolved"].get(key, {})
-	var title := _label("当前位置：%s（%s）" % [ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node["type"]), "?"), str(node.get("hint", ""))], 17, CREAM)
+	var art := ExpeditionArt.new()
+	art.subject = _node_art(str(node["type"]))
+	art.tint = ExpeditionUI.GOLD
+	art.custom_minimum_size.y = 100
+	node_column.add_child(art)
+	var title := _label("%s  /  %s" % [ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node["type"]), "?"), str(node.get("hint", ""))], 22, CREAM)
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	node_column.add_child(title)
 	match str(node["type"]):
@@ -254,7 +253,13 @@ func _refresh_node() -> void:
 		"rest_exit":
 			_refresh_rest_node(resolved, key)
 		"exit":
-			node_column.add_child(_label("撤离站：可以带着现有收获回家，或继续深入。", 14, Color("#cfe2c2")))
+			node_column.add_child(_label("撤离站：带着收获回家，或继续挑战守门战。", 14, LIGHT_TEXT))
+			var extract := _button("在此撤离（带着收获回家）", Color("#ffd98a"), WARN_GOLD)
+			extract.pressed.connect(_open_extract_confirm)
+			node_column.add_child(extract)
+			var deeper := _button("继续深入", CREAM, GOOD_GREEN)
+			deeper.pressed.connect(_on_leave_node)
+			node_column.add_child(deeper)
 
 
 func _refresh_battle_node(node: Dictionary, resolved: Dictionary, key: String) -> void:
@@ -289,7 +294,7 @@ func _refresh_rewards_area(resolved: Dictionary, key: String, choose_one: bool) 
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 8)
 		var already := choice_locked or mine.has(str(def_id))
-		var suffix := "✓ 已领取" if already else ("已放弃（本节点选择已锁定）" if choice_locked else "")
+		var suffix := "✓ 已领取" if mine.has(str(def_id)) else ("已放弃（选择已锁定）" if choice_locked else "")
 		var info := _label("%s（%d×%d，%d 张牌，%s）%s" % [def["name"], def["size"].x, def["size"].y, def["cards"].size(),
 			"可售 %d 金币" % int(def.get("base_value", 0)) if bool(def.get("sellable", false)) else "不可售", suffix], 14, LIGHT_TEXT)
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -303,7 +308,9 @@ func _refresh_rewards_area(resolved: Dictionary, key: String, choose_one: bool) 
 				var claim_safe := _button("放保险箱", Color("#fff5df"), Color("#d5b87d"))
 				claim_safe.pressed.connect(_on_claim_reward.bind(key, str(def_id), "safe", choose_one))
 				row.add_child(claim_safe)
-		node_column.add_child(row)
+		var reward_card := ExpeditionUI.panel(Color("#233941"), ExpeditionUI.LINE, 12)
+		reward_card.add_child(row)
+		node_column.add_child(reward_card)
 	if not public_items.is_empty():
 		node_column.add_child(_label("公共物资（不占个人选择次数）：", 13, LIGHT_MUTED))
 		for def_id in public_items:
@@ -567,7 +574,14 @@ func _leave_node_now() -> void:
 func _on_leave_node() -> void:
 	var run: Dictionary = expedition.run
 	var resolved: Dictionary = run["resolved"].get(expedition.node_id(int(run["current"]["row"]), int(run["current"]["col"])), {})
-	var pending := int(resolved.get("rewards", []).size()) + int(resolved.get("public", []).size())
+	var mine: Array = resolved.get("claimed", {}).get("p1", [])
+	var node := expedition.current_node()
+	var choice_locked := str(node.get("type", "")) in ["battle", "elite", "gate"] and not mine.is_empty()
+	var pending := int(resolved.get("public", []).size())
+	if not choice_locked:
+		for id in resolved.get("rewards", []):
+			if not mine.has(str(id)):
+				pending += 1
 	if pending > 0 or not run["node_drops"].is_empty():
 		_confirm_overlay("还有 %d 件候选/公共物品未领取，离开后将放弃。确认离开？" % (pending + run["node_drops"].size()), func() -> void:
 			_leave_node_now()
@@ -630,8 +644,8 @@ func _open_extract_confirm() -> void:
 	decision_title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(decision_title)
 	for line in [
-		_label("带入旧装备：%d 件（可售 %d 金币）——返回时按\"释放占用\"处理，不重复发放" % [brought, brought_value], 14, TEXT_DARK),
-		_label("新增战利品：%d 件（可售 %d 金币）——回家入库后自行出售" % [gained, gained_value], 14, TEXT_DARK),
+		_label("带入装备：%d 件（可售 %d 金币），回家后返还仓库。" % [brought, brought_value], 14, TEXT_DARK),
+		_label("新增战利品：%d 件（可售 %d 金币），带回后可出售或制作。" % [gained, gained_value], 14, TEXT_DARK),
 		_label("保护区（保险箱，失败也保留）：%d 金币" % protected_value, 14, GOOD_GREEN),
 		_label("当前生命 %d/%d；下一段风险更高、资源倾向更好。" % [int(run["player"]["hp"]), int(run["player"]["max_hp"])], 13, TEXT_MUTED),
 	]:
@@ -718,7 +732,7 @@ func _open_menu() -> void:
 func _show_settlement(settlement: Dictionary) -> void:
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 6)
-	var kind_text := {"extract": "成功撤离回家", "gate_clear": "击败守门战，第一层通关", "death": "战斗失败……", "abandon": "已放弃本次探险"}
+	var kind_text := {"extract": "成功撤离回家", "gate_clear": "击败最后的守门者，探险完成", "death": "战斗失败……", "abandon": "已放弃本次探险"}
 	column.add_child(_label(kind_text.get(str(settlement["kind"]), str(settlement["kind"])), 20, FOREST))
 	for group in [["returned", "返还带入物品"], ["gained", "新增获得"], ["protected", "保险箱保留"], ["lost", "损失"], ["consumed", "已消耗补给"]]:
 		var entries: Array = settlement.get(group[0], [])
@@ -745,23 +759,30 @@ func _show_settlement(settlement: Dictionary) -> void:
 	)
 	column.add_child(done)
 	_show_overlay(column)
+	settlement_visible = true
 
 
 # —— 覆盖层 ————————————————————————————————————————————————
 
 
 func _show_overlay(content: Control) -> void:
+	settlement_visible = false
 	for child in overlay_column.get_children():
 		overlay_column.remove_child(child)
 		child.queue_free()
 	overlay_column.add_child(content)
 	overlay_panel.visible = true
+	modal_shade.visible = true
+	overlay_scroll.custom_minimum_size.y = minf(520, get_viewport_rect().size.y - 100)
+	_fit_overlay.call_deferred()
 	# 覆盖层弹出时恢复拦截：点在面板外的点击不应穿透到地图按钮。
 	overlay_center.mouse_filter = Control.MOUSE_FILTER_STOP
 
 
 func _close_overlay() -> void:
+	settlement_visible = false
 	overlay_panel.visible = false
+	modal_shade.visible = false
 	overlay_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
@@ -797,28 +818,6 @@ func _flash_overlay(message: String) -> void:
 # —— 小构件 ——————————————————————————————————————————————————————
 
 
-func _panel(fill: Color, border: Color, radius: int) -> PanelContainer:
-	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = fill
-	style.border_color = border
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(radius)
-	style.content_margin_left = 16
-	style.content_margin_right = 16
-	style.content_margin_top = 12
-	style.content_margin_bottom = 12
-	panel.add_theme_stylebox_override("panel", style)
-	return panel
-
-
-func _style(fill: Color, border: Color, radius: int) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = fill
-	style.border_color = border
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(radius)
-	return style
 
 
 func _label(content: String, size: int, color: Color) -> Label:
@@ -830,19 +829,61 @@ func _label(content: String, size: int, color: Color) -> Label:
 	return label
 
 
-func _button(content: String, fill: Color, border: Color) -> Button:
-	var button := Button.new()
-	button.text = content
-	button.add_theme_color_override("font_color", Color("#35513d"))
-	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
-	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
-	button.add_theme_color_override("font_disabled_color", Color("#b8c6b2"))
-	button.add_theme_font_size_override("font_size", 15)
-	var style := _style(fill, border, 12)
-	style.content_margin_left = 10
-	style.content_margin_right = 10
-	button.add_theme_stylebox_override("normal", style)
-	button.add_theme_stylebox_override("hover", style)
-	button.add_theme_stylebox_override("pressed", style)
-	button.add_theme_stylebox_override("disabled", style)
-	return button
+func _button(content: String, fill: Color, _border: Color) -> Button:
+	return ExpeditionUI.button(content, fill == Color("#ffd98a"))
+
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if not visible or not event is InputEventKey or not event.pressed or event.echo:
+		return
+	if event.is_action_pressed("pause"):
+		if overlay_panel.visible:
+			if not settlement_visible:
+				_close_overlay()
+		elif selected_route.x >= 0:
+			selected_route = Vector2i(-1, -1)
+			_refresh_node()
+		else:
+			_open_menu()
+		get_viewport().set_input_as_handled()
+
+func _node_art(type: String) -> String:
+	return {"battle": "attack", "elite": "attack", "gate": "shield", "chest": "chest", "gather": "crystal", "event": "draw", "rest_exit": "rest", "exit": "exit"}.get(type, "start")
+
+func _refresh_route_preview() -> void:
+	if selected_route.x < 0:
+		var art := ExpeditionArt.new()
+		art.subject = "start"
+		art.custom_minimum_size.y = 160
+		node_column.add_child(art)
+		node_column.add_child(_label("下一步，走向哪里？", 26, CREAM))
+		var note := _label("点击路线图上下一排的节点，查看风险和遭遇，再确认前进。\n休整站可恢复生命，也能带着战利品安全撤离。", 16, LIGHT_MUTED)
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		node_column.add_child(note)
+		return
+	var node: Dictionary = expedition.run["map"]["rows"][selected_route.x][selected_route.y]
+	var art := ExpeditionArt.new()
+	art.subject = _node_art(str(node["type"]))
+	art.tint = ExpeditionUI.RED if str(node.get("risk", "")) == "high" else ExpeditionUI.GOLD
+	art.custom_minimum_size.y = 140
+	node_column.add_child(art)
+	node_column.add_child(_label("下一站 · %s" % ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node["type"]), "?"), 26, CREAM))
+	node_column.add_child(_label(ExpeditionRoute.risk_text(str(node.get("risk", "none"))), 15, art.tint))
+	var hint := _label(str(node.get("hint", "")), 16, LIGHT_TEXT)
+	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	node_column.add_child(hint)
+	var encounter_id := str(node.get("encounter", ""))
+	if CombatGame.ENCOUNTERS.has(encounter_id):
+		var names: Array[String] = []
+		for id in CombatGame.ENCOUNTERS[encounter_id]["enemies"]:
+			names.append(str(CombatGame.ENEMIES[id]["name"]))
+		var enemies := _label("可能遭遇：" + "、".join(names), 14, LIGHT_MUTED)
+		enemies.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		node_column.add_child(enemies)
+	var go := ExpeditionUI.button("确认选路 / 投票前进" if bool(expedition.run.get("coop", false)) else "向这里前进   →", true)
+	go.pressed.connect(_on_move.bind(selected_route.x, selected_route.y))
+	node_column.add_child(go)
+
+func _fit_overlay() -> void:
+	if overlay_panel.visible:
+		overlay_scroll.custom_minimum_size.y = minf(get_viewport_rect().size.y - 110, overlay_column.get_combined_minimum_size().y + 8)

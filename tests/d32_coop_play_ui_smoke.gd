@@ -104,15 +104,18 @@ func _run() -> void:
 		var energy_before := int(p2["energy"])
 		var played := false
 		for card in (p2["hand"] as Array).duplicate():
+			# 随机开局可能全是自用牌；按定义选合法目标，验证会话裁定而非抽到攻击牌的概率。
+			var def := CardDefs.get_card(str(card["card_id"]))
+			var target := "e1" if str(def["target"]) == "enemy" else "p2"
 			guest_battle._on_card_clicked(int(card["uid"]))
-			guest_battle._on_target_clicked("e1")
+			guest_battle._on_target_clicked(target)
 			await _pump(12)
 			var combat_now: CombatGame = host.expedition.restore_battle()
 			var p2_now: Dictionary = combat_now.state["players"]["p2"]
 			if (p2_now["hand"] as Array).size() < hand_before or int(p2_now["energy"]) < energy_before:
 				played = true
 				break
-			## 该牌对 e1 不合法（掩护/自愈等）：换下一张继续试。
+			## 如能量或消耗品不足，尝试下一张。
 		_check(played, "出牌：客机出牌经主机裁定生效")
 		_check(int(guest_battle.combat.state["players"]["p2"]["energy"]) <= energy_before,
 			"出牌：客机界面按镜像刷新")

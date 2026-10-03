@@ -77,7 +77,18 @@ func _on_run(run: Dictionary) -> void:
 	_mirror_serial_dirty()  # 新快照到达：置脏，下一帧重建
 
 
-func _on_result(_action_id: String, result: Dictionary) -> void:
+func _on_result(action_id: String, result: Dictionary) -> void:
+	if battle_screen != null and battle_screen.visible and battle_screen.pending_action and action_id == battle_screen.pending_action_id:
+		battle_screen.pending_acknowledged = true
+		if not bool(result.get("ok", false)):
+			battle_screen.pending_action = false
+			battle_screen.status_label.text = "主机裁定：%s" % str(result.get("reason", ""))
+		battle_screen.combat = _mirror_combat()
+		battle_screen._refresh()
+		for event in result.get("events", []):
+			if str(event.get("type", "")) == "card_played" and str(event.get("owner", "")) == "p2":
+				battle_screen.played_count += 1
+		battle_screen._flash_events(result.get("events", []))
 	if not bool(result.get("ok", true)):
 		_flash("主机裁定：%s" % str(result.get("reason", "")))
 
@@ -140,8 +151,7 @@ func _build() -> void:
 	battle_screen = preload("res://scenes/battle_screen.tscn").instantiate()
 	battle_screen.player_key = "p2"
 	battle_screen.action_sink = func(kind: String, args: Dictionary) -> Variant:
-		client.send_action(kind, args)
-		return null
+		return client.send_action(kind, args)
 	battle_screen.combat_refresher = func() -> CombatGame: return _mirror_combat()
 	add_child(battle_screen)
 
@@ -360,8 +370,15 @@ func _open_battle() -> void:
 	if combat == null:
 		body_column.add_child(_label("战斗进行中，等待主机快照……", 15, LIGHT_TEXT))
 		return
-	battle_screen.open_run(combat, "p2")
-	battle_screen.visible = true
+	if battle_screen.visible:
+		if battle_screen.pending_acknowledged:
+			battle_screen.pending_action = false
+			battle_screen.pending_acknowledged = false
+			battle_screen.status_label.text = "行动已完成。" if not bool(combat.state["players"]["p2"].get("ended", false)) else "已结束行动，等待队友……"
+		battle_screen.combat = combat
+		battle_screen._refresh()
+	else:
+		battle_screen.open_run(combat, "p2")
 
 
 func _mirror_combat() -> CombatGame:
