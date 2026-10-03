@@ -20,6 +20,8 @@ var state_label: Label
 var body_column: VBoxContainer
 var log_label: RichTextLabel
 var battle_screen: BattleScreen
+var loot_panel: ExpeditionLootPanel
+var main_frame: CenterContainer
 ## 镜像版本：仅快照变化时重建界面，避免每帧重建按钮。
 var _mirror_version := -1
 
@@ -55,6 +57,8 @@ func close() -> void:
 	visible = false
 	if battle_screen != null:
 		battle_screen.visible = false
+	if loot_panel != null:
+		loot_panel.visible = false
 
 
 func _process(_delta: float) -> void:
@@ -78,6 +82,8 @@ func _on_run(run: Dictionary) -> void:
 
 
 func _on_result(action_id: String, result: Dictionary) -> void:
+	if loot_panel != null:
+		loot_panel.acknowledge(action_id, result, client.mirror_serial)
 	if battle_screen != null and battle_screen.visible and battle_screen.pending_action and action_id == battle_screen.pending_action_id:
 		battle_screen.pending_acknowledged = true
 		if not bool(result.get("ok", false)):
@@ -103,6 +109,7 @@ func _build() -> void:
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(shade)
 	var center := CenterContainer.new()
+	main_frame = center
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	var panel := _panel(Color("#20332a"), Color("#6f9b71"), 16)
@@ -154,6 +161,11 @@ func _build() -> void:
 		return client.send_action(kind, args)
 	battle_screen.combat_refresher = func() -> CombatGame: return _mirror_combat()
 	add_child(battle_screen)
+	loot_panel = ExpeditionLootPanel.new()
+	loot_panel.z_index = 10
+	loot_panel.action_sink = func(kind: String, args: Dictionary) -> Variant: return client.send_action(kind, args)
+	loot_panel.menu_requested.connect(_on_close)
+	add_child(loot_panel)
 
 
 # —— 刷新 ————————————————————————————————————————————————————————
@@ -167,6 +179,8 @@ func _refresh() -> void:
 		state_label.text = "等待主机开局……"
 		return
 	_mirror_version = client.mirror_serial
+	main_frame.visible = not ExpeditionLootPanel.is_loot_phase(run)
+	loot_panel.display(run, "p2", client.mirror_serial)
 	if battle_screen != null and battle_screen.visible and str(run.get("phase", "")) != "battle":
 		battle_screen.visible = false
 	var me: Dictionary = run.get("guest", {})
@@ -184,7 +198,8 @@ func _refresh() -> void:
 		"map":
 			_refresh_map_votes()
 		"node":
-			_refresh_node()
+			if not ExpeditionLootPanel.is_loot_phase(run):
+				_refresh_node()
 		"battle":
 			_open_battle()
 		"over":

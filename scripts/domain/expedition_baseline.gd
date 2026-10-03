@@ -48,7 +48,9 @@ static func size_for(expedition_block: Dictionary, container: String) -> Vector2
 	if not CONTAINER_SIZE.has(container):
 		return Vector2i.ZERO
 	var crafting: Dictionary = expedition_block.get("crafting", {})
-	var level := int(crafting.get("upgrade_levels", {}).get(container, 1))
+	# 局内库存保留出发时的扩容等级；旧局缺此字段仍采用原来的基础尺寸。
+	var levels: Dictionary = crafting.get("upgrade_levels", expedition_block.get("inventory", {}).get("container_levels", {}))
+	var level := int(levels.get(container, 1))
 	if level <= 1:
 		return CONTAINER_SIZE[container]
 	var table: Dictionary = CONTAINER_UPGRADE_SIZE.get(container, {})

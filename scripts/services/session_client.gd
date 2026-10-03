@@ -106,6 +106,7 @@ func hello_with(player_id: String, inventory: InventoryGame) -> void:
 		"player_id": player_id,
 		"rules_version": ExpeditionBaseline.PROTO_RULES_VERSION,
 		"next_instance_id": int(inventory.expedition.get("next_instance_id", 1000)),
+		"container_levels": (inventory.expedition.get("crafting", {}).get("upgrade_levels", {}) as Dictionary).duplicate(true),
 		"loadout": (inventory.expedition.get("inventory", {}) as Dictionary).get("loadout", {}).duplicate(true),
 		"carried": carried,
 		"hp": ExpeditionBaseline.MAX_HP,
@@ -123,6 +124,7 @@ func set_ready(ready: bool) -> void:
 	_send({
 		"t": "ready",
 		"ready": ready,
+		"container_levels": (expedition.get("crafting", {}).get("upgrade_levels", {}) as Dictionary).duplicate(true),
 		"loadout": (inventory.expedition.get("inventory", {}) as Dictionary).get("loadout", {}).duplicate(true),
 		"carried": carried,
 	})

@@ -29,6 +29,8 @@ $godot = 'E:\其他\chorme_download\Godot_v4.6.1-stable_win64.exe\Godot_v4.6.1-s
 
 矿洞界面已更新为探险营地、路线预览与卡牌战场；支持拖牌出牌、合法目标高亮、伤害预览、牌堆查看和快捷键。设计与验证记录见 [矿洞卡牌 UI 重设计](docs/design/Farm_矿洞卡牌UI_重设计_2026-10-03.md)，预览见 `screenshots/expedition_redesign/`。
 
+战后、宝箱和采集节点会打开全屏搜刮台：比较战利品的售价、占格、牌效和货物负担，拖放装包，现场整理胸挂／背包／保险箱，丢弃后可在离开前捡回。单人和合作客机共用界面。规则与验证见 [战后搜刮台](docs/design/Farm_战后搜刮台_2026-10-03.md)，预览见 `screenshots/loot_redesign/`。
+
 ## 已知限制
 
 1. 单人本地存档（`user://farm_save_v1.json`，内容版本 v7，含洞窟/制作进度），无云存档；设备时钟可被修改，会影响离线成熟、每日客人与育种机结算。
