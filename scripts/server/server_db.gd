@@ -32,8 +32,8 @@ const SCHEMA_V3 := [
 		"id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT UNIQUE NOT NULL, " +
 		"state TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
 	"CREATE TABLE IF NOT EXISTS runs(" +
-		"run_id TEXT PRIMARY KEY, room_id INTEGER, state TEXT NOT NULL, " +
-		"version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL)",
+		"run_id TEXT PRIMARY KEY, room_id INTEGER, owner_account_id INTEGER NOT NULL DEFAULT 0, " +
+		"state TEXT NOT NULL, version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL)",
 	"CREATE TABLE IF NOT EXISTS settlements(" +
 		"settlement_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, account_id INTEGER NOT NULL, " +
 		"state TEXT NOT NULL, created_at TEXT NOT NULL)",

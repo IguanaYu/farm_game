@@ -17,7 +17,7 @@ var tag := "m1"
 var port := 31971
 var bind := "127.0.0.1"
 var db_path := ""
-## 默认开放全部已实现命令组（M1 基础 + M2 全量）；需要灰度时用 --features 显式收紧。
+## 默认开放全部已实现命令组（M1 基础 + M2 全量 + M3 洞窟）；需要灰度时用 --features 显式收紧。
 var features: Array = [
 	OnlineProtocol.FEATURE_FARM_BASIC,
 	OnlineProtocol.FEATURE_FARM_SHOP,
@@ -25,12 +25,14 @@ var features: Array = [
 	OnlineProtocol.FEATURE_FARM_MARKET,
 	OnlineProtocol.FEATURE_FARM_CRAFT,
 	OnlineProtocol.FEATURE_FARM_INVENTORY,
+	OnlineProtocol.FEATURE_EXPEDITION,
 ]
 var dev_mode := false
 
 var store: ServerDB
 var auth: AuthService
 var farms: FarmService
+var rooms: RoomService
 var peer := WebSocketMultiplayerPeer.new()
 var listening := false
 ## 4.6 的 WebSocketMultiplayerPeer 无 get_peer_list，用信号自维护在线表。
@@ -69,6 +71,13 @@ func _ready() -> void:
 	farms.features = features
 	if dev_mode:
 		farms.time_shift = _dev_time_shift
+	rooms = RoomService.new()
+	rooms.store = store
+	rooms.auth = auth
+	rooms.farm_service = farms
+	rooms.features = features
+	rooms.send = _reply
+	rooms.restore()
 	if not _listen_tls():
 		quit_now(4)
 		return
@@ -94,6 +103,7 @@ func _on_peer_disconnected(id: int) -> void:
 	auth.unbind_peer(id)
 	if account_id != 0:
 		farms.evict(account_id)
+		rooms.notify_offline(account_id)
 	_log("peer_disconnected id=%d online=%d" % [id, peers.size()])
 
 
@@ -260,8 +270,10 @@ func _cmd_activate(pid: int, msg: Dictionary) -> void:
 	_establish_session(pid, int(created["account_id"]), str(created["nick"]), str(created["token"]))
 
 
-## 登录/激活成功：绑定会话（N03 顶替旧 peer）→ 下发 welcome（含快照与特性开关）。
+## 登录/激活成功：绑定会话（N03 顶替旧 peer）→ 下发 welcome（含快照与特性开关；
+## M3：在房/在局时附 room/run，重连即恢复）。
 func _establish_session(pid: int, account_id: int, nick: String, new_token := "") -> void:
+	auth.set_nick(account_id, nick)
 	var kicked_peer := auth.bind_session(account_id, pid)
 	if kicked_peer != 0 and peers.has(kicked_peer):
 		_log("kick peer=%d（账户 %d 被新连接顶替）" % [kicked_peer, account_id])
@@ -275,6 +287,9 @@ func _establish_session(pid: int, account_id: int, nick: String, new_token := ""
 		"features": features, "server_now": farms.now(),
 		"farm_seq": runtime.seq, "snapshot": farms.snapshot(runtime),
 	}
+	var rejoin := rooms.attach_on_login(account_id, nick)
+	for key in rejoin:
+		payload[key] = rejoin[key]
 	if new_token != "":
 		payload["token"] = new_token
 	_reply(pid, payload)
@@ -286,9 +301,14 @@ func _cmd_req(pid: int, msg: Dictionary) -> void:
 	if account_id == 0:
 		_reply(pid, OnlineProtocol.error_payload(OnlineProtocol.ERR_NOT_AUTHENTICATED))
 		return
-	var reply: Dictionary = farms.execute(
-		account_id, str(msg.get("req_id", "")), str(msg.get("op", "")), _args_of(msg)
-	)
+	var op := str(msg.get("op", ""))
+	var args := _args_of(msg)
+	var reply: Dictionary
+	if rooms.is_expedition_op(op):
+		## M3：房间/洞窟命令走房间服务（含收据去重与推送）。
+		reply = rooms.handle(account_id, auth.nick_of(account_id), str(msg.get("req_id", "")), op, args)
+	else:
+		reply = farms.execute(account_id, str(msg.get("req_id", "")), op, args)
 	_reply(pid, reply)
 
 

@@ -8,6 +8,8 @@ var store: ServerDB
 ## N03 单会话映射：account_id ↔ 在线 peer（一个 peer 同一时刻只挂一个账户）。
 var _peer_by_account := {}
 var _account_by_peer := {}
+## M3：账户昵称缓存（房间成员显示用；登录时刷新）。
+var _nick_by_account := {}
 
 const CODE_ALPHABET := "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
 
@@ -126,6 +128,24 @@ func bind_session(account_id: int, peer_id: int) -> int:
 
 func account_of_peer(peer_id: int) -> int:
 	return int(_account_by_peer.get(peer_id, 0))
+
+
+## M3 房间服务用：账户当前在线 peer（0=无会话）。
+func peer_of_account(account_id: int) -> int:
+	return int(_peer_by_account.get(account_id, 0))
+
+
+func has_session(account_id: int) -> bool:
+	return _peer_by_account.has(account_id)
+
+
+## M3：昵称缓存（登录/激活时写入；未登录账户回退空串）。
+func set_nick(account_id: int, nick: String) -> void:
+	_nick_by_account[account_id] = nick
+
+
+func nick_of(account_id: int) -> String:
+	return str(_nick_by_account.get(account_id, ""))
 
 
 func unbind_peer(peer_id: int) -> void:
