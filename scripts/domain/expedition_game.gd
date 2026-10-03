@@ -11,6 +11,10 @@ const SETTLEMENT_FMT := 1
 var run: Dictionary = {}
 var game: FarmGame
 var rng := RandomNumberGenerator.new()
+## M3 服务器模式注入：apply_guest_too=true 时，p2 结算单在同一事务内直接应用到
+## guest_farm（线上无"客机自行应用"）。单机 coop 不设置，保持 guest_handoff 语义。
+var apply_guest_too := false
+var guest_farm: FarmGame = null
 
 
 func bind(farm_game: FarmGame) -> void:
@@ -19,25 +23,27 @@ func bind(farm_game: FarmGame) -> void:
 
 # —— 出发事务（总计划 §9.3：生成局 ID → 写占用 → 写局初始快照 → 开始）——————
 
-static func depart(farm_game: FarmGame, now: int) -> Dictionary:
+## 出发前置校验（M3 服务器与本机共用）：返回空串=通过，否则为拒绝原因。
+static func depart_check(farm_game: FarmGame) -> String:
 	var inventory := InventoryGame.new()
 	inventory.bind(farm_game.state["expedition"])
 	var check := inventory.loadout_check()
 	if not check["hard_blocks"].is_empty():
-		return {"ok": false, "reason": "、".join(check["hard_blocks"])}
+		return "、".join(check["hard_blocks"])
 	if inventory.is_run_occupied():
-		return {"ok": false, "reason": "已有活动局"}
+		return "已有活动局"
 	var preview := inventory.deck_preview()
 	if int(preview["totals"][1]) <= 0:
-		return {"ok": false, "reason": "首回合牌库为空，先在胸挂放入装备"}
-	var run_id := ExpeditionStore.new_run_id(int(Time.get_unix_time_from_system() * 1000.0))
-	if not inventory.set_run_occupied(run_id)["ok"]:
-		return {"ok": false, "reason": "写入占用失败"}
+		return "首回合牌库为空，先在胸挂放入装备"
+	return ""
+
+
+## 纯构造 run 字典（M3 服务器复用）：不占用、不落盘；coop=true 时并入 guest 成员。
+## log_line 由调用方传入（单人/双人出发文案不同）。
+static func compose_run(farm_game: FarmGame, guest_profile: Dictionary, run_id: String, now: int, coop: bool, log_line: String) -> Dictionary:
 	var expedition: Dictionary = farm_game.state["expedition"]
 	var seed_value := run_id.hash() + int(Time.get_unix_time_from_system())
-	var instance := ExpeditionGame.new()
-	instance.game = farm_game
-	instance.run = {
+	var run := {
 		"fmt": 1,
 		"run_id": run_id,
 		"rules_version": ExpeditionBaseline.PROTO_RULES_VERSION,
@@ -47,7 +53,7 @@ static func depart(farm_game: FarmGame, now: int) -> Dictionary:
 		"created_at": now,
 		"player": {"hp": ExpeditionBaseline.MAX_HP, "max_hp": ExpeditionBaseline.MAX_HP, "extra_draw_next": false},
 		"inventory": _snapshot_loadout(farm_game),
-		"next_instance_id": int(expedition.get("next_instance_id", 1000)),
+		"next_instance_id": maxi(int(expedition.get("next_instance_id", 1000)), int(guest_profile.get("next_instance_id", 1000))) if coop else int(expedition.get("next_instance_id", 1000)),
 		"map": _build_map("moss_stone_shallow"),
 		"current": {"row": 0, "col": 0},
 		"resolved": {},
@@ -58,15 +64,38 @@ static func depart(farm_game: FarmGame, now: int) -> Dictionary:
 		"settlement_id": "",
 		"carried_from_farm": _carried_ids(farm_game),
 		"consumed": [],
-		"log": ["出发：生命 %d/%d，携带牌 %d 张" % [ExpeditionBaseline.MAX_HP, ExpeditionBaseline.MAX_HP, preview["totals"][1] + preview["totals"][2] + preview["totals"][3]]],
+		"log": [log_line],
 	}
-	expedition["active_run_ref"] = run_id
-	if not ExpeditionStore.save_run(run_id, instance.run):
+	if coop:
+		run["coop"] = true
+		run["guest"] = _guest_member(guest_profile)
+		run["votes"] = {"p1": "", "p2": ""}
+		run["extract_votes"] = {"p1": false, "p2": false}
+	return run
+
+
+static func depart(farm_game: FarmGame, now: int) -> Dictionary:
+	var problem := depart_check(farm_game)
+	if problem != "":
+		return {"ok": false, "reason": problem}
+	var inventory := InventoryGame.new()
+	inventory.bind(farm_game.state["expedition"])
+	var run_id := ExpeditionStore.new_run_id(int(Time.get_unix_time_from_system() * 1000.0))
+	if not inventory.set_run_occupied(run_id)["ok"]:
+		return {"ok": false, "reason": "写入占用失败"}
+	var preview := inventory.deck_preview()
+	var run := compose_run(farm_game, {}, run_id, now, false,
+		"出发：生命 %d/%d，携带牌 %d 张" % [ExpeditionBaseline.MAX_HP, ExpeditionBaseline.MAX_HP, preview["totals"][1] + preview["totals"][2] + preview["totals"][3]])
+	var instance := ExpeditionGame.new()
+	instance.game = farm_game
+	instance.run = run
+	farm_game.state["expedition"]["active_run_ref"] = run_id
+	if not ExpeditionStore.save_run(run_id, run):
 		inventory.clear_run_occupied(run_id)
-		expedition["active_run_ref"] = ""
+		farm_game.state["expedition"]["active_run_ref"] = ""
 		return {"ok": false, "reason": "局档写入失败，已恢复出发前状态"}
-	instance.rng.seed = seed_value
-	return {"ok": true, "reason": "", "run": instance.run, "game": instance}
+	instance.rng.seed = int(run["rng_seed"])
+	return {"ok": true, "reason": "", "run": run, "game": instance}
 
 
 static func _snapshot_loadout(farm_game: FarmGame) -> Dictionary:
@@ -120,44 +149,18 @@ static func depart_coop(farm_game: FarmGame, guest_profile: Dictionary, now: int
 	var run_id := run_id_override if run_id_override != "" else ExpeditionStore.new_run_id(int(Time.get_unix_time_from_system() * 1000.0))
 	if not inventory.set_run_occupied(run_id)["ok"]:
 		return {"ok": false, "reason": "写入占用失败"}
-	var expedition: Dictionary = farm_game.state["expedition"]
-	var seed_value := run_id.hash() + int(Time.get_unix_time_from_system())
+	var run := compose_run(farm_game, guest_profile, run_id, now, true,
+		"双人出发：主机与 %s" % str(guest_profile.get("name", "队友")))
 	var instance := ExpeditionGame.new()
 	instance.game = farm_game
-	instance.run = {
-		"fmt": 1,
-		"run_id": run_id,
-		"coop": true,
-		"rules_version": ExpeditionBaseline.PROTO_RULES_VERSION,
-		"layer_id": "moss_stone_shallow",
-		"rng_seed": seed_value,
-		"rng_state": str(seed_value),
-		"created_at": now,
-		"player": {"hp": ExpeditionBaseline.MAX_HP, "max_hp": ExpeditionBaseline.MAX_HP, "extra_draw_next": false},
-		"inventory": _snapshot_loadout(farm_game),
-		"guest": _guest_member(guest_profile),
-		"next_instance_id": maxi(int(expedition.get("next_instance_id", 1000)), int(guest_profile.get("next_instance_id", 1000))),
-		"map": _build_map("moss_stone_shallow"),
-		"current": {"row": 0, "col": 0},
-		"resolved": {},
-		"node_drops": [],
-		"battle": {},
-		"phase": "map",
-		"outcome": "",
-		"settlement_id": "",
-		"carried_from_farm": _carried_ids(farm_game),
-		"consumed": [],
-		"votes": {"p1": "", "p2": ""},
-		"extract_votes": {"p1": false, "p2": false},
-		"log": ["双人出发：主机与 %s" % str(guest_profile.get("name", "队友"))],
-	}
-	expedition["active_run_ref"] = run_id
-	if not ExpeditionStore.save_run(run_id, instance.run):
+	instance.run = run
+	farm_game.state["expedition"]["active_run_ref"] = run_id
+	if not ExpeditionStore.save_run(run_id, run):
 		inventory.clear_run_occupied(run_id)
-		expedition["active_run_ref"] = ""
+		farm_game.state["expedition"]["active_run_ref"] = ""
 		return {"ok": false, "reason": "局档写入失败，已恢复出发前状态"}
-	instance.rng.seed = seed_value
-	return {"ok": true, "reason": "", "run": instance.run, "game": instance}
+	instance.rng.seed = int(run["rng_seed"])
+	return {"ok": true, "reason": "", "run": run, "game": instance}
 
 
 static func _guest_member(profile: Dictionary) -> Dictionary:
@@ -967,6 +970,11 @@ func _settle_one_member(kind: String, detail: int, member_key: String, is_host: 
 		settlement["guest_handoff"] = true
 		settlement["player_id"] = str(run.get("guest", {}).get("player_id", ""))
 		ExpeditionStore.save_settlement(settlement_id, settlement)
+		## M3 服务器模式：无"客机自行应用"，同一事务内直接应用到客机账户候选档。
+		if apply_guest_too and guest_farm != null:
+			var applied := apply_settlement(guest_farm, settlement)
+			if not applied["ok"]:
+				return {"ok": false, "reason": applied["reason"]}
 		return {"ok": true, "reason": "", "settlement": settlement}
 	if not ExpeditionStore.save_settlement(settlement_id, settlement):
 		return {"ok": false, "reason": "结算档写入失败（本局保持未决，可重试）"}

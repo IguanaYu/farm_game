@@ -2,8 +2,15 @@ class_name ExpeditionStore
 extends RefCounted
 ## 局档／结算档的存取边界与 ID 生成（2.1 计划 W1）。2.1 只落骨架：ID 格式跨阶段不改，
 ## 读写封装与农场档同样采用 tmp→bak→替换 三段式。业务字段在 2.4/2.6/2.7 扩展。
+##
+## M3 服务器注入点：backend 有效时 save_run/save_settlement 路由到服务器暂存区
+## （room_service 在同一 SQLite 事务内落 runs/settlements 表，回滚即丢弃）；
+## 单机/客户端路径不设置 backend，文件行为零变化。
 
 const EXPEDITION_DIR := "user://expeditions"
+
+## 形如 Callable(kind: String, id: String, data: Dictionary) -> bool；kind ∈ {save_run, save_settlement}。
+static var backend: Callable = Callable()
 
 
 static func new_player_id(now: int) -> String:
@@ -73,6 +80,8 @@ static func load_json(path: String) -> Dictionary:
 
 
 static func save_run(run_id: String, data: Dictionary) -> bool:
+	if backend.is_valid():
+		return bool(backend.call("save_run", run_id, data))
 	return save_json(run_path(run_id), data)
 
 
@@ -84,6 +93,8 @@ static func load_run(run_id: String) -> Dictionary:
 
 
 static func save_settlement(settlement_id: String, data: Dictionary) -> bool:
+	if backend.is_valid():
+		return bool(backend.call("save_settlement", settlement_id, data))
 	return save_json(settlement_path(settlement_id), data)
 
 

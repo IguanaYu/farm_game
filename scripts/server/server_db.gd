@@ -4,7 +4,7 @@ extends RefCounted
 ## schema v2 = 账号/邀请/token/收据。所有写走 tx()（BEGIN IMMEDIATE），
 ## 事务函数返回非 OK 时整体回滚，保证"先保存，再回复成功"（规划 §4.2）。
 
-const SCHEMA_VERSION := 2
+const SCHEMA_VERSION := 3
 
 const SCHEMA := [
 	"CREATE TABLE IF NOT EXISTS meta(" +
@@ -26,6 +26,19 @@ const SCHEMA := [
 		"created_at TEXT NOT NULL, PRIMARY KEY(account_id, req_id))",
 ]
 
+## v3（M3）：房间/局/结算。结算由服务器事务内直接应用，state 留档对账（S04）。
+const SCHEMA_V3 := [
+	"CREATE TABLE IF NOT EXISTS rooms(" +
+		"id INTEGER PRIMARY KEY AUTOINCREMENT, code TEXT UNIQUE NOT NULL, " +
+		"state TEXT NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)",
+	"CREATE TABLE IF NOT EXISTS runs(" +
+		"run_id TEXT PRIMARY KEY, room_id INTEGER, state TEXT NOT NULL, " +
+		"version INTEGER NOT NULL DEFAULT 1, updated_at TEXT NOT NULL)",
+	"CREATE TABLE IF NOT EXISTS settlements(" +
+		"settlement_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, account_id INTEGER NOT NULL, " +
+		"state TEXT NOT NULL, created_at TEXT NOT NULL)",
+]
+
 var db: SQLite
 var db_path := ""
 
@@ -42,7 +55,7 @@ func open(path: String) -> bool:
 		return false
 	db.query("PRAGMA journal_mode=WAL;")
 	db.query("PRAGMA synchronous=FULL;")
-	for stmt in SCHEMA:
+	for stmt in SCHEMA + SCHEMA_V3:
 		if not db.query(stmt):
 			push_error("SQLite 建表失败: %s" % stmt)
 			return false
@@ -61,9 +74,19 @@ func _check_or_init_meta() -> bool:
 			"INSERT INTO meta(key, value) VALUES('schema_version', ?)", [str(SCHEMA_VERSION)]
 		) and db.query_with_bindings("INSERT INTO meta(key, value) VALUES('created_at', ?)", [created])
 	var stored := int(db.query_result[0]["value"])
-	if stored != SCHEMA_VERSION:
+	if stored > SCHEMA_VERSION:
 		push_error("数据库 schema 版本不符：库内 %d，本程序 %d（先备份再迁移）" % [stored, SCHEMA_VERSION])
 		return false
+	if stored < SCHEMA_VERSION:
+		## 只做加表迁移（v2→v3：rooms/runs/settlements）；v1→v2 需人工备份重建。
+		for stmt in SCHEMA_V3:
+			if not db.query(stmt):
+				push_error("SQLite 迁移建表失败: %s" % stmt)
+				return false
+		if not db.query_with_bindings(
+			"UPDATE meta SET value = ? WHERE key = 'schema_version'", [str(SCHEMA_VERSION)]
+		):
+			return false
 	return true
 
 
