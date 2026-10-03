@@ -1,0 +1,8 @@
+extends SceneTree
+func _initialize() -> void:
+	broken_subtest()
+	print("STAGE6_REGRESSION_PASS")
+	quit(0)
+func broken_subtest() -> void:
+	var value: Dictionary = {}
+	print(value["qa_injected_missing_key"])

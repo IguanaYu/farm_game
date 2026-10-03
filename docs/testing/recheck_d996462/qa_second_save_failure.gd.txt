@@ -1,0 +1,50 @@
+extends SceneTree
+
+class FailSecondRoom extends RoomPanel:
+	var save_calls := 0
+	func _save_farm() -> bool:
+		save_calls += 1
+		return save_calls != 2
+
+func _initialize() -> void:
+	_run.call_deferred()
+
+func _run() -> void:
+	var host_panel := RoomPanel.new()
+	host_panel.listen_port = 31999
+	root.add_child(host_panel)
+	host_panel.open(_fresh("qa-host"))
+	host_panel._on_create()
+	var guest_panel := FailSecondRoom.new()
+	guest_panel.listen_port = 31999
+	root.add_child(guest_panel)
+	guest_panel.open(_fresh("qa-guest"))
+	guest_panel.address_edit.text = "127.0.0.1"
+	guest_panel._on_join()
+	await _pump(30)
+	host_panel._on_ready()
+	guest_panel._on_ready()
+	await _pump(15)
+	host_panel._on_depart()
+	await _pump(60)
+	print("QA_SECOND_SAVE_FAILURE save_calls=", guest_panel.save_calls, " host_started=", host_panel.host.expedition != null, " guest_active_ref=", guest_panel.game.state["expedition"]["active_run_ref"], " status=", guest_panel.status_label.text)
+	if host_panel.host.expedition != null:
+		print("QA_SECOND_SAVE_FAILURE_REPRODUCED: host starts despite occupancy save failure")
+	guest_panel.client.disconnect_link()
+	quit(0)
+
+func _pump(frames: int) -> void:
+	for attempt in range(frames):
+		await process_frame
+		OS.delay_msec(3)
+
+func _fresh(marker: String) -> FarmGame:
+	var farm := FarmGame.new()
+	farm.new_game(1000)
+	farm.state["expedition"]["player_id"] = marker
+	var inventory := InventoryGame.new()
+	inventory.bind(farm.state["expedition"])
+	inventory.grant_basic_kit()
+	for instance in inventory.warehouse_list().duplicate():
+		inventory.move_to_loadout(int(instance["instance_id"]), "chest")
+	return farm

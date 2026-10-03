@@ -1,0 +1,4 @@
+================ 回归汇总 ================
+stage6_regression_smoke.gd           exit=0   errors=1   allow=3 ok
+总计 1 项，失败 0 项
+REGRESSION_ALL_PASS

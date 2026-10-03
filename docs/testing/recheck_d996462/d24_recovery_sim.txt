@@ -1,0 +1,14 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: 强退：农场档可恢复
+  ok: 强退：占用与活动局引用保留
+  ok: 强退：局档可恢复
+  ok: 强退：战斗阶段保留
+  ok: 强退：战斗快照可重建
+  ok: 强退：手牌一致（不重抽）
+  ok: 强退：生命一致
+  ok: 强退：敌人意图一致
+  ok: 强退：恢复后可继续完成战斗
+  ok: 强退：恢复后可完整撤离结算
+  ok: 强退：结算后占用解除
+D24_RECOVERY_SIM_PASS

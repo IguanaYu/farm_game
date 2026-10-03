@@ -1,0 +1,23 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: F-08：播种后引导推进到第 2 步（内存）
+  ok: F-08：HUD 状态随推进刷新（横幅数据源）
+  ok: F-08：引导横幅仍显示
+  ok: F-08：磁盘存档同步为第 2 步（此前停留在 0）
+  ok: F-08：跳过后引导关闭（内存）
+  ok: F-08：横幅隐藏
+  ok: F-08：跳过立即落盘（此前只改内存）
+  ok: F-05：cabbage sprout → 模型 cabbage_sprout
+  ok: F-05：cabbage growing → 模型 cabbage_growing
+  ok: F-05：cabbage mature → 模型 cabbage_mature
+  ok: F-05：carrot sprout → 模型 carrot_sprout
+  ok: F-05：carrot growing → 模型 carrot_growing
+  ok: F-05：carrot mature → 模型 carrot_mature
+  ok: F-05：rock_sprout sprout → 模型 rock_sprout_sprout
+  ok: F-05：rock_sprout growing → 模型 rock_sprout_growing
+  ok: F-05：rock_sprout mature → 模型 rock_sprout_mature
+  ok: F-05：glow_berry sprout → 模型 glow_berry_sprout
+  ok: F-05：glow_berry growing → 模型 glow_berry_growing
+  ok: F-05：glow_berry mature → 模型 glow_berry_mature
+  ok: F-05：12 次地块模型刷新无脚本异常
+D33_SCENE_INTEGRATION_PASS

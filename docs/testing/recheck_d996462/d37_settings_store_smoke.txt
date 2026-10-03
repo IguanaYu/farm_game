@@ -1,0 +1,20 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: Master 总线存在
+  ok: Music 与 SFX 子总线存在
+  ok: 默认窗口化
+  ok: 默认开垂直同步
+  ok: 默认窗口尺寸 1280×800
+  ok: 默认主音量 1.0
+  ok: 默认不重播引导
+  ok: 全屏写读一致
+  ok: 窗口尺寸写读一致
+  ok: 垂直同步关闭写读一致
+  ok: 音量线性 0.5 写读一致
+  ok: 重播引导写读一致
+  ok: Music 总线音量 = linear_to_db(0.5)
+  ok: 音量 >0 时 Music 不静音
+  ok: 音量 0 → SFX 总线静音
+  ok: 版本号可读取（0.2.0）
+  ok: 旧 cfg（仅 fullscreen）读取得通，其余走默认
+D37_SETTINGS_STORE_PASS

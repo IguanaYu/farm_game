@@ -23,6 +23,7 @@ for path in tests/*.gd; do
   name="$(basename "$path")"
   case "$name" in
     capture_*) continue ;;  # 截图类需真实窗口，另跑
+    m0_*) continue ;;  # M0 探针需编排器起服务端，见 tools/m0_local_verify.py
   esac
   total=$((total + 1))
   out="$(mktemp)"

@@ -1,0 +1,63 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+Vulkan 1.4.325 - Forward Mobile - Using Device #0: NVIDIA - NVIDIA GeForce RTX 4060 Ti
+
+AUDIT 01_farm_base: checked 4 buttons
+SHOT 01_farm_base
+AUDIT 02_modal_shop: checked 16 buttons
+SHOT 02_modal_shop
+AUDIT 03_modal_market: checked 2 buttons
+SHOT 03_modal_market
+AUDIT 04_modal_warehouse_crops: checked 5 buttons
+SHOT 04_modal_warehouse_crops
+AUDIT 05_modal_warehouse_seeds: checked 15 buttons
+SHOT 05_modal_warehouse_seeds
+AUDIT 06_modal_breeder: checked 6 buttons
+SHOT 06_modal_breeder
+AUDIT 07_hub: checked 5 buttons
+SHOT 07_hub
+AUDIT 08_loadout_real: checked 46 buttons
+SHOT 08_loadout_real
+AUDIT 09_crafting_real: checked 7 buttons
+SHOT 09_crafting_real
+AUDIT 10_eqwarehouse_real: checked 8 buttons
+SHOT 10_eqwarehouse_real
+AUDIT 11_farm_fresh: checked 4 buttons
+SHOT 11_farm_fresh
+AUDIT 12_loadout_empty: checked 46 buttons
+SHOT 12_loadout_empty
+AUDIT 13_loadout_kit: checked 49 buttons
+SHOT 13_loadout_kit
+AUDIT 14_map_start: checked 15 buttons
+SHOT 14_map_start
+AUDIT 15_map_menu: checked 3 buttons
+SHOT 15_map_menu
+AUDIT 16_map_flash: checked 1 buttons
+SHOT 16_map_flash
+AUDIT 17_map_battle_node: checked 11 buttons
+SHOT 17_map_battle_node
+BATTLE_STATE round=1 phase=player energy=3 hand=5 draw=3
+AUDIT 18_battle_round1: checked 8 buttons
+SHOT 18_battle_round1
+OUTCOME_LABEL visible=true text_len=38 rect=[P: (481.0, 387.0), S: (478.0, 93.0)]
+OVERLAY_CHILD VBoxContainer visible=true text_len=-1 rect=[P: (481.0, 387.0), S: (478.0, 125.0)]
+AUDIT 19_battle_over: checked 1 buttons
+SHOT 19_battle_over
+AUDIT 20_map_battle_rewards: checked 16 buttons
+SHOT 20_map_battle_rewards
+AUDIT 21_map_gather: checked 15 buttons
+SHOT 21_map_gather
+AUDIT 22_leave_confirm: checked 2 buttons
+SHOT 22_leave_confirm
+AUDIT 23_map_chest: checked 14 buttons
+SHOT 23_map_chest
+AUDIT 24_map_event: checked 12 buttons
+SHOT 24_map_event
+AUDIT 25_map_rest: checked 14 buttons
+SHOT 25_map_rest
+AUDIT 26_extract_confirm: checked 3 buttons
+SHOT 26_extract_confirm
+AUDIT 27_settlement: checked 1 buttons
+SHOT 27_settlement
+AUDIT 28_room_panel: checked 6 buttons
+SHOT 28_room_panel
+UI_AUDIT_DONE

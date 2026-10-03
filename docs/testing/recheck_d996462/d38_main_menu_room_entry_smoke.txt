@@ -1,0 +1,9 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: 好友联机按钮存在
+  ok: 点击后切换进农场世界
+  ok: 房间页已自动打开
+  ok: GameFlow 消费后复位
+  ok: 无档兜底开新档（引导从头开始）
+  ok: 房间页可关闭（正常回农场）
+D38_MAIN_MENU_ROOM_PASS

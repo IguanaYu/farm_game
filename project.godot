@@ -13,7 +13,7 @@ config_version=5
 config/name="小小农场"
 config/description="点击种植、离线成长的农场游戏"
 config/version="0.2.0"
-run/main_scene="res://scenes/main_menu.tscn"
+run/main_scene="res://scenes/boot.tscn"
 config/features=PackedStringArray("4.6")
 config/icon="res://assets/icons/farm_icon.png"
 

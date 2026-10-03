@@ -1,0 +1,4 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+QA_SECOND_SAVE_FAILURE save_calls=2 host_started=true guest_active_ref=run-1790951549738-4312 status=警告：占用已写入但落盘失败；重启后可能需要重新占用，请联系主机。
+QA_SECOND_SAVE_FAILURE_REPRODUCED: host starts despite occupancy save failure

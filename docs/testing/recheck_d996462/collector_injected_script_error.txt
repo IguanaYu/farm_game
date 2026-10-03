@@ -1,0 +1,8 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+SCRIPT ERROR: Invalid access to property or key 'qa_injected_missing_key' on a base object of type 'Dictionary'.
+   at: broken_subtest (res://tests/stage6_regression_smoke.gd:8)
+   GDScript backtrace (most recent call first):
+       [0] broken_subtest (res://tests/stage6_regression_smoke.gd:8)
+       [1] _initialize (res://tests/stage6_regression_smoke.gd:3)
+STAGE6_REGRESSION_PASS

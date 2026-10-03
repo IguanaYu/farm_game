@@ -8,3 +8,5 @@ build/*
 !build/.gdignore
 .audit_backup/
 __pycache__/
+.zcode/
+server/secrets/
