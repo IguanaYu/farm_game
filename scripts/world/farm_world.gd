@@ -44,6 +44,8 @@ const STAGE_MODELS := {
 
 var game: FarmGame
 var hud: FarmHud
+## M1 线上模式（计划 §5.5）：非空时本世界由服务器权威档驱动，本地 SaveStore 完全停用（F09）。
+var online: OnlineFarmBridge = null
 var plot_holders: Dictionary = {}
 var plot_models: Dictionary = {}
 var plot_model_keys: Dictionary = {}
@@ -53,6 +55,9 @@ var hovered_plot_id: int = 0
 
 func _ready() -> void:
 	game = FarmGame.new()
+	if GameFlow.mode == GameFlow.Mode.ONLINE:
+		_boot_online()
+		return
 	var fresh_start := GameFlow.mode == GameFlow.Mode.NEW_GAME
 	if fresh_start:
 		# 主菜单"开始新游戏"：跳过读档直接开新局（旧档由原子写自动进 .bak）。
@@ -80,12 +85,7 @@ func _ready() -> void:
 	_build_farm()
 	_build_hud()
 	_refresh_all()
-	var clock := Timer.new()
-	clock.name = "GrowthRefreshTimer"
-	clock.wait_time = 1.0
-	clock.timeout.connect(_on_clock_tick)
-	add_child(clock)
-	clock.start()
+	_start_clock()
 	if open_room and hud != null:
 		# 主菜单"好友联机"直入：读档/建档完成后自动打开房间页（延迟一帧让 HUD 先完成布局）。
 		hud.call_deferred("open_room")
@@ -448,6 +448,14 @@ func _refresh_plot_model(plot_id: int) -> void:
 
 func _on_clock_tick() -> void:
 	hud.view_now = _now()
+	if online != null:
+		## 线上模式：市场跨日/结算在服务器登录与命令路径完成，本端只做展示刷新（F08/F09）。
+		for plot_id in range(1, FarmGame.MAX_PLOTS + 1):
+			_refresh_plot_model(plot_id)
+		_refresh_hover_hint()
+		hud.update_harvest_entry()
+		hud.tick_update(_now())
+		return
 	if game.refresh_market(_now()):
 		_save()
 		_refresh_guest_models()
@@ -502,6 +510,78 @@ func _refresh_hover_hint() -> void:
 	hud.show_plot_hint(hovered_plot_id, game.get_plot(hovered_plot_id), _now())
 
 
+# —— M1 线上模式（计划 §5.5） ——————————————————————————————————————
+
+
+func _boot_online() -> void:
+	## 不读不写本地档（F09）；等服务器快照灌入后再构建场景与 HUD。
+	online = OnlineFarmBridge.new()
+	online.name = "OnlineFarmBridge"
+	add_child(online)
+	game = online.game
+	online.snapshot_applied.connect(_online_bootstrap)
+	online.login_failed.connect(_online_login_failed)
+	online.status_changed.connect(_on_online_status)
+	var token := GameFlow.online_token
+	GameFlow.reset()
+	if token == "":
+		token = str(OnlineClient.load_session().get("token", ""))
+	online.begin(SettingsStore.get_online_server_url(), token)
+
+
+func _online_bootstrap() -> void:
+	if hud != null:
+		return  # 仅首个快照构建；后续快照由命令路径各自刷新
+	_build_farm()
+	_build_hud()
+	hud.set_online_mode(true)
+	_refresh_all()
+	_start_clock()
+	AudioKit.play_music(self)
+
+
+func _online_login_failed(code: String, _need: Dictionary) -> void:
+	## 登录失败：给出原因并回到主菜单（不落任何本地档）。
+	var layer := CanvasLayer.new()
+	layer.name = "OnlineFailLayer"
+	add_child(layer)
+	var box := VBoxContainer.new()
+	box.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+	box.add_theme_constant_override("separation", 12)
+	layer.add_child(box)
+	var label := Label.new()
+	label.text = "线上登录失败（%s）。\n本机存档未受任何影响，返回主菜单重试或玩单机模式。" % code
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(label)
+	var back := Button.new()
+	back.text = "返回主菜单"
+	back.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/main_menu.tscn"))
+	box.add_child(back)
+
+
+func _on_online_status(text: String, is_online: bool) -> void:
+	if hud != null:
+		hud.set_online_status(text, is_online)
+
+
+func _start_clock() -> void:
+	var clock := Timer.new()
+	clock.name = "GrowthRefreshTimer"
+	clock.wait_time = 1.0
+	clock.timeout.connect(_on_clock_tick)
+	add_child(clock)
+	clock.start()
+
+
+## M1 未联网化的入口统一拦截：提示后直接返回，绝不落入本地路径（F09 禁止混合两套存档归属）。
+func _online_refused() -> bool:
+	if online == null:
+		return false
+	AudioKit.play(self, "warn")
+	hud.show_status("该功能将在联机版后续更新开放。")
+	return true
+
+
 func _on_plot_action(plot_id: int) -> void:
 	var plot := game.get_plot(plot_id)
 	if plot.is_empty():
@@ -516,7 +596,19 @@ func _on_plot_action(plot_id: int) -> void:
 
 
 func _do_harvest(plot_id: int) -> void:
-	var result := game.harvest(plot_id, _now())
+	if online != null:
+		var reply: Dictionary = await online.request("farm.harvest", {"plot_id": plot_id})
+		if reply.is_empty() or reply.get("t", "") == "req_err":
+			if not reply.is_empty():
+				AudioKit.play(self, "warn")
+				hud.show_status(str(reply.get("msg", "收获失败")))
+			return
+		_finish_harvest(plot_id, reply["result"])
+		return
+	_finish_harvest(plot_id, game.harvest(plot_id, _now()))
+
+
+func _finish_harvest(plot_id: int, result: Dictionary) -> void:
 	if not result["ok"]:
 		AudioKit.play(self, "warn")
 		hud.show_status(result["message"])
@@ -540,6 +632,9 @@ func _do_harvest(plot_id: int) -> void:
 func _on_building_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int, kind: String) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		AudioKit.play(self, "ui_click")
+		if online != null and kind == "cave":
+			hud.show_status("洞窟探险将在联机版后续更新开放。")
+			return
 		match kind:
 			"shop":
 				hud.open_shop()
@@ -559,15 +654,28 @@ func _on_building_input(_camera: Node, event: InputEvent, _position: Vector3, _n
 
 
 func _on_plant_seed_requested(plot_id: int, seed_id: int) -> void:
-	var result := game.plant_seed(plot_id, seed_id, _now())
-	if result != "":
+	if online != null:
+		var reply: Dictionary = await online.request("farm.plant_seed", {"plot_id": plot_id, "seed_id": seed_id})
+		if reply.is_empty() or reply.get("t", "") == "req_err":
+			if not reply.is_empty():
+				AudioKit.play(self, "warn")
+				hud.show_status(str(reply.get("msg", "播种失败")))
+			return
+		_finish_plant_seed(reply["result"], plot_id)
+		return
+	var message := game.plant_seed(plot_id, seed_id, _now())
+	_finish_plant_seed({"ok": message == "", "message": message}, plot_id)
+
+
+func _finish_plant_seed(result: Dictionary, plot_id: int) -> void:
+	if not result["ok"]:
 		AudioKit.play(self, "warn")
-		hud.show_status(result)
+		hud.show_status(result["message"])
 		_refresh_all()
 		return
 	AudioKit.play(self, "plant")
 	## F-08：成功动作先推进引导再统一保存/刷新——推进本身也会落盘（见 _advance_tutorial），
-	## 保证播种后磁盘与横幅立即到下一步，退出重开不回退。
+	## 保证播种后磁盘与横幅立即到下一步，退出重开不回退。线上由服务器推进（本地钩子直通）。
 	if int(game.state.get("tutorial_step", 99)) == 0:
 		_advance_tutorial(0)
 	elif int(game.state.get("tutorial_step", 99)) == 4:
@@ -582,7 +690,19 @@ func _on_plant_seed_requested(plot_id: int, seed_id: int) -> void:
 
 
 func _on_water_requested(plot_id: int) -> void:
-	var result := game.water(plot_id, _now())
+	if online != null:
+		var reply: Dictionary = await online.request("farm.water", {"plot_id": plot_id})
+		if reply.is_empty() or reply.get("t", "") == "req_err":
+			if not reply.is_empty():
+				AudioKit.play(self, "warn")
+				hud.show_status(str(reply.get("msg", "浇水失败")))
+			return
+		_finish_water(plot_id, reply["result"])
+		return
+	_finish_water(plot_id, game.water(plot_id, _now()))
+
+
+func _finish_water(plot_id: int, result: Dictionary) -> void:
 	if result["ok"]:
 		AudioKit.play(self, "water")
 	hud.show_status(result["message"] if not result["ok"] else "第 %d 块地浇水完成，本时段加分已记录。" % plot_id)
@@ -594,7 +714,19 @@ func _on_water_requested(plot_id: int) -> void:
 
 
 func _on_fertilize_requested(plot_id: int, kind: String) -> void:
-	var result := game.apply_fertilizer(plot_id, kind, _now())
+	if online != null:
+		var reply: Dictionary = await online.request("farm.fertilize", {"plot_id": plot_id, "kind": kind})
+		if reply.is_empty() or reply.get("t", "") == "req_err":
+			if not reply.is_empty():
+				AudioKit.play(self, "warn")
+				hud.show_status(str(reply.get("msg", "施肥失败")))
+			return
+		_finish_fertilize(plot_id, reply["result"])
+		return
+	_finish_fertilize(plot_id, game.apply_fertilizer(plot_id, kind, _now()))
+
+
+func _finish_fertilize(plot_id: int, result: Dictionary) -> void:
 	if not result["ok"]:
 		AudioKit.play(self, "warn")
 		hud.show_status(result["message"])
@@ -608,6 +740,8 @@ func _on_fertilize_requested(plot_id: int, kind: String) -> void:
 
 
 func _on_buy_seed_requested(kind: String, quantity: int) -> void:
+	if _online_refused():
+		return
 	var result := game.buy_seeds(quantity, kind)
 	if result != "":
 		AudioKit.play(self, "warn")
@@ -622,6 +756,8 @@ func _on_buy_seed_requested(kind: String, quantity: int) -> void:
 
 
 func _on_buy_fertilizer_requested(kind: String, quantity: int) -> void:
+	if _online_refused():
+		return
 	var result := game.buy_fertilizer(kind, quantity)
 	if result != "":
 		AudioKit.play(self, "warn")
@@ -637,6 +773,8 @@ func _on_buy_fertilizer_requested(kind: String, quantity: int) -> void:
 
 
 func _on_upgrade_shop_requested() -> void:
+	if _online_refused():
+		return
 	var result := game.upgrade_shop()
 	if result != "":
 		AudioKit.play(self, "warn")
@@ -650,7 +788,19 @@ func _on_upgrade_shop_requested() -> void:
 
 
 func _on_harvest_all_requested() -> void:
-	var summary := game.harvest_all(_now())
+	if online != null:
+		var reply: Dictionary = await online.request("farm.harvest_all", {})
+		if reply.is_empty() or reply.get("t", "") == "req_err":
+			if not reply.is_empty():
+				AudioKit.play(self, "warn")
+				hud.show_status(str(reply.get("msg", "收获失败")))
+			return
+		_finish_harvest_all(reply["result"])
+		return
+	_finish_harvest_all(game.harvest_all(_now()))
+
+
+func _finish_harvest_all(summary: Dictionary) -> void:
 	if not summary["ok"]:
 		AudioKit.play(self, "warn")
 		hud.show_status("现在没有成熟的地块。")
@@ -667,6 +817,8 @@ func _on_harvest_all_requested() -> void:
 
 
 func _on_sell_batch_requested(batch_id: int) -> void:
+	if _online_refused():
+		return
 	var result := game.sell_batch(batch_id)
 	if not result["ok"]:
 		AudioKit.play(self, "warn")
@@ -681,6 +833,8 @@ func _on_sell_batch_requested(batch_id: int) -> void:
 
 
 func _on_sell_all_requested() -> void:
+	if _online_refused():
+		return
 	if game.state["crop_batches"].is_empty():
 		AudioKit.play(self, "warn")
 		hud.show_status("仓库里没有可出售的作物。")
@@ -695,6 +849,8 @@ func _on_sell_all_requested() -> void:
 
 
 func _on_recycle_seed_requested(seed_id: int) -> void:
+	if _online_refused():
+		return
 	var result := game.recycle_seed(seed_id)
 	if result["ok"]:
 		AudioKit.play(self, "coins")
@@ -705,6 +861,8 @@ func _on_recycle_seed_requested(seed_id: int) -> void:
 
 
 func _on_recycle_pending_seed_requested(seed_id: int) -> void:
+	if _online_refused():
+		return
 	var result := game.recycle_pending_seed(seed_id)
 	hud.show_status("回收 1 粒待领取种子，获得 %d 金币。" % result["coins"] if result["ok"] else result["message"])
 	if result["ok"] and not _save():
@@ -713,6 +871,8 @@ func _on_recycle_pending_seed_requested(seed_id: int) -> void:
 
 
 func _on_sell_pending_crop_requested(batch_id: int) -> void:
+	if _online_refused():
+		return
 	var result := game.sell_pending_crop(batch_id)
 	hud.show_status("出售一批待领取作物，获得 %d 金币。" % result["coins"] if result["ok"] else result["message"])
 	if result["ok"] and not _save():
@@ -721,6 +881,8 @@ func _on_sell_pending_crop_requested(batch_id: int) -> void:
 
 
 func _on_claim_pending_requested() -> void:
+	if _online_refused():
+		return
 	var moved := game.claim_pending()
 	if moved["crops"] == 0 and moved["seeds"] == 0:
 		AudioKit.play(self, "warn")
@@ -735,6 +897,8 @@ func _on_claim_pending_requested() -> void:
 
 
 func _on_upgrade_warehouse_requested() -> void:
+	if _online_refused():
+		return
 	var result := game.upgrade_warehouse()
 	if result != "":
 		hud.show_status(result)
@@ -747,6 +911,8 @@ func _on_upgrade_warehouse_requested() -> void:
 
 
 func _on_buy_breeder_requested() -> void:
+	if _online_refused():
+		return
 	var result := game.buy_breeder(_now())
 	if result != "":
 		hud.show_status(result)
@@ -759,6 +925,8 @@ func _on_buy_breeder_requested() -> void:
 
 
 func _on_upgrade_breeder_requested() -> void:
+	if _online_refused():
+		return
 	var result := game.upgrade_breeder()
 	if result != "":
 		hud.show_status(result)
@@ -771,6 +939,8 @@ func _on_upgrade_breeder_requested() -> void:
 
 
 func _on_set_template_requested(seed_id: int) -> void:
+	if _online_refused():
+		return
 	var result := game.set_breeder_template(seed_id, _now())
 	if not result["ok"]:
 		hud.show_status(result["message"])
@@ -783,6 +953,8 @@ func _on_set_template_requested(seed_id: int) -> void:
 
 
 func _on_clear_template_requested() -> void:
+	if _online_refused():
+		return
 	var result := game.clear_breeder_template(_now())
 	if result != "":
 		hud.show_status(result)
@@ -792,6 +964,8 @@ func _on_clear_template_requested() -> void:
 
 
 func _on_collect_breeder_requested() -> void:
+	if _online_refused():
+		return
 	var result := game.collect_breeder(_now())
 	if not result["ok"]:
 		hud.show_status(result["message"])
@@ -804,6 +978,8 @@ func _on_collect_breeder_requested() -> void:
 
 
 func _on_buy_plot_requested() -> void:
+	if _online_refused():
+		return
 	var result := game.buy_plot()
 	if result != "":
 		hud.show_status(result)
@@ -816,6 +992,8 @@ func _on_buy_plot_requested() -> void:
 
 
 func _on_buy_can2_requested() -> void:
+	if _online_refused():
+		return
 	var result := game.buy_can2()
 	if result != "":
 		hud.show_status(result)
@@ -828,6 +1006,8 @@ func _on_buy_can2_requested() -> void:
 
 
 func _on_lock_guest_requested(guest_id: int) -> void:
+	if _online_refused():
+		return
 	var result := game.request_lock_guest(guest_id)
 	hud.show_status(result if result != "" else "锁定请求已记录，明天零点生效。")
 	if result == "" and not _save():
@@ -836,6 +1016,8 @@ func _on_lock_guest_requested(guest_id: int) -> void:
 
 
 func _on_unlock_guest_requested() -> void:
+	if _online_refused():
+		return
 	var result := game.request_lock_guest(0)
 	hud.show_status(result if result != "" else "解锁请求已记录，明天零点生效。")
 	if result == "" and not _save():
@@ -844,6 +1026,8 @@ func _on_unlock_guest_requested() -> void:
 
 
 func _on_lock_formula_requested(kind: String) -> void:
+	if _online_refused():
+		return
 	var result := game.request_lock_formula(kind)
 	hud.show_status(result if result != "" else "公式锁定已记录，明天零点生效（系数仍每日重抽）。")
 	if result == "" and not _save():
@@ -852,6 +1036,8 @@ func _on_lock_formula_requested(kind: String) -> void:
 
 
 func _on_unlock_formula_requested() -> void:
+	if _online_refused():
+		return
 	var result := game.request_unlock_formula()
 	hud.show_status(result if result != "" else "公式解锁已记录，明天零点生效。")
 	if result == "" and not _save():
@@ -860,6 +1046,8 @@ func _on_unlock_formula_requested() -> void:
 
 
 func _on_sell_batch_to_requested(batch_id: int, count: int, guest_id: int) -> void:
+	if _online_refused():
+		return
 	var result := game.sell_batch_to(batch_id, count, guest_id, _now())
 	if not result["ok"]:
 		hud.show_status(result["message"])
@@ -874,6 +1062,9 @@ func _on_sell_batch_to_requested(batch_id: int, count: int, guest_id: int) -> vo
 
 func _on_plain_save_requested() -> void:
 	## HUD 本地改动的立即保存（跳过引导等）：不剔除演示物品，仅整档写入＋刷新。
+	if online != null:
+		hud.show_status("线上进度由服务器实时保存，无需手动存档。")
+		return
 	if not _save():
 		hud.show_status("存档写入失败，本次操作可能没有保存！")
 	_refresh_all()
@@ -881,6 +1072,9 @@ func _on_plain_save_requested() -> void:
 
 func _on_expedition_save_requested(dirty: bool) -> void:
 	## 战备面板关闭：先剔除演示物品再保存（2.1 计划 W6：演示内容不进存档）。
+	if online != null:
+		_refresh_all()
+		return
 	var inventory := InventoryGame.new()
 	inventory.bind(game.state["expedition"])
 	inventory.strip_demo_instances()
@@ -890,7 +1084,7 @@ func _on_expedition_save_requested(dirty: bool) -> void:
 
 
 func _debug_mature_all() -> void:
-	if not OS.is_debug_build():
+	if not OS.is_debug_build() or online != null:
 		return
 	var changed := false
 	for plot in game.state["plots"]:
@@ -906,6 +1100,9 @@ func _debug_mature_all() -> void:
 func _advance_tutorial(completed_step: int) -> void:
 	## 首轮引导：动作成功且正处在对应步骤时推进；最后一步完成或跳过后不再打扰。
 	## F-08：推进即落盘并刷新横幅——不依赖玩家再做一次无关操作才可见/持久。
+	## 线上模式：教程步由服务器在命令事务内推进并随快照回传，本地禁止改动（防双推进）。
+	if online != null:
+		return
 	if int(game.state.get("tutorial_step", 99)) != completed_step:
 		return
 	game.state["tutorial_step"] = 99 if completed_step >= 4 else completed_step + 1
@@ -916,13 +1113,19 @@ func _advance_tutorial(completed_step: int) -> void:
 
 
 ## 2.5：收获事件进成长统计（第一茬岩芽菜等目标判定）。
+## 线上模式：服务器在命令事务内记账，本地不再重复统计。
 func _record_harvest(kind: String, count: int) -> void:
+	if online != null:
+		return
 	var crafting := CraftingGame.new()
 	crafting.bind(game)
 	crafting.record_event("harvested", {"kind": kind, "count": count})
 
 
 func _now() -> int:
+	if online != null:
+		## F08：线上时间锚定服务器（本机单调流逝补足），改本机时钟不影响生长/收益。
+		return online.now()
 	return int(Time.get_unix_time_from_system())
 
 
@@ -936,6 +1139,9 @@ func _consume_tutorial_replay() -> bool:
 
 
 func _save() -> bool:
+	if online != null:
+		## 线上档只存在服务器（F01/F09）：每命令成功即事务落库，本地无保存动作。
+		return true
 	game.breeder_settle(_now())
 	var ok := SaveStore.save_state(game.state)
 	if not ok:

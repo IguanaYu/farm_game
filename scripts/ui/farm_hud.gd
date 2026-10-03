@@ -95,6 +95,9 @@ var crops_value: Label
 var level_value: Label
 var plot_hint_label: Label
 var status_label: Label
+## M1 线上模式（计划 §5.6）：状态角标 + 未联网化入口的门控。
+var online_mode := false
+var online_badge: Label = null
 var modal_overlay: Control
 var modal_panel: PanelContainer
 var modal_title: Label
@@ -221,6 +224,40 @@ func show_harvest_all(result: Dictionary) -> void:
 	_apply_modal_height(300)
 	modal_overlay.visible = true
 	_render_modal()
+
+
+func set_online_mode(enabled: bool) -> void:
+	## 线上模式开关：显示状态角标；单机路径不调用，界面零变化（计划 §5.6）。
+	online_mode = enabled
+	if enabled and online_badge == null:
+		online_badge = Label.new()
+		online_badge.name = "OnlineBadge"
+		online_badge.add_theme_font_size_override("font_size", 14)
+		online_badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		online_badge.offset_left = -260
+		online_badge.offset_right = -12
+		online_badge.offset_top = 8
+		online_badge.offset_bottom = 34
+		online_badge.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		add_child(online_badge)
+	if online_badge != null:
+		online_badge.visible = enabled
+
+
+func set_online_status(text: String, is_online: bool) -> void:
+	if online_badge == null:
+		return
+	online_badge.text = "联机 · %s" % text
+	online_badge.add_theme_color_override("font_color", Color("#2e7d4f") if is_online else Color("#b0623a"))
+
+
+func _online_blocked(hint: String) -> bool:
+	## M1：依赖本地权威档/本地局的入口在线上模式一律拦截（F09）。
+	if not online_mode:
+		return false
+	if status_label != null:
+		show_status(hint)
+	return true
 
 
 func open_shop() -> void:
@@ -1533,6 +1570,8 @@ func open_equipment_warehouse() -> void:
 
 func open_room() -> void:
 	## 2.6：好友组队房间页（局域网／本机直连）。
+	if _online_blocked("联机房间将在洞窟联网（M3）后开放。"):
+		return
 	_close_modal()
 	room_panel.open(game)
 
@@ -1561,6 +1600,8 @@ func _on_coop_run_started_client(client: SessionClient) -> void:
 
 func open_battle_demo() -> void:
 	## 演示战斗入口：从战备面板进入；牌组按当前布局生成（2.3），不动存档。
+	if _online_blocked("战斗演示不在线上模式开放。"):
+		return
 	_close_modal()
 	if expedition_hub_panel != null:
 		expedition_hub_panel.close()
@@ -1668,11 +1709,16 @@ func _clear_coop_sinks() -> void:
 
 
 func open_expedition_hub() -> void:
+	if _online_blocked("洞窟探险将在联机版后续更新开放。"):
+		return
 	_close_modal()
 	expedition_hub_panel.open(game)
 
 
 func open_loadout() -> void:
+	## M2 开放装备/战备的线上命令前，先维持只读不可入（与洞窟同批解禁）。
+	if _online_blocked("战备与装备仓库将在联机版后续更新开放。"):
+		return
 	_close_modal()
 	expedition_hub_panel.close()
 	loadout_panel.open(game)

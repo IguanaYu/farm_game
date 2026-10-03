@@ -21,6 +21,19 @@ static func _save(config: ConfigFile) -> void:
 	config.save(SETTINGS_PATH)
 
 
+# —— 线上农场（M1） ————————————————————————————————————————————
+
+static func get_online_server_url() -> String:
+	var url := str(_load().get_value("online", "server_url", OnlineProtocol.DEFAULT_SERVER_URL))
+	return url if url.begins_with("wss://") else OnlineProtocol.DEFAULT_SERVER_URL
+
+
+static func set_online_server_url(url: String) -> void:
+	var config := _load()
+	config.set_value("online", "server_url", url)
+	_save(config)
+
+
 # —— 窗口 ——————————————————————————————————————————————————————
 
 static func get_fullscreen() -> bool:

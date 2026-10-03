@@ -1,6 +1,7 @@
 class_name MainMenu
 extends Control
-## 主菜单（启动首页）：继续 / 新游戏（覆盖需确认）/ 好友联机 / 设置 / 退出。
+## 主菜单（启动首页）：继续 / 新游戏（覆盖需确认）/ 线上农场（M1 服务器权威档）/
+## 好友联机（本地档房间）/ 设置 / 退出。
 ## 纯代码构建，沿用 room_panel 的主题与配色约定；1440×900 设计坐标。
 ## 按钮显式命名（ContinueButton 等），测试按控件名查找。
 ## 设置子页复用 SettingsView（与游戏内暂停菜单共用一套）。
@@ -19,6 +20,8 @@ const WORLD_SCENE := "res://scenes/main.tscn"
 var main_view: VBoxContainer
 var confirm_view: VBoxContainer
 var settings_view: VBoxContainer
+var online_view: VBoxContainer
+var online_panel: OnlineLoginPanel
 var settings_panel: SettingsView
 var continue_button: Button
 var confirm_summary: Label
@@ -84,6 +87,10 @@ func _build() -> void:
 	new_game_button.name = "NewGameButton"
 	new_game_button.pressed.connect(_on_new_game)
 	main_view.add_child(new_game_button)
+	var online_button := _menu_button("线上农场", Color("#eef4e7"), Color("#9fbf8a"), 40, 16)
+	online_button.name = "OnlineButton"
+	online_button.pressed.connect(_on_online)
+	main_view.add_child(online_button)
 	var coop_button := _menu_button("好友联机", Color("#e7eef6"), Color("#8fa8c8"), 40, 16)
 	coop_button.name = "CoopButton"
 	coop_button.pressed.connect(_on_coop)
@@ -99,10 +106,12 @@ func _build() -> void:
 
 	confirm_view = _build_confirm_view()
 	stack.add_child(confirm_view)
+	online_view = _build_online_view()
+	stack.add_child(online_view)
 	settings_view = _build_settings_view()
 	stack.add_child(settings_view)
 
-	var footer := _label("v%s · 存档即时保存 · 单机本地单存档" % SettingsStore.game_version(), 12, TEXT_MUTED)
+	var footer := _label("v%s · 本地档即时保存 · 线上档服务器保存" % SettingsStore.game_version(), 12, TEXT_MUTED)
 	footer.name = "MenuFooter"
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stack.add_child(footer)
@@ -134,6 +143,21 @@ func _build_confirm_view() -> VBoxContainer:
 	return view
 
 
+func _build_online_view() -> VBoxContainer:
+	var view := VBoxContainer.new()
+	view.name = "OnlineView"
+	view.visible = false
+	view.add_theme_constant_override("separation", 12)
+	online_panel = OnlineLoginPanel.new()
+	online_panel.name = "OnlinePanel"
+	online_panel.entered_online.connect(_on_entered_online)
+	view.add_child(online_panel)
+	var back_button := _menu_button("返回", Color("#f2eede"), Color("#cfc4a6"), 36, 15)
+	back_button.pressed.connect(func() -> void: _show_main_view())
+	view.add_child(back_button)
+	return view
+
+
 func _build_settings_view() -> VBoxContainer:
 	var view := VBoxContainer.new()
 	view.name = "SettingsView"
@@ -152,6 +176,7 @@ func _build_settings_view() -> VBoxContainer:
 func _show_main_view() -> void:
 	main_view.visible = true
 	confirm_view.visible = false
+	online_view.visible = false
 	settings_view.visible = false
 	_refresh_continue_summary()
 
@@ -159,6 +184,7 @@ func _show_main_view() -> void:
 func _show_view(view: VBoxContainer) -> void:
 	main_view.visible = false
 	confirm_view.visible = view == confirm_view
+	online_view.visible = view == online_view
 	settings_view.visible = view == settings_view
 
 
@@ -180,6 +206,17 @@ func _on_new_game() -> void:
 func _on_settings() -> void:
 	settings_panel.refresh()
 	_show_view(settings_view)
+
+
+func _on_online() -> void:
+	online_panel._refresh_session()
+	_show_view(online_view)
+
+
+func _on_entered_online(_token: String) -> void:
+	## 登录面板已保存凭据并设置 GameFlow.online_token；这里只负责切世界。
+	GameFlow.mode = GameFlow.Mode.ONLINE
+	get_tree().change_scene_to_file(WORLD_SCENE)
 
 
 func _on_coop() -> void:

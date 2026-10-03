@@ -343,6 +343,7 @@ M0 必须确定，下列未知项不阻止编写本规划，但不能用默认�
 - [第二大阶段修复计划与执行记录](Godot_第二大阶段_测试反馈修复计划_v0.1.md)：已有修复及批次 F 未完成验收。
 - [全阶段工程约定](plan/Godot_阶段2.1_规则基线与工程基础_代码执行计划_v0.1.md)：分层、时间/随机注入、复用规则和测试档隔离。
 - [实机测试清单](Godot_第二大阶段_实机测试清单_v0.1.md)：扩展为公网/专用服务端验收，历史记录保留。
+- [M1/M2 线上身份与个人农场代码执行计划](plan/Godot_好友联网_M1_M2_线上身份与个人农场_代码执行计划_v0.1.md)：2026-10-03 起 M1 已按此实施（§6 M1/M2 行展开）。
 - [Godot 4.6 高层多人文档](https://docs.godotengine.org/en/4.6/tutorials/networking/high_level_multiplayer.html)：网络接口和主机可达性依据。
 - [Godot 4.6 专用服务器导出](https://docs.godotengine.org/en/4.6/tutorials/export/exporting_for_dedicated_servers.html)：无界面服务端运行依据。
 - [Godot 4.6 WebSocketMultiplayerPeer](https://docs.godotengine.org/en/4.6/classes/class_websocketmultiplayerpeer.html)：WSS、证书验证和传输适配依据。
