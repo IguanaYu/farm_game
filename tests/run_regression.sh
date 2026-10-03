@@ -28,7 +28,8 @@ for path in tests/*.gd; do
   esac
   total=$((total + 1))
   out="$(mktemp)"
-  "$GODOT" --headless --path . --script "res://tests/$name" >"$out" 2>&1
+  ## 每项 8 分钟上限：脚本在 quit() 前崩溃会留下永不退出的场景循环，套件会挂死（R2 实测坑）。
+  timeout 480 "$GODOT" --headless --path . --script "res://tests/$name" >"$out" 2>&1
   ec=$?
   errors=$(grep -cE "^ERROR|SCRIPT ERROR" "$out" || true)
   allow=${WHITELIST[$name]:-0}

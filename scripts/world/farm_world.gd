@@ -53,43 +53,46 @@ var guest_slots: Array = []
 var hovered_plot_id: int = 0
 
 
+## R2：常驻上下文（GameContext）持有模式/档/线上桥接；farm_world 只做视图与装配。
+var context: GameContext = null
+## R2：地点路由与地点根——农场 3D 全部挂 FarmLocation 下，切换=该节点可见性（不重建）。
+var router: SceneRouter = null
+var farm_location: Node3D = null
+
+
 func _ready() -> void:
-	game = FarmGame.new()
-	if GameFlow.mode == GameFlow.Mode.ONLINE:
-		_boot_online()
-		return
-	var fresh_start := GameFlow.mode == GameFlow.Mode.NEW_GAME
-	if fresh_start:
-		# 主菜单"开始新游戏"：跳过读档直接开新局（旧档由原子写自动进 .bak）。
-		game.new_game(_now())
-	else:
-		var saved := SaveStore.load_state()
-		var loaded := not saved.is_empty() and game.load_state(saved)
-		if not loaded:
-			saved = SaveStore.load_backup_state()
-			loaded = not saved.is_empty() and game.load_state(saved)
-		if not loaded:
-			fresh_start = true
-			game.new_game(_now())
-	if _consume_tutorial_replay() and not fresh_start:
-		# 只有读档路径需要归零（新档本来就是 0）；新档只落一次盘，保住"开新局前"的 .bak。
-		game.state["tutorial_step"] = 0
-		_save()
-	elif fresh_start:
-		_save()
-	var open_room := GameFlow.open_room_on_entry
-	GameFlow.reset()
-	var market_changed := game.refresh_market(_now())
-	if game.breeder_settle(_now()) or market_changed:
-		_save()
+	context = GameContext.create()
+	context.attach_to(self)
+	context.bootstrapped.connect(_on_context_ready)
+	context.login_failed.connect(_online_login_failed)
+	context.status_changed.connect(_on_online_status)
+	context.boot()
+
+
+## 上下文就绪（离线 boot 完成 / 线上首快照到达）：构建视图。幂等——重复快照不重建。
+func _on_context_ready() -> void:
+	if hud != null:
+		return  # 仅首个快照构建；后续快照由命令路径各自刷新
+	game = context.game
+	online = context.online
 	_build_farm()
+	_setup_router()
 	_build_hud()
+	if online != null:
+		hud.set_online_mode(true)
+		hud.online_request = Callable(online, "request")
+		hud.set_online_expedition(online)
 	_refresh_all()
 	_start_clock()
-	if open_room and hud != null:
+	AudioKit.play_music(self)
+	if online != null:
+		## M3：welcome 附带活动局（重连恢复，S05 核心）→ 直接回到局面板。
+		if not context.resume_run.is_empty() and str(context.resume_run.get("outcome", "")) == "":
+			hud.enter_online_run()
+		return
+	if context.open_room_on_entry and hud != null:
 		# 主菜单"好友联机"直入：读档/建档完成后自动打开房间页（延迟一帧让 HUD 先完成布局）。
 		hud.call_deferred("open_room")
-	AudioKit.play_music(self)
 
 
 func _process(delta: float) -> void:
@@ -112,6 +115,9 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 
 func _build_farm() -> void:
+	farm_location = Node3D.new()
+	farm_location.name = "FarmLocation"
+	add_child(farm_location)
 	var environment_node := WorldEnvironment.new()
 	environment_node.name = "FarmEnvironment"
 	var sky := Environment.new()
@@ -172,6 +178,99 @@ func _build_farm() -> void:
 		_add_decoration(FENCE_MODEL, Vector3(7.5, 0.08, z), 90.0)
 
 
+## R2：地点路由装配——farm（自身 3D 组）+ shop 占位间；切换不触碰 GameContext。
+func _setup_router() -> void:
+	router = SceneRouter.new()
+	router.name = "SceneRouter"
+	add_child(router)
+	router.register("farm", farm_location)
+	var shop := _build_shop_stub()
+	router.register("shop", shop, Callable(), Callable())
+
+
+## 商店占位内景（R2 骨架，R3 换正式切墙内景）：小间 + 柜台（保留原商店面板）+ 回程门。
+func _build_shop_stub() -> Node3D:
+	var shop := Node3D.new()
+	shop.name = "ShopStubLocation"
+	shop.visible = false
+	add_child(shop)
+	var floor_mesh := MeshInstance3D.new()
+	floor_mesh.name = "ShopFloor"
+	var floor_box := BoxMesh.new()
+	floor_box.size = Vector3(10.0, 0.2, 8.0)
+	floor_mesh.mesh = floor_box
+	floor_mesh.position = Vector3(0, -0.1, 0)
+	var floor_mat := StandardMaterial3D.new()
+	floor_mat.albedo_color = Color("#8a6a45")
+	floor_mesh.material_override = floor_mat
+	shop.add_child(floor_mesh)
+	var wall := MeshInstance3D.new()
+	wall.name = "ShopBackWall"
+	var wall_box := BoxMesh.new()
+	wall_box.size = Vector3(10.0, 3.2, 0.3)
+	wall.mesh = wall_box
+	wall.position = Vector3(0, 1.6, -4.0)
+	var wall_mat := StandardMaterial3D.new()
+	wall_mat.albedo_color = Color("#a4543f")
+	wall.material_override = wall_mat
+	shop.add_child(wall)
+	var counter := StaticBody3D.new()
+	counter.name = "ShopCounter"
+	counter.position = Vector3(0, 0.5, -2.2)
+	counter.input_ray_pickable = true
+	var counter_hit := CollisionShape3D.new()
+	var counter_shape := BoxShape3D.new()
+	counter_shape.size = Vector3(4.0, 1.0, 0.8)
+	counter_hit.shape = counter_shape
+	counter.add_child(counter_hit)
+	var counter_mesh := MeshInstance3D.new()
+	var counter_box := BoxMesh.new()
+	counter_box.size = Vector3(4.0, 1.0, 0.8)
+	counter_mesh.mesh = counter_box
+	var counter_mat := StandardMaterial3D.new()
+	counter_mat.albedo_color = Color("#c8a772")
+	counter_mesh.material_override = counter_mat
+	counter.add_child(counter_mesh)
+	counter.input_event.connect(_on_shop_counter_input)
+	shop.add_child(counter)
+	var door := StaticBody3D.new()
+	door.name = "ShopDoor"
+	door.position = Vector3(0, 1.1, 3.7)
+	door.input_ray_pickable = true
+	var door_hit := CollisionShape3D.new()
+	var door_shape := BoxShape3D.new()
+	door_shape.size = Vector3(1.8, 2.2, 0.3)
+	door_hit.shape = door_shape
+	door.add_child(door_hit)
+	var door_mesh := MeshInstance3D.new()
+	var door_box := BoxMesh.new()
+	door_box.size = Vector3(1.8, 2.2, 0.3)
+	door_mesh.mesh = door_box
+	var door_mat := StandardMaterial3D.new()
+	door_mat.albedo_color = Color("#77a75a")
+	door_mat.emission_enabled = true
+	door_mat.emission = Color("#ffd257")
+	door_mat.emission_energy_multiplier = 0.4
+	door_mesh.material_override = door_mat
+	door.add_child(door_mesh)
+	door.input_event.connect(_on_shop_door_input)
+	shop.add_child(door)
+	return shop
+
+
+func _on_shop_counter_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
+		hud.open_shop()
+
+
+func _on_shop_door_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
+		if router != null:
+			router.go_back()
+
+
 func _add_ground(node_name: String, dimensions: Vector3, location: Vector3, color: Color) -> void:
 	var ground := MeshInstance3D.new()
 	ground.name = node_name
@@ -183,7 +282,7 @@ func _add_ground(node_name: String, dimensions: Vector3, location: Vector3, colo
 	material.roughness = 1.0
 	ground.material_override = material
 	ground.position = location
-	add_child(ground)
+	_loc().add_child(ground)
 
 
 func _add_plot(plot_id: int, location: Vector3) -> void:
@@ -238,7 +337,7 @@ func _add_plot(plot_id: int, location: Vector3) -> void:
 	body.input_event.connect(_on_plot_input.bind(plot_id))
 	body.mouse_entered.connect(_on_plot_hover.bind(plot_id))
 	body.mouse_exited.connect(_on_plot_exit.bind(plot_id))
-	add_child(body)
+	_loc().add_child(body)
 	plot_holders[plot_id] = model_holder
 
 
@@ -258,7 +357,7 @@ func _add_building(node_name: String, model: PackedScene, location: Vector3, kin
 	appearance.name = "Appearance"
 	body.add_child(appearance)
 	body.input_event.connect(_on_building_input.bind(kind))
-	add_child(body)
+	_loc().add_child(body)
 
 
 ## 第二大阶段占位道具（2.1 计划 W5）：纯色方盒＋发光顶边，点击走建筑分发。
@@ -299,7 +398,7 @@ func _add_prop(node_name: String, location: Vector3, dimensions: Vector3, fill: 
 	trim.material_override = trim_material
 	body.add_child(trim)
 	body.input_event.connect(_on_building_input.bind(kind))
-	add_child(body)
+	_loc().add_child(body)
 
 
 func _add_guest_slot(location: Vector3) -> void:
@@ -317,7 +416,7 @@ func _add_guest_slot(location: Vector3) -> void:
 	hitbox.position.y = 0.85
 	body.add_child(hitbox)
 	body.input_event.connect(_on_guest_input.bind(slot_index))
-	add_child(body)
+	_loc().add_child(body)
 	guest_slots.append(body)
 
 
@@ -345,7 +444,12 @@ func _add_decoration(model: PackedScene, location: Vector3, rotation_y: float = 
 	var appearance := model.instantiate()
 	appearance.position = location
 	appearance.rotation_degrees.y = rotation_y
-	add_child(appearance)
+	_loc().add_child(appearance)
+
+
+## 地点根（R2）：农场 3D 的挂载点；环境/太阳/相机留在 farm_world 层共享。
+func _loc() -> Node3D:
+	return farm_location if farm_location != null else self
 
 
 func _build_hud() -> void:
@@ -456,7 +560,7 @@ func _on_clock_tick() -> void:
 		hud.update_harvest_entry()
 		hud.tick_update(_now())
 		return
-	if game.refresh_market(_now()):
+	if context.tick_market():
 		_save()
 		_refresh_guest_models()
 	for plot_id in range(1, FarmGame.MAX_PLOTS + 1):
@@ -511,38 +615,6 @@ func _refresh_hover_hint() -> void:
 
 
 # —— M1 线上模式（计划 §5.5） ——————————————————————————————————————
-
-
-func _boot_online() -> void:
-	## 不读不写本地档（F09）；等服务器快照灌入后再构建场景与 HUD。
-	online = OnlineFarmBridge.new()
-	online.name = "OnlineFarmBridge"
-	add_child(online)
-	game = online.game
-	online.snapshot_applied.connect(_online_bootstrap)
-	online.login_failed.connect(_online_login_failed)
-	online.status_changed.connect(_on_online_status)
-	var token := GameFlow.online_token
-	GameFlow.reset()
-	if token == "":
-		token = str(OnlineClient.load_session().get("token", ""))
-	online.begin(SettingsStore.get_online_server_url(), token)
-
-
-func _online_bootstrap() -> void:
-	if hud != null:
-		return  # 仅首个快照构建；后续快照由命令路径各自刷新
-	_build_farm()
-	_build_hud()
-	hud.set_online_mode(true)
-	hud.online_request = Callable(online, "request")
-	hud.set_online_expedition(online)
-	_refresh_all()
-	_start_clock()
-	AudioKit.play_music(self)
-	## M3：welcome 附带活动局（重连恢复，S05 核心）→ 直接回到局面板。
-	if not online.mirror_run.is_empty() and str(online.mirror_run.get("outcome", "")) == "":
-		hud.enter_online_run()
 
 
 func _online_login_failed(code: String, _need: Dictionary) -> void:
@@ -654,7 +726,11 @@ func _on_building_input(_camera: Node, event: InputEvent, _position: Vector3, _n
 			return
 		match kind:
 			"shop":
-				hud.open_shop()
+				## R2：商店入口改为切换地点（占位间，柜台仍打开原商店面板；R3 换正式内景）。
+				if router != null:
+					router.switch_to("shop")
+				else:
+					hud.open_shop()
 			"warehouse":
 				hud.open_warehouse()
 			"breeder":
@@ -1293,28 +1369,10 @@ func _record_harvest(kind: String, count: int) -> void:
 	crafting.record_event("harvested", {"kind": kind, "count": count})
 
 
+## R2 薄转发：时间与保存是常驻上下文的服务（切换地点不重建）；保留旧名以零改动调用点。
 func _now() -> int:
-	if online != null:
-		## F08：线上时间锚定服务器（本机单调流逝补足），改本机时钟不影响生长/收益。
-		return online.now()
-	return int(Time.get_unix_time_from_system())
-
-
-## 主菜单"重新显示新手引导"：合并 GameFlow（本次会话）与 settings.cfg（跨启动）两个来源，
-## cfg 标志消费即清除，避免下次进农场再次重播。
-func _consume_tutorial_replay() -> bool:
-	var replay := GameFlow.reset_tutorial or SettingsStore.get_tutorial_replay()
-	if SettingsStore.get_tutorial_replay():
-		SettingsStore.set_tutorial_replay(false)
-	return replay
+	return context.now()
 
 
 func _save() -> bool:
-	if online != null:
-		## 线上档只存在服务器（F01/F09）：每命令成功即事务落库，本地无保存动作。
-		return true
-	game.breeder_settle(_now())
-	var ok := SaveStore.save_state(game.state)
-	if not ok:
-		push_error("存档写入失败，请检查磁盘空间与 user:// 目录权限。")
-	return ok
+	return context.save_game(game)

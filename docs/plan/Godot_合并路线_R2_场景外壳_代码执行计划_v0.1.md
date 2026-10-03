@@ -1,6 +1,6 @@
 # 合并路线 R2：常驻场景外壳 代码执行计划 v0.1
 
-编写日期：2026-10-03。状态：**已定稿，开始实施**。
+编写日期：2026-10-03。状态：**已完成**（d47 37/37：切换零重建/零额外收益/线上 context 断言）。
 
 依据：[合并路线图](Godot_合并路线图_联网与多场景_v0.1.md) R2 行；[多场景与空间交互设计稿 v0.4](../design/Farm_多场景与空间交互_设计稿_v0.4.md) §10（Godot 落地结构）。
 
@@ -59,3 +59,14 @@ main.tscn（FarmWorld 节点，即事实上的 WorldShell——常驻根）
 ## 5. 维护
 
 完成后更新本文件状态与[合并路线图](Godot_合并路线图_联网与多场景_v0.1.md) §0；偏差记录在本文件末尾。
+
+
+## 6. 实施记录
+
+### 2026-10-03：R2 全部落地
+
+- **R2-a**：`game_context.gd`（mode/game/online/now/save_game/tick_market + boot 生命周期与 bootstrapped/login_failed/status_changed 信号）；farm_world._ready 改为 context 驱动，保留 `_now()/_save()` 薄转发（调用点零改动）；`_boot_online/_online_bootstrap` 由 context + `_on_context_ready` 取代。d33/d35/d38/d42/d43 零变化通过。
+- **R2-b**：`scene_router.gd`（注册表/返回栈/0.12s 淡入淡出纯表现过渡/未注册地点拒但不污染错误计数）；农场 3D 全部迁入 `FarmLocation` 组节点（环境/太阳/相机留外壳层共享）；`ShopStubLocation` 占位间（柜台=原商店面板入口，门=回程）；商店建筑点击改走 router。
+- **R2-c**：d47（37 项）：farm↔shop 十次往返 game 同实例、coins/day_index/tutorial/seeds 零变化、返回栈正确；线上 context（预铸 token + 本地服务器）game 即桥副本、now() 服务器锚点。
+
+**偏差**：无（与 §2 决策一致；"视图 game 可换实例再存"的语义由 save_game(target) 保留，d33 换档演练不受影响）。
