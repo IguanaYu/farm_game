@@ -536,9 +536,13 @@ func _online_bootstrap() -> void:
 	_build_hud()
 	hud.set_online_mode(true)
 	hud.online_request = Callable(online, "request")
+	hud.set_online_expedition(online)
 	_refresh_all()
 	_start_clock()
 	AudioKit.play_music(self)
+	## M3：welcome 附带活动局（重连恢复，S05 核心）→ 直接回到局面板。
+	if not online.mirror_run.is_empty() and str(online.mirror_run.get("outcome", "")) == "":
+		hud.enter_online_run()
 
 
 func _online_login_failed(code: String, _need: Dictionary) -> void:

@@ -11,6 +11,8 @@ signal request_completed(req_id: String, reply: Dictionary)
 signal kicked(reason: String)
 signal state_changed(state: int)
 signal bye_received(code: String)
+## M3：服务器主动推送（push.room / push.run / push.settlement）。
+signal push_received(kind: String, payload: Dictionary)
 
 enum State { OFFLINE, CONNECTING, ONLINE, RECONNECTING }
 
@@ -181,6 +183,8 @@ func _handle_packet(raw: String) -> void:
 			bye_received.emit(str(msg.get("code", "")))
 		"pong":
 			pass
+		"push":
+			push_received.emit(str(msg.get("kind", "")), msg)
 		"error":
 			var code := str(msg.get("code", ""))
 			if not _authenticated:

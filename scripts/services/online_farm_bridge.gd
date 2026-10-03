@@ -9,6 +9,10 @@ extends Node
 signal snapshot_applied
 signal login_failed(code: String, need: Dictionary)
 signal status_changed(text: String, online: bool)
+## M3：房间/局推送（服务器主动下发；run 带 version，客户端丢弃旧版本）。
+signal room_updated(room: Dictionary)
+signal run_snapshot(run: Dictionary, version: int)
+signal settlement_arrived(settlement: Dictionary)
 
 const REQUEST_TIMEOUT_MS := 8000
 
@@ -16,18 +20,33 @@ var client := OnlineClient.new()
 var game := FarmGame.new()
 var _busy := false
 var _bootstrapped := false
+## M3：局镜像（版本门控）。welcome 重连恢复与 push.run 同一入口维护。
+var mirror_run := {}
+var mirror_run_version := 0
+var mirror_room := {}
 
 
 func begin(url: String, token: String) -> void:
+	_wire_client()
+	client.begin_with_token(url, token)
+	_set_status("连接中…", false)
+
+
+## 一次性邀请激活（M3 测试/登录面板用）：与 begin() 同一装配，走 activate 路径。
+func begin_with_invite(url: String, invite: String, nick_name: String) -> void:
+	_wire_client()
+	client.activate(url, invite, nick_name)
+	_set_status("连接中…", false)
+
+
+func _wire_client() -> void:
 	add_child(client)
-	client.server_url = url
 	client.welcome_received.connect(_on_welcome)
 	client.handshake_failed.connect(_on_handshake_failed)
 	client.state_changed.connect(_on_state_changed)
 	client.kicked.connect(_on_kicked)
 	client.request_completed.connect(_on_request_completed)
-	client.begin_with_token(url, token)
-	_set_status("连接中…", false)
+	client.push_received.connect(_on_push)
 
 
 func now() -> int:
@@ -58,7 +77,8 @@ func request(op: String, args: Dictionary) -> Dictionary:
 	if reply.is_empty():
 		_set_status("操作响应超时；若已生效会在重连后从快照看到结果", false)
 		return {}
-	if str(reply.get("t", "")) == "req_ok" and _apply_snapshot(reply):
+	## M3 起 room/run 应答不带农场快照（局态在 run/version）；仅应答携带快照时回灌。
+	if str(reply.get("t", "")) == "req_ok" and reply.has("snapshot") and _apply_snapshot(reply):
 		_set_status("已连接", true)
 	return reply
 
@@ -69,9 +89,119 @@ func _on_welcome(msg: Dictionary) -> void:
 		login_failed.emit(OnlineProtocol.ERR_INTERNAL, {})
 		return
 	_set_status("已连接", true)
+	## M3：重连恢复——welcome 附带房间与活动局（S05 核心）。
+	if msg.has("room"):
+		mirror_room = msg["room"]
+		room_updated.emit(mirror_room)
+	if msg.has("run"):
+		_apply_run(msg["run"], int(msg.get("version", 0)))
 	if not _bootstrapped:
 		_bootstrapped = true
 		snapshot_applied.emit()
+
+
+func _on_push(kind: String, msg: Dictionary) -> void:
+	match kind:
+		"room":
+			var room: Variant = msg.get("room", {})
+			if room is Dictionary:
+				mirror_room = room
+				room_updated.emit(room)
+		"run":
+			_apply_run(msg.get("run", {}), int(msg.get("version", 0)))
+		"settlement":
+			var settlement: Variant = msg.get("settlement", {})
+			if settlement is Dictionary:
+				settlement_arrived.emit(settlement)
+
+
+func _apply_run(run: Variant, version: int) -> void:
+	if not (run is Dictionary) or run.is_empty():
+		return
+	## 版本是"每局"计数：换局（run_id 变化）时重置基线，否则旧局版本会挡住新局快照。
+	var rid := str(run.get("run_id", ""))
+	if rid != "" and rid != str(mirror_run.get("run_id", "")):
+		mirror_run_version = 0
+	if version <= mirror_run_version and not mirror_run.is_empty():
+		return
+	mirror_run = run
+	mirror_run_version = version
+	run_snapshot.emit(run, version)
+
+
+# —— M3 局命令面（W07 客户端半） ——————————————————————————————————
+
+
+## 房间/出发应答的 result 里带 room/run：即刻吸收进镜像，不依赖后续推送的到达时机。
+func _absorb_room(reply: Dictionary) -> void:
+	var result: Variant = reply.get("result", {})
+	if not (result is Dictionary):
+		return
+	var room: Variant = result.get("room", {})
+	if room is Dictionary and not room.is_empty():
+		mirror_room = room
+		room_updated.emit(room)
+
+
+func _absorb_run(reply: Dictionary) -> void:
+	var result: Variant = reply.get("result", {})
+	if not (result is Dictionary):
+		return
+	if result.has("run"):
+		_apply_run(result.get("run", {}), int(result.get("version", 0)))
+
+
+func room_create() -> Dictionary:
+	var reply: Dictionary = await request("room.create", {})
+	_absorb_room(reply)
+	return reply
+
+
+func room_join(code: String) -> Dictionary:
+	var reply: Dictionary = await request("room.join", {"code": code})
+	_absorb_room(reply)
+	return reply
+
+
+func room_leave() -> Dictionary:
+	var reply: Dictionary = await request("room.leave", {})
+	if str(reply.get("t", "")) == "req_ok":
+		mirror_room = {}
+		room_updated.emit({})
+	return reply
+
+
+func room_ready(ready: bool) -> Dictionary:
+	var reply: Dictionary = await request("room.ready", {"ready": ready})
+	_absorb_room(reply)
+	return reply
+
+
+func begin_depart() -> Dictionary:
+	var reply: Dictionary = await request("room.begin_depart", {})
+	_absorb_room(reply)
+	_absorb_run(reply)
+	return reply
+
+
+func depart_solo() -> Dictionary:
+	var reply: Dictionary = await request("run.depart_solo", {})
+	_absorb_run(reply)
+	return reply
+
+
+## 局内动作（供 map/battle/loot 的 sink 调用）：返回规则结果字典；
+## 失败/超时返回 {ok:false, reason}。req_ok 附带的 run 已按 version 灌入镜像。
+func run_action(kind: String, args: Dictionary = {}) -> Dictionary:
+	var reply: Dictionary = await request("run.action", {"kind": kind, "args": args})
+	if reply.is_empty():
+		return {"ok": false, "reason": "连接不可用或响应超时，稍后会自动重试"}
+	if str(reply.get("t", "")) != "req_ok":
+		return {"ok": false, "reason": str(reply.get("msg", reply.get("code", "操作失败")))}
+	if reply.has("run"):
+		_apply_run(reply["run"], int(reply.get("version", 0)))
+	var result: Variant = reply.get("result", {})
+	return result if result is Dictionary else {"ok": true}
 
 
 func _on_handshake_failed(code: String, need: Dictionary) -> void:
@@ -97,7 +227,7 @@ func _on_state_changed(state: int) -> void:
 
 ## 迟到的 req_ok（超时后重连送达）也刷快照，保持副本最新。
 func _on_request_completed(_req_id: String, reply: Dictionary) -> void:
-	if str(reply.get("t", "")) == "req_ok":
+	if str(reply.get("t", "")) == "req_ok" and reply.has("snapshot"):
 		_apply_snapshot(reply)
 
 

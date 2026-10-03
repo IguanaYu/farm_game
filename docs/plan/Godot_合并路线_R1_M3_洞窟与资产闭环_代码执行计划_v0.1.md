@@ -1,6 +1,6 @@
 # 合并路线 R1 / M3：洞窟与资产闭环 代码执行计划 v0.1
 
-编写日期：2026-10-03。状态：**已定稿，开始实施**。
+编写日期：2026-10-03。状态：**代码与本地验证全部完成**（d45 78/78、d46 28/28；部署上生产待 R5/M4 一并或用户指示）。
 
 依据：[合并路线图](Godot_合并路线图_联网与多场景_v0.1.md) R1 行；[【主要】好友联网试玩版开发规划 v0.1](../【主要】Godot_好友联网试玩版_开发规划_v0.1.md) §6 M3 行、§3.3/§3.4、W05/W06/W07 工作包。编号引用 C01～C10、S01～S04、T04～T08。
 
@@ -126,21 +126,21 @@ settlements(settlement_id TEXT PRIMARY KEY, run_id TEXT NOT NULL, account_id INT
 
 | 编号 | 内容 | 处理 | 验证 | 状态 |
 | --- | --- | --- | --- | --- |
-| C01 | 创建/房码加入/离开 | §3.1 room.*；错误码全覆盖 | d45 段1 | ⏳ |
-| C02 | 多房间隔离 | runs/rooms 按行隔离；裁定只读本房 run | d45 段5（双房并行不串局） | ⏳ |
-| C03 | 成员/准备/出发 | room.ready + begin_depart 服务器重查开局 | d45 段2 | ⏳ |
-| C04 | 创建者与服务器分离 | 创建者仅发起权限；离开移交 | d45 段1（移交断言） | ⏳ |
-| C05 | 单人线上探险 | run.depart_solo 同一资产入口 | d45 段4 | ⏳ |
-| C06 | 双端独立操作 | run.action 双方各自提交，服务器排序裁定 | d45 段3 | ⏳ |
-| C07 | 选路/事件/休整/搜刮/分配 | 动作集全量 + 满包拒绝不吞奖励 | d45 段3 | ⏳ |
-| C08 | 分享/撤离/死亡/放弃 | vote_extract/abandon_member 语义沿用 | d45 段3 | ⏳ |
-| C09 | 快照与信息范围 | push.run 快照 version 化；未入节点无 resolved | d45 段3（快照断言） | ⏳ |
-| C10 | 快捷信号 | signal 动作走同通道 | d45 段3（1 条信号断言） | ⏳ |
-| S01 | 带入检查与占用 | 出发跨账户单事务 | d45 段2（失败注入：B 未准备/占用中） | ⏳ |
-| S02 | 去重与过期保护 | receipts 收据 + run.version | d45 段6（重放同号同参/同号异参） | ⏳ |
-| S03 | 消耗/获得/转移/结算 | 结算跨账户事务+逐件对账 | d45 段3（带入/获得/损失/保险箱四清单核对） | ⏳ |
-| S04 | 未送达结果查询 | 重连即 welcome 带 run+重放收据回原结果 | d45 段2（强杀重启后动作重放） | ⏳ |
-| 附带 | `inv.discard`/`inv.claim_reward` 服务端命令 | M2 遗留：局内入口即 run.action 的 loot_manage/claim_reward（无需独立 farm 命令） | d45 段3 | ⏳ |
+| C01 | 创建/房码加入/离开 | §3.1 room.*；错误码全覆盖 | d45 段1 | ✅ |
+| C02 | 多房间隔离 | runs/rooms 按行隔离；裁定只读本房 run | d45 段5（双房并行不串局） | ✅ |
+| C03 | 成员/准备/出发 | room.ready + begin_depart 服务器重查开局 | d45 段2 | ✅ |
+| C04 | 创建者与服务器分离 | 创建者仅发起权限；离开移交 | d45 段1（移交断言） | ✅ |
+| C05 | 单人线上探险 | run.depart_solo 同一资产入口 | d45 段4 | ✅ |
+| C06 | 双端独立操作 | run.action 双方各自提交，服务器排序裁定 | d45 段3 | ✅ |
+| C07 | 选路/事件/休整/搜刮/分配 | 动作集全量 + 满包拒绝不吞奖励 | d45 段3 | ✅ |
+| C08 | 分享/撤离/死亡/放弃 | vote_extract/abandon_member 语义沿用 | d45 段3 | ✅ |
+| C09 | 快照与信息范围 | push.run 快照 version 化；未入节点无 resolved | d45 段3（快照断言） | ✅ |
+| C10 | 快捷信号 | signal 动作走同通道 | d45 段3（1 条信号断言） | ✅ |
+| S01 | 带入检查与占用 | 出发跨账户单事务 | d45 段2（失败注入：B 未准备/占用中） | ✅ |
+| S02 | 去重与过期保护 | receipts 收据 + run.version | d45 段6（重放同号同参/同号异参） | ✅ |
+| S03 | 消耗/获得/转移/结算 | 结算跨账户事务+逐件对账 | d45 段3（带入/获得/损失/保险箱四清单核对） | ✅ |
+| S04 | 未送达结果查询 | 重连即 welcome 带 run+重放收据回原结果 | d45 段2（强杀重启后动作重放） | ✅ |
+| 附带 | `inv.discard`/`inv.claim_reward` 服务端命令 | M2 遗留：局内入口即 run.action 的 loot_manage/claim_reward（无需独立 farm 命令） | d45 段3 | ✅ |
 
 T 编号映射：T04（段6）、T05（段4）、T06（段3 双客户端全链路·自动化近似）、T07（并发动作串行化·子集）、T08（段5）。真双机公网人工验收留 R6/M5（不冒充自动化）。
 
@@ -176,3 +176,19 @@ T 编号映射：T04（段6）、T05（段4）、T06（段3 双客户端全链�
 ## 10. 维护
 
 - 完成后更新本表状态列与[合并路线图](Godot_合并路线图_联网与多场景_v0.1.md) §0 进度；实施偏差记录在本文件末尾（沿 M1/M2 计划体例）。
+
+
+## 11. 实施记录
+
+### 2026-10-03：M3 全部落地（本地验证）
+
+- **M3-a**（7cbfad7）：PROTO v3 + `FEATURE_EXPEDITION`、schema v3（rooms/runs/settlements，v2→v3 加表迁移）、`ExpeditionStore.backend` 注入、`depart_check/compose_run` 抽取、`apply_guest_too/guest_farm` 服务器结算注入。离线洞窟 9 项测试零变化。
+- **M3-b/c**（7c3f21f）：`room_service.gd`（C01～C04 房间生命周期、S01 跨账户出发事务、C06～C10 动作裁定+推送、S02～S04 收据去重与结算同事务、S07 启动恢复）；`server_main` 装配/welcome 扩展/断线通知；d45 78/78。
+- **M3-d**（本提交）：`online_client` push 信号；`online_farm_bridge` 局命令面（room_*/depart_solo/run_action）+ 房间/局镜像（换局重置版本基线）+ 三信号；`OnlineRoomPanel`/`OnlineRunPanel`（镜像驱动、意图全走服务器，战斗 pending 由回执与新快照双路解除）；farm_hud 在线房间/出发/继续分支 + farm_world welcome 恢复直回局面板；d46 28/28。
+
+**与计划的偏差（实测定型）：**
+
+1. **房主个人放弃 = 终局**：规则层 `_settle_one_member` 的 is_host 分支恒置 outcome（离线路径依赖客机自行处理，服务器无法依赖）。服务器侧为未结算队友自动补一份放弃结算（`_member_unsettled` 防重），杜绝占用悬空；d45 段5 断言该语义。
+2. **map/battle/loot 的 sink 未走 await 化路线**：改为 OnlineRunPanel 自带 battle_screen/loot_panel 实例 + fire-and-forget sink（返回 String 走 pending 模式），避免改动单机/中继路径的 20+ 处调用点——离线回归零 diff 风险更低。计划 §5.3 的"调用点全面 await 化"作废，以本偏差记录为准。
+3. **客户端镜像版本门控跨局串号**：`_apply_run` 按 run_id 变化重置版本基线（d46 发现：旧局 v3 会挡住新局 v1）。
+4. run 持久化不走 ExpeditionStore.backend 暂存（初稿设计），run 行由 room_service 在事务内显式 INSERT/UPDATE（版本统一管理）；backend 只接结算单。

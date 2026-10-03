@@ -119,6 +119,9 @@ var coop_client_panel: CoopClientPanel
 var active_expedition: ExpeditionGame
 ## 合作局主机侧会话（F-04）：地图/战斗面板的裁定入口与快照刷新从这里注入。
 var coop_host: SessionHost = null
+var online_bridge: OnlineFarmBridge = null
+var online_room_panel: OnlineRoomPanel = null
+var online_run_panel: OnlineRunPanel = null
 ## ESC 暂停菜单：所有面板收起时才允许弹出；卡片内分主视图与设置子视图两页。
 var pause_overlay: Control
 var pause_back_button: Button
@@ -1557,6 +1560,14 @@ func _build_expedition_panels() -> void:
 	coop_client_panel.name = "CoopClientPanel"
 	coop_client_panel.close_requested.connect(func() -> void: coop_client_panel.close())
 	add_child(coop_client_panel)
+	online_room_panel = OnlineRoomPanel.new()
+	online_room_panel.name = "OnlineRoomPanel"
+	online_room_panel.close_requested.connect(func() -> void: online_room_panel.close())
+	add_child(online_room_panel)
+	online_run_panel = OnlineRunPanel.new()
+	online_run_panel.name = "OnlineRunPanel"
+	online_run_panel.close_requested.connect(func() -> void: online_run_panel.close())
+	add_child(online_run_panel)
 
 
 func open_crafting() -> void:
@@ -1573,10 +1584,21 @@ func open_equipment_warehouse() -> void:
 	equipment_warehouse_panel.open(game)
 
 
+func set_online_expedition(bridge: OnlineFarmBridge) -> void:
+	## M3：线上模式由 farm_world 注入桥接层，房间/局命令都从这里走。
+	online_bridge = bridge
+
+
 func open_room() -> void:
-	## 2.6：好友组队房间页（局域网／本机直连）。
-	if _online_blocked("联机房间将在洞窟联网（M3）后开放。"):
-		return
+	## 2.6：好友组队房间页（局域网／本机直连）；M3 线上模式走服务器房间。
+	if online_mode:
+		if online_bridge == null:
+			show_status("线上房间不可用，请重新登录。")
+			return
+		if not online_run_panel.visible:
+			_close_modal()
+			online_room_panel.open(online_bridge)
+			return
 	_close_modal()
 	room_panel.open(game)
 
@@ -1625,6 +1647,9 @@ func _on_battle_inventory_mutated() -> void:
 
 func _on_depart_requested() -> void:
 	_clear_coop_sinks()
+	if online_mode:
+		_on_depart_requested_online()
+		return
 	var result := ExpeditionGame.depart(game, int(Time.get_unix_time_from_system()))
 	if not result["ok"]:
 		if expedition_hub_panel != null:
@@ -1661,6 +1686,9 @@ func _on_loadout_depart_requested() -> void:
 
 func _on_resume_requested() -> void:
 	_clear_coop_sinks()
+	if online_mode:
+		_on_resume_requested_online()
+		return
 	var result := ExpeditionGame.resume(game)
 	if not result["ok"]:
 		if expedition_hub_panel != null:
@@ -1705,6 +1733,46 @@ func _on_run_finished() -> void:
 	_clear_coop_sinks()
 
 
+## —— M3：线上局编排（出发/继续/进局面板） ——
+
+func _on_depart_requested_online() -> void:
+	if online_bridge == null:
+		return
+	if expedition_hub_panel != null:
+		expedition_hub_panel.status_label.text = "正在向服务器申请出发……"
+	var reply: Dictionary = await online_bridge.depart_solo()
+	if str(reply.get("t", "")) != "req_ok":
+		if expedition_hub_panel != null:
+			expedition_hub_panel.status_label.text = str(reply.get("msg", "出发失败，稍后再试"))
+		return
+	if expedition_hub_panel != null:
+		expedition_hub_panel.status_label.text = ""
+		expedition_hub_panel.close()
+	_close_modal()
+	enter_online_run()
+
+
+func _on_resume_requested_online() -> void:
+	if online_bridge == null:
+		return
+	if online_bridge.mirror_run.is_empty():
+		if expedition_hub_panel != null:
+			expedition_hub_panel.status_label.text = "服务器上没有你的活动局。"
+		return
+	_close_modal()
+	if expedition_hub_panel != null:
+		expedition_hub_panel.close()
+	enter_online_run()
+
+
+## 进入选中的线上局：局快照由 bridge 维护，面板拉镜像渲染（W07）。
+func enter_online_run() -> void:
+	if online_bridge == null or online_bridge.mirror_run.is_empty():
+		return
+	online_room_panel.close()
+	online_run_panel.open(online_bridge)
+
+
 ## 回到单人路径时清掉合作裁定入口：地图/战斗面板恢复直调本地 ExpeditionGame。
 func _clear_coop_sinks() -> void:
 	map_panel.host_action_sink = Callable()
@@ -1714,8 +1782,7 @@ func _clear_coop_sinks() -> void:
 
 
 func open_expedition_hub() -> void:
-	if _online_blocked("洞窟探险将在联机版后续更新开放。"):
-		return
+	## M3：线上模式洞窟开放——单人出发/继续走服务器（_on_depart/_on_resume 在线分支）。
 	_close_modal()
 	expedition_hub_panel.open(game)
 
