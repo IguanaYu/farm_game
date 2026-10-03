@@ -103,10 +103,13 @@ def probe(step, extra=None, want_rc=0):
 
 
 def cmd_verify():
+    import time as _t
     ok = True
     ok &= probe("ping")
     ok &= probe("handshake_fail", ["--cert", "-"])
-    ok &= probe("tx", ["--count", "5", "--delta", "7", "--req-prefix", "net1"])
+    prefix = "net%d" % int(_t.time())
+    tx = probe("tx", ["--count", "5", "--delta", "7", "--req-prefix", prefix])
+    ok &= tx
     ok &= probe("balance")
     ok &= probe("receipts")
     print("==== 公网验证 %s ====" % ("ALL PASS" if ok else "有失败项"))

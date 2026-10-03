@@ -54,8 +54,8 @@ func _read_args() -> void:
 			"--url":
 				url = args[i + 1]
 			"--cert":
-				if args[i + 1] != "-":
-					cert_path = args[i + 1]
+				# "-" 表示显式禁用（负向握手测试）；后传覆盖先传
+				cert_path = "" if args[i + 1] == "-" else args[i + 1]
 			"--step":
 				step = args[i + 1]
 			"--count":
