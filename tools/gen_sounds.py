@@ -140,14 +140,14 @@ def build_farm_day():
                 win = math.sin(math.pi * t) ** 2
                 s = 0.085 * win * (math.sin(2 * math.pi * f * (seg_start + i) / SR)
                                    + 0.4 * math.sin(2 * math.pi * f * 1.003 * (seg_start + i) / SR))
-                out[int(seg_start) + i] += s
+                out[int(seg_start * SR) + i] += s
         # 低音：每小节一个根音，拨弦衰减。
         for b in range(2):
             at = seg_start + b * bar
             n = int(SR * bar * 0.95)
             for i in range(n):
                 s = 0.12 * math.exp(-2.2 * i / SR) * math.sin(2 * math.pi * bass * (at + i) / SR)
-                out[int(at) + i] += s
+                out[int(at * SR) + i] += s
     # 拨弦旋律：五声音阶（C D E G A），确定性序列，落在拍点上。
     scale = {"C5": 523.25, "D5": 587.33, "E5": 659.26, "G5": 783.99, "A5": 880.00,
              "C6": 1046.50, "B4": 493.88}
@@ -169,7 +169,7 @@ def build_farm_day():
             s = 0.14 * math.exp(-5.0 * i / SR) * (
                 math.sin(2 * math.pi * f * (at + i) / SR)
                 + 0.25 * math.sin(2 * math.pi * f * 2 * (at + i) / SR))
-            out[int(at) + i] += s
+            out[int(at * SR) + i] += s
     # 总线轻限幅。
     out = [max(-0.92, min(0.92, s)) for s in out]
     write_wav("farm_day", out)
