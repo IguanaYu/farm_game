@@ -1,0 +1,955 @@
+{
+  "revision": 3,
+  "errors": [],
+  "scenarios": [
+    "object navigation",
+    "customer trade",
+    "crop selection",
+    "shelf purchase",
+    "cave entry before exploration",
+    "loadout",
+    "party",
+    "battle roundtrip",
+    "extraction",
+    "door and window exits",
+    "farm harvest"
+  ],
+  "layouts": [
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "farm",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "field-ui",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "seed-field-ui",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "care-field-ui",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "expand-field-ui",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "shop",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "basket-ui",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "customer-ui",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "camp",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "cave-entry-ui",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "home",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "home-ui",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1440,
+        900
+      ],
+      "view": "yard",
+      "width": 1408,
+      "height": 804.5625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "farm",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "field-ui",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "seed-field-ui",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "care-field-ui",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "expand-field-ui",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "shop",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "basket-ui",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "customer-ui",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "camp",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "cave-entry-ui",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "home",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "home-ui",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1280,
+        800
+      ],
+      "view": "yard",
+      "width": 1248,
+      "height": 713.140625,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "farm",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "field-ui",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "seed-field-ui",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "care-field-ui",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "expand-field-ui",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "shop",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "basket-ui",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "customer-ui",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "camp",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "cave-entry-ui",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "home",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "home-ui",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        1024,
+        640
+      ],
+      "view": "yard",
+      "width": 992,
+      "height": 566.84375,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "farm",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "field-ui",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "seed-field-ui",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "care-field-ui",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "expand-field-ui",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "shop",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "basket-ui",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "customer-ui",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "camp",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "cave-entry-ui",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "home",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "home-ui",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        736,
+        700
+      ],
+      "view": "yard",
+      "width": 770,
+      "height": 440,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "farm",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "field-ui",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "seed-field-ui",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "care-field-ui",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "expand-field-ui",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "shop",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "basket-ui",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "customer-ui",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "camp",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "cave-entry-ui",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "home",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "home-ui",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        360,
+        800
+      ],
+      "view": "yard",
+      "width": 328,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "farm",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "field-ui",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "seed-field-ui",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "care-field-ui",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "expand-field-ui",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "shop",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "basket-ui",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "customer-ui",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "camp",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "cave-entry-ui",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "home",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "home-ui",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    },
+    {
+      "viewport": [
+        320,
+        800
+      ],
+      "view": "yard",
+      "width": 288,
+      "height": 620,
+      "outside": [],
+      "collisions": 0,
+      "externalUi": 0
+    }
+  ]
+}

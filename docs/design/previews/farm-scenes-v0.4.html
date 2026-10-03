@@ -1,0 +1,2591 @@
+<!doctype html>
+<html lang="en" data-visualize-standalone>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src 'unsafe-inline' blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>小小农场：多场景与多好友拜访设计 v0.4</title>
+<style>:root{color-scheme:light dark;background:light-dark(rgb(255 255 255), rgb(24 24 24))}html,body{margin:0}body{box-sizing:border-box;padding:1rem;background:inherit}iframe{display:block;width:100%;height:calc(100vh - 2rem);margin:0 auto;border:0}</style>
+</head>
+<body>
+<iframe id="codex-visualization" sandbox="allow-scripts" referrerpolicy="no-referrer" title="小小农场：多场景与多好友拜访设计 v0.4" data-srcdoc="&lt;!doctype html&gt;
+&lt;html lang=&quot;en&quot; data-visualize-standalone&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;meta name=&quot;referrer&quot; content=&quot;no-referrer&quot;&gt;
+&lt;meta http-equiv=&quot;Content-Security-Policy&quot; content=&quot;default-src &#x27;none&#x27;; script-src &#x27;unsafe-inline&#x27; &#x27;unsafe-eval&#x27; &#x27;wasm-unsafe-eval&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; style-src &#x27;unsafe-inline&#x27; blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; img-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; font-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; media-src blob: data: https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://esm.sh https://fonts.bunny.net https://fonts.googleapis.com https://fonts.gstatic.com https://unpkg.com; worker-src blob:; connect-src blob: data:; frame-src &#x27;none&#x27;; object-src &#x27;none&#x27;; base-uri &#x27;none&#x27;; form-action &#x27;none&#x27;&quot;&gt;
+&lt;title&gt;小小农场：多场景与多好友拜访设计 v0.4&lt;/title&gt;
+&lt;style&gt;:root {
+  color-scheme: light dark;
+  background-color: var(
+    --background,
+    var(--color-background-primary, light-dark(rgb(255 255 255), rgb(24 24 24)))
+  ) !important;
+
+  /* Agent-facing contract; keep in sync with SKILL.md. */
+  --background: var(
+    --color-background-primary,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --card: color-mix(in oklab, var(--foreground) 5%, var(--background));
+  --card-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --popover: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255), rgb(45 45 45))
+  );
+  --popover-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --primary: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --primary-foreground: var(
+    --color-text-inverse,
+    light-dark(rgb(255 255 255), rgb(13 13 13))
+  );
+  --secondary: var(
+    --color-background-secondary,
+    light-dark(rgb(255 255 255 / 96%), rgb(54 54 54 / 96%))
+  );
+  --secondary-foreground: var(
+    --color-text-primary,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --muted: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --muted-foreground: var(
+    --color-text-secondary,
+    light-dark(rgb(26 28 31 / 49.4%), rgb(255 255 255 / 49.8%))
+  );
+  --accent: var(
+    --color-background-info,
+    light-dark(rgb(229 242 255), rgb(13 39 63))
+  );
+  --accent-foreground: var(
+    --color-text-info,
+    light-dark(rgb(51 156 255), rgb(131 195 255))
+  );
+  --destructive: var(
+    --color-text-warning,
+    light-dark(rgb(226 85 7), rgb(255 133 73))
+  );
+  --border: var(
+    --color-border-secondary,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+  --input: var(
+    --color-border-primary,
+    light-dark(
+      rgb(26 28 31 / 11.8%),
+      color-mix(in oklab, rgb(0 0 0) 10%, transparent)
+    )
+  );
+  --ring: var(
+    --color-ring-primary,
+    light-dark(rgb(51 156 255), rgb(131 195 255 / 76%))
+  );
+  --font-size-base: var(--font-text-md-size, 14px);
+  --blue: light-dark(rgb(51 156 255), rgb(51 156 255));
+  --orange: light-dark(rgb(226 85 7), rgb(251 106 34));
+  --green: light-dark(rgb(0 162 64), rgb(64 201 119));
+  --red: light-dark(rgb(224 46 42), rgb(255 103 100));
+  --purple: light-dark(rgb(146 79 247), rgb(173 123 249));
+  --yellow: light-dark(rgb(255 195 0), rgb(255 210 64));
+  --viz-series-1: var(--primary);
+  --viz-series-2: light-dark(rgb(243 136 59), rgb(245 154 86));
+  --viz-series-3: light-dark(rgb(93 201 119), rgb(116 213 139));
+  --viz-series-4: light-dark(rgb(235 119 177), rgb(240 143 192));
+  --viz-series-5: light-dark(rgb(155 121 236), rgb(170 145 239));
+  --viz-series-6: light-dark(rgb(58 185 177), rgb(90 203 194));
+
+  /* Internal implementation variables; not part of the agent contract. */
+  --font-sans: -apple-system, system-ui, &quot;Segoe UI&quot;, sans-serif;
+  --font-mono:
+    ui-monospace, SFMono-Regular, &quot;SF Mono&quot;, Menlo, Consolas, &quot;Liberation Mono&quot;,
+    monospace;
+  --font-size-normal: max(11px, var(--font-size-base));
+  --font-size-tooltip: calc(var(--font-size-base) - 1px);
+  --font-size-small: max(11px, calc(var(--font-size-base) - 2px));
+  --font-size-h1: calc(var(--font-size-normal) * 1.7142857143);
+  --font-size-h2: calc(var(--font-size-normal) * 1.4285714286);
+  --font-size-h3: calc(var(--font-size-normal) * 1.2857142857);
+  --font-weight-normal: 430;
+  --font-weight-medium: 500;
+  --icon-size: 16px;
+  --line-height-normal: calc(var(--font-size-normal) * 1.5);
+  --line-height-tooltip: calc(var(--font-size-tooltip) * 1.4285714286);
+  --line-height-small: calc(var(--font-size-small) + 4px);
+  --corner-shape: round;
+  --radius: var(--border-radius-lg, 10px);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-2xl: calc(var(--radius) * 1.6);
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px -1px rgb(0 0 0 / 8%);
+  --checkmark-image: url(&quot;data:image/svg+xml,%3Csvg xmlns=&#x27;http://www.w3.org/2000/svg&#x27; viewBox=&#x27;0 0 17 17&#x27;%3E%3Cpath d=&#x27;M12.8961 3.64101C13.1297 3.41418 13.4984 3.37523 13.7779 3.56581C14.0571 3.75635 14.1554 4.11331 14.0299 4.41347L13.9615 4.53847L7.71151 13.7045C7.59411 13.8767 7.4063 13.9877 7.19881 14.0072C6.99136 14.0267 6.78564 13.9533 6.63826 13.806L2.88826 10.056L2.79842 9.9457C2.6192 9.67407 2.64927 9.30496 2.88826 9.06581C3.12738 8.82669 3.49647 8.79676 3.76815 8.97597L3.8785 9.06581L7.03084 12.2182L12.8053 3.74941L12.8961 3.64101Z&#x27;/%3E%3C/svg%3E&quot;);
+
+  /* Legacy aliases; not part of the current agent contract. */
+  --viz-bg: transparent;
+  --viz-panel: var(--card);
+  --viz-border: var(--border);
+  --viz-text: var(--foreground);
+  --viz-muted: var(--muted-foreground);
+  --viz-accent: var(--primary);
+  --viz-accent-text: var(--primary-foreground);
+  --viz-accent-bg: var(--accent);
+  --viz-font-size: var(--font-size-base);
+  --viz-warning: var(--destructive);
+}
+
+:root[data-theme=&quot;light&quot;] {
+  color-scheme: light;
+}
+
+:root[data-theme=&quot;dark&quot;] {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html &gt; body {
+  /* Preserve MCP aliases for older inline renderers without creating :root cycles. */
+  --color-background-primary: var(
+    --background,
+    light-dark(rgb(255 255 255), rgb(24 24 24))
+  );
+  --color-text-primary: var(
+    --foreground,
+    light-dark(rgb(26 28 31), rgb(255 255 255))
+  );
+  --color-border-secondary: var(
+    --border,
+    light-dark(rgb(26 28 31 / 8%), rgb(255 255 255 / 8.2%))
+  );
+
+  margin: 0;
+  padding: var(--visualize-paint-gutter, 0px);
+  color: var(--foreground);
+  background: transparent !important;
+  font-family: var(--font-sans) !important;
+  font-size: var(--font-size-normal);
+  font-weight: var(--font-weight-normal);
+  line-height: var(--line-height-normal);
+}
+
+.cursor-interaction {
+  cursor: var(--cursor-interaction, pointer);
+}
+
+a {
+  color: color-mix(in srgb, var(--viz-accent) 80%, var(--viz-text) 20%);
+  cursor: var(--cursor-interaction, pointer);
+  font-weight: var(--font-weight-medium, 500);
+  text-decoration: none;
+  text-underline-offset: 2px;
+}
+
+a:is(:hover, :focus-visible) {
+  text-decoration-line: underline;
+  text-decoration-style: dashed;
+  text-decoration-thickness: 0.5px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p {
+  margin-block: 0;
+}
+
+h1 {
+  font-size: var(--font-size-h1);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h2 {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+h3,
+h4,
+h5,
+h6 {
+  font-size: var(--font-size-h3);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.3;
+}
+
+b,
+strong,
+th {
+  font-weight: var(--font-weight-medium);
+}
+
+code:not(pre code) {
+  display: inline;
+  padding: 1px 6px;
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background: var(--muted);
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  overflow-wrap: anywhere;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  word-break: break-word;
+}
+
+.table-responsive {
+  width: 100%;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  color: var(--foreground);
+  font: inherit;
+  text-align: start;
+}
+
+.table :is(th, td) {
+  padding-block: 10px;
+  padding-inline: 0 24px;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+}
+
+.table-responsive &gt; .table :is(th, td) {
+  overflow-wrap: break-word;
+}
+
+.table :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.table :is(caption, thead th) {
+  font-weight: 600;
+}
+
+.table thead th {
+  padding-block: 8px;
+  border-bottom-color: color-mix(in srgb, var(--foreground) 16%, transparent);
+}
+
+.table tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
+}
+
+.table.table-sm :is(th, td) {
+  padding-block: 6px;
+}
+
+.table.table-sm :is(th, td):not(:last-child) {
+  padding-inline-end: 16px;
+}
+
+.table :is(.text-end, [align=&quot;right&quot;]) {
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.table :is(.text-center, [align=&quot;center&quot;]) {
+  text-align: center;
+}
+
+.table .text-nowrap {
+  white-space: nowrap;
+}
+
+#widget {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  padding: 0;
+  background: transparent !important;
+}
+
+.card {
+  min-width: 0;
+  padding: 12px;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  border-radius: var(--radius-2xl);
+  corner-shape: var(--corner-shape);
+  color: var(--card-foreground);
+  background: var(--card);
+}
+
+.widget {
+  min-width: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  box-shadow: 0 0 0 0.5px var(--border-strong, var(--border));
+  color: var(--foreground);
+  background: var(--background);
+}
+
+#widget &gt; :not(.card, .widget, .progress) {
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.tooltip {
+  position: fixed;
+  z-index: 50;
+  top: 0;
+  left: 0;
+  width: max-content;
+  max-width: min(
+    20rem,
+    var(--tooltip-available-width, calc(100vw - 10px)),
+    calc(100vw - 10px)
+  );
+  max-height: min(
+    var(--tooltip-available-height, calc(100vh - 10px)),
+    calc(100vh - 10px)
+  );
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--popover-foreground);
+  background: var(--popover);
+  box-shadow: none;
+  font-size: var(--font-size-tooltip);
+  line-height: var(--line-height-tooltip);
+  overflow-wrap: break-word;
+  white-space: normal;
+  pointer-events: none;
+  user-select: none;
+}
+
+.viz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(180px, 24%), 1fr));
+  gap: 10px;
+}
+
+.viz-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.viz-stat-value {
+  font-size: var(--font-size-h2);
+  font-weight: var(--font-weight-medium);
+  line-height: 1.25;
+}
+
+.viz-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+hr {
+  width: 100%;
+  height: 1px;
+  margin-block: 6px;
+  border: 0;
+  background: var(--border);
+}
+
+.nav {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 4px;
+}
+
+.progress {
+  display: flex;
+  height: 8px;
+  margin-block: calc((var(--line-height-normal, 1.5em) - 8px) / 2);
+  overflow: hidden;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+}
+
+.progress-bar:only-child {
+  border-radius: var(--radius-full);
+}
+
+.progress-bar {
+  height: 100%;
+  flex-shrink: 0;
+  border: 0;
+  background: var(--viz-series-1);
+}
+
+.viz-badge {
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  color: var(--accent-foreground);
+  background: var(--accent);
+  font-weight: var(--font-weight-medium);
+}
+
+small,
+.text-small,
+.viz-badge {
+  font-size: var(--font-size-small);
+  line-height: var(--line-height-small);
+}
+
+.text-muted {
+  color: var(--muted-foreground);
+}
+
+.tabular-nums {
+  font-variant-numeric: tabular-nums;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.viz-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.viz-controls &gt; .form-label {
+  display: grid;
+  min-width: min(100%, 260px);
+  flex: 1 1 280px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin-bottom: 0;
+}
+
+.viz-controls &gt; .form-label &gt; :is(.form-control, .form-range, .form-select) {
+  grid-column: 1 / -1;
+}
+
+.btn,
+.nav-link,
+.form-check-input,
+.form-control,
+.form-range,
+.form-select {
+  font: inherit;
+}
+
+.btn,
+.nav-link {
+  appearance: button;
+  display: inline-flex;
+  inline-size: fit-content;
+  max-inline-size: 100%;
+  min-height: 28px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: var(--cursor-interaction, pointer);
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.btn:is(.btn-block, .viz-tile) {
+  inline-size: 100%;
+}
+
+.btn.viz-tile {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+a.btn {
+  cursor: var(--cursor-interaction, pointer);
+  text-decoration: none;
+}
+
+.btn:not(:disabled):hover,
+.nav-link:not(:disabled):not([aria-disabled=&quot;true&quot;]):hover {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.btn-primary {
+  border-color: transparent;
+  color: var(--primary-foreground);
+  background: var(--foreground);
+  background-clip: padding-box;
+}
+
+.btn-primary .text-muted {
+  color: color-mix(in srgb, var(--primary-foreground) 50%, transparent);
+}
+
+.btn-primary:not(:disabled):hover {
+  background: color-mix(in srgb, var(--foreground) 80%, transparent);
+  background-clip: padding-box;
+}
+
+.btn-ghost {
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.btn-ghost:not(:disabled):hover {
+  color: var(--foreground);
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.nav-pills .nav-link {
+  min-width: 0;
+  border-color: transparent;
+  color: var(--muted-foreground);
+  background: transparent;
+}
+
+.nav-justified .nav-link {
+  flex: 1 1 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.nav-pills .nav-link.active {
+  color: var(--foreground);
+  background: var(--muted);
+}
+
+/* Shared preview chrome; product styles stay inside each variant. */
+.viz-dotted-background {
+  background-image: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--foreground) 14%, transparent) 0.8px,
+    transparent 0.8px
+  );
+  background-position: center;
+  background-size: 16px 16px;
+}
+
+.viz-carousel {
+  position: relative;
+  min-width: 0;
+}
+
+.viz-carousel:has(&gt; .viz-carousel-controls) {
+  min-height: calc(60px + var(--viz-carousel-picker-height, 0px));
+  padding-bottom: 60px;
+}
+
+.viz-carousel &gt; [data-variant][hidden] {
+  display: none !important;
+}
+
+.viz-carousel &gt; [data-variant] {
+  isolation: isolate;
+}
+
+.viz-carousel-controls {
+  --viz-carousel-hover: light-dark(
+    color-mix(in srgb, var(--foreground) 5.4%, transparent),
+    color-mix(in srgb, var(--foreground) 7.8%, transparent)
+  );
+  position: absolute;
+  z-index: 2;
+  bottom: 8px;
+  left: 50%;
+  display: flex;
+  width: max-content;
+  /* Leave room for the host&#x27;s design-controls launcher at the trailing edge. */
+  max-width: calc(100% - 96px);
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: var(--font-sans);
+  /* Match the settings dropdown chrome independently of the content font size. */
+  font-size: 13px;
+  font-weight: var(--font-weight-normal);
+  line-height: 18px;
+  transform: translateX(-50%);
+  user-select: none;
+}
+
+/* Keep authored mockup button styles out of the shared carousel chrome. */
+.viz-carousel-controls button,
+.viz-carousel-picker &gt; summary {
+  display: flex !important;
+  height: auto !important;
+  min-height: 30px;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px;
+  padding: 0 6px !important;
+  -webkit-app-region: no-drag;
+  border: 0 !important;
+  border-radius: 14px !important;
+  color: inherit !important;
+  background: transparent !important;
+  font: inherit !important;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.viz-carousel-controls &gt; button,
+.viz-carousel-picker &gt; summary {
+  position: relative;
+  isolation: isolate;
+}
+
+.viz-carousel-controls &gt; button {
+  --icon-size: 16px;
+  width: 30px !important;
+  padding: 0 !important;
+}
+
+.viz-carousel-picker &gt; summary {
+  padding-inline: 12px !important;
+}
+
+.viz-carousel-controls .viz-carousel-caret {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  margin: 0;
+  color: inherit;
+  transform: rotate(180deg);
+}
+
+.viz-carousel-controls &gt; button &gt; svg,
+.viz-carousel-controls .viz-carousel-caret,
+.viz-carousel-count {
+  opacity: 0.5;
+}
+
+.viz-carousel-controls &gt; button::before,
+.viz-carousel-picker &gt; summary::before {
+  position: absolute;
+  z-index: -1;
+  inset: 3px;
+  border-radius: 12px;
+  content: &quot;&quot;;
+  pointer-events: none;
+}
+
+.viz-carousel-controls &gt; button:hover::before,
+.viz-carousel-picker &gt; summary:hover::before {
+  background: var(--viz-carousel-hover);
+}
+
+.viz-carousel-controls &gt; button,
+.viz-carousel-controls [data-lucide],
+.viz-carousel-controls .lucide {
+  flex-shrink: 0;
+}
+
+.viz-carousel-picker {
+  min-width: 0;
+}
+
+.viz-carousel-picker &gt; summary {
+  min-width: 0;
+  list-style: none;
+}
+
+.viz-carousel-picker &gt; summary::-webkit-details-marker {
+  display: none;
+}
+
+.viz-carousel-count {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.viz-carousel-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.viz-carousel-options {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 4px);
+  left: 0;
+  display: flex;
+  max-height: 240px;
+  flex-direction: column;
+  gap: 2px;
+  overflow: auto;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--background);
+  box-shadow: 0 4px 12px light-dark(rgb(0 0 0 / 6%), rgb(0 0 0 / 25%));
+}
+
+.viz-carousel-options &gt; button {
+  border-radius: max(0px, calc(var(--radius-lg) - 5px)) !important;
+  width: 100% !important;
+  min-height: 28px;
+  justify-content: flex-start !important;
+  padding: 4px 8px !important;
+  font-size: var(--font-size-small) !important;
+  text-align: start;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.viz-carousel-options &gt; [aria-current=&quot;true&quot;],
+.viz-carousel-options &gt; button:hover {
+  background: var(--viz-carousel-hover) !important;
+}
+
+.btn:disabled,
+.nav-link:disabled,
+.nav-link[aria-disabled=&quot;true&quot;] {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+[data-lucide] {
+  stroke-width: 1.6;
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--foreground);
+}
+
+.form-control {
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background: var(--secondary);
+}
+
+.form-control::placeholder {
+  color: var(--muted-foreground);
+}
+
+.form-control[type=&quot;file&quot;] {
+  padding: 0;
+  overflow: hidden;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control[type=&quot;file&quot;]::file-selector-button {
+  min-height: 26px;
+  margin-right: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-right: 1px solid var(--input);
+  color: var(--secondary-foreground);
+  background: var(--secondary);
+  cursor: inherit;
+  font: inherit;
+}
+
+.form-control[type=&quot;file&quot;]:not(:disabled):hover::file-selector-button {
+  background: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-control-color[type=&quot;color&quot;] {
+  width: 40px;
+  height: 28px;
+  padding: 3px;
+  cursor: var(--cursor-interaction, pointer);
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.form-control-color[type=&quot;color&quot;]::-webkit-color-swatch {
+  border: 0;
+  border-radius: calc(var(--radius-lg) - 4px);
+  corner-shape: var(--corner-shape);
+}
+
+textarea.form-control {
+  height: auto;
+  min-height: 72px;
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.form-control:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-control:disabled,
+.form-select:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.form-select {
+  appearance: none;
+  display: block;
+  width: 100%;
+  min-height: 28px;
+  margin: 0;
+  padding: 0 32px 0 8px;
+  outline: none;
+  border: 1px solid var(--input);
+  border-radius: var(--radius-lg);
+  corner-shape: var(--corner-shape);
+  color: var(--foreground);
+  background-color: var(--secondary);
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--muted-foreground) 50%),
+    linear-gradient(135deg, var(--muted-foreground) 50%, transparent 50%);
+  background-position:
+    calc(100% - 14px) 50%,
+    calc(100% - 10px) 50%;
+  background-repeat: no-repeat;
+  background-size: 4px 4px;
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-select:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--foreground) 6%, var(--secondary));
+}
+
+.form-select:focus-visible {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-check {
+  display: flex;
+  min-height: 20px;
+  align-items: center;
+  gap: 6px;
+}
+
+.form-check-input {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 auto;
+  margin: 0;
+  border: 1px solid var(--input);
+  color: var(--primary-foreground);
+  background-color: transparent;
+  cursor: var(--cursor-interaction, default);
+  transition:
+    background-color 150ms,
+    border-color 150ms,
+    box-shadow 150ms;
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;] {
+  border-color: var(--input);
+  border-radius: var(--radius-sm);
+  corner-shape: var(--corner-shape);
+  background-color: var(--secondary);
+  box-shadow: var(--shadow-sm);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input:not(:disabled):not(:checked):hover {
+  background-color: var(--card);
+}
+
+.form-check:not(.form-switch) .form-check-input[type=&quot;checkbox&quot;]:checked {
+  border-color: var(--primary);
+  background-color: var(--primary);
+}
+
+.form-check:not(.form-switch)
+  .form-check-input[type=&quot;checkbox&quot;]:checked::before {
+  display: block;
+  width: 100%;
+  height: 100%;
+  background: var(--primary-foreground);
+  content: &quot;&quot;;
+  mask: var(--checkmark-image) center / 12px 12px no-repeat;
+}
+
+.form-check-input[type=&quot;radio&quot;] {
+  width: 14px;
+  height: 14px;
+  border-radius: var(--radius-full);
+}
+
+.form-check-input[type=&quot;radio&quot;]:checked {
+  border: 2px solid var(--primary);
+  background:
+    radial-gradient(circle, var(--primary-foreground) 0 2.5px, transparent 3px),
+    var(--primary);
+}
+
+.form-check:not(.form-switch) .form-check-input:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled {
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.form-check:not(.form-switch) .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+}
+
+.form-switch .form-check-input:disabled,
+.form-switch .form-check-input:disabled + .form-check-label {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.form-check-label {
+  color: var(--foreground);
+  cursor: var(--cursor-interaction, default);
+}
+
+.form-switch .form-check-input {
+  position: relative;
+  width: 32px;
+  height: 20px;
+  border: 0;
+  border-radius: var(--radius-full);
+  background: var(--muted);
+  box-shadow: none;
+  transition: background-color 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 16px;
+  height: 16px;
+  box-sizing: border-box;
+  border: 1px solid light-dark(var(--primary-foreground), var(--foreground));
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+  box-shadow: var(--shadow-sm);
+  content: &quot;&quot;;
+  transform: translate(2px, -50%);
+  transition: transform 200ms cubic-bezier(0, 0, 0.2, 1);
+}
+
+.form-switch .form-check-input:checked {
+  background: var(--primary);
+}
+
+.form-switch .form-check-input:checked::before {
+  transform: translate(14px, -50%);
+}
+
+.form-switch .form-check-input:focus-visible {
+  box-shadow: 0 0 0 2px var(--ring);
+}
+
+.form-range {
+  appearance: none;
+  display: block;
+  width: 100%;
+  height: 28px;
+  flex: 1;
+  margin: 0;
+  padding: 0;
+  outline: none;
+  border: 0;
+  accent-color: var(--primary);
+  background: linear-gradient(
+      color-mix(in srgb, var(--foreground) 7%, transparent),
+      color-mix(in srgb, var(--foreground) 7%, transparent)
+    )
+    center / 100% 2px no-repeat;
+}
+
+.form-range::-webkit-slider-runnable-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-webkit-slider-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range::-moz-range-track {
+  height: 28px;
+  background: transparent;
+}
+
+.form-range::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: light-dark(var(--primary-foreground), var(--foreground));
+}
+
+.form-range:focus-visible::-moz-range-thumb {
+  border-color: var(--ring);
+  box-shadow: inset 0 0 0 1px var(--ring);
+}
+
+.form-range:disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
+
+.btn:not(.btn-primary, .viz-tile):is(
+  [aria-pressed=&quot;true&quot;],
+  [aria-selected=&quot;true&quot;],
+  .is-selected
+) {
+  border-color: var(--primary);
+  color: var(--primary-foreground);
+  background: var(--primary);
+}
+
+.btn.viz-tile:is([aria-pressed=&quot;true&quot;], [aria-selected=&quot;true&quot;], .is-selected) {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+
+.btn:focus-visible,
+.nav-link:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+
+.viz-carousel-controls :is(button, summary):focus-visible {
+  outline: 2px solid var(--ring) !important;
+  outline-offset: 2px !important;
+}
+
+@media (pointer: coarse) {
+  .viz-carousel:has(&gt; .viz-carousel-controls) {
+    min-height: calc(76px + var(--viz-carousel-picker-height, 0px));
+    padding-bottom: 76px;
+  }
+
+  .btn,
+  .nav-link,
+  .viz-carousel-controls button,
+  .viz-carousel-picker &gt; summary,
+  .form-control,
+  .form-select {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  /* Keep small-screen WebKit from zooming when a text field receives focus. */
+  .form-control,
+  .form-select {
+    font-size: max(16px, var(--font-size-normal));
+  }
+
+  .form-control[type=&quot;file&quot;]::file-selector-button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .form-control-color[type=&quot;color&quot;] {
+    width: 44px;
+    height: 44px;
+  }
+
+  .form-control:is(
+    [type=&quot;date&quot;],
+    [type=&quot;datetime-local&quot;],
+    [type=&quot;month&quot;],
+    [type=&quot;time&quot;],
+    [type=&quot;week&quot;]
+  ) {
+    min-width: 0;
+    max-width: 100%;
+    padding-block: 8px;
+  }
+
+  .form-check {
+    min-height: 44px;
+    padding-inline: 15px;
+  }
+
+  .form-check-input {
+    position: relative;
+  }
+
+  .form-check-input::after {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 44px;
+    height: 44px;
+    content: &quot;&quot;;
+    transform: translate(-50%, -50%);
+  }
+
+  .form-check-label {
+    display: inline-flex;
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .form-range {
+    height: 44px;
+    touch-action: pan-y;
+  }
+
+  .form-range::-webkit-slider-runnable-track {
+    height: 44px;
+  }
+
+  .form-range::-moz-range-track {
+    height: 44px;
+  }
+
+  .form-range::-webkit-slider-thumb {
+    margin-top: 12px;
+  }
+}
+
+svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+#widget &gt; svg {
+  width: 100%;
+}
+
+/* Model-authored chart rules can otherwise stretch icons after these styles load. */
+svg.lucide {
+  display: block;
+  width: var(--icon-size) !important;
+  height: var(--icon-size) !important;
+  flex: none;
+  margin: 0 !important;
+  stroke-width: 1.6;
+}
+
+.text-warning,
+.text-destructive {
+  color: var(--destructive);
+}
+
+html&gt;body{padding:0}&lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;script type=&quot;application/json&quot; id=&quot;codex-visualization-widget-state&quot;&gt;__CODEX_VISUALIZATION_WIDGET_STATE__&lt;/script&gt;
+&lt;script&gt;(() =&gt; {
+  const root = document.documentElement;
+  const mediaQuery = globalThis.matchMedia(&quot;(prefers-color-scheme: dark)&quot;);
+  const apply = Reflect.apply;
+  const isArray = Array.isArray;
+  const hasOwn = Object.hasOwn;
+  const parentWindow = globalThis.parent;
+  const stringify = JSON.stringify;
+  const parse = JSON.parse;
+  const encode = TextEncoder.prototype.encode.bind(new TextEncoder());
+  const initialStateElement = document.getElementById(
+    &quot;codex-visualization-widget-state&quot;,
+  );
+  const initialGlobals = parse(initialStateElement?.textContent ?? &quot;{}&quot;);
+  initialStateElement?.remove();
+  /** @type {Record&lt;string, unknown&gt; | null} */
+  let state = initialGlobals.widgetState ?? null;
+  const statePersistence = initialGlobals.statePersistence ?? &quot;none&quot;;
+  let nextStateRequestId = 0;
+  /** @type {Map&lt;number, { resolve: () =&gt; void; reject: (error: Error) =&gt; void; timeout: ReturnType&lt;typeof globalThis.setTimeout&gt;; serializedState: string }&gt;} */
+  const pendingStateWrites = new Map();
+  const persistenceError = () =&gt;
+    Object.assign(
+      new Error(&quot;The host could not persist the widget state update&quot;),
+      {
+        code: -32000,
+        data: { code: &quot;widget_state_persistence_failed&quot;, retryable: false },
+      },
+    );
+  /**
+   * @param {object} prototype
+   * @param {string} property
+   */
+  const getPrototypeGetter = (prototype, property) =&gt; {
+    // oxlint-disable-next-line typescript/unbound-method -- invoked through captured Reflect.apply
+    const getter = Object.getOwnPropertyDescriptor(prototype, property)?.get;
+    if (getter == null) {
+      throw new Error(`Missing ${property} getter`);
+    }
+    return getter;
+  };
+  const getMessageData = getPrototypeGetter(MessageEvent.prototype, &quot;data&quot;);
+  const getMessagePorts = getPrototypeGetter(MessageEvent.prototype, &quot;ports&quot;);
+  const getMessageSource = getPrototypeGetter(MessageEvent.prototype, &quot;source&quot;);
+  // oxlint-disable-next-line typescript/unbound-method -- captured before the untrusted fragment runs
+  const addHostMessageListener = MessagePort.prototype.addEventListener;
+  // oxlint-disable-next-line typescript/unbound-method -- captured before the untrusted fragment runs
+  const postHostMessage = MessagePort.prototype.postMessage;
+  // oxlint-disable-next-line typescript/unbound-method -- captured before the untrusted fragment runs
+  const startHostPort = MessagePort.prototype.start;
+  // oxlint-disable-next-line typescript/unbound-method -- captured before the untrusted fragment runs
+  const stopMessagePropagation = Event.prototype.stopImmediatePropagation;
+  /** @type {MessagePort | null} */
+  let hostPort = null;
+  const postToHost = (type, payload) =&gt; {
+    if (hostPort != null) {
+      apply(postHostMessage, hostPort, [{ type, ...payload }]);
+    }
+  };
+  const openExternal = ({ href }) =&gt; {
+    if (globalThis.navigator.userActivation?.isActive === true) {
+      postToHost(&quot;open-external&quot;, { href });
+    }
+  };
+  const sendFollowUpMessage = ({ context, prompt, title }) =&gt; {
+    if (globalThis.navigator.userActivation?.isActive === true) {
+      postToHost(&quot;follow-up&quot;, { context, prompt, title });
+    }
+    return Promise.resolve();
+  };
+  /**
+   * @param {Record&lt;string, unknown&gt; | ((previous: Record&lt;string, unknown&gt; | null) =&gt; Record&lt;string, unknown&gt;)} next
+   * @returns {Promise&lt;void&gt;}
+   */
+  const setWidgetState = async (next) =&gt; {
+    const nextState = typeof next === &quot;function&quot; ? next(state) : next;
+    if (
+      nextState == null ||
+      typeof nextState !== &quot;object&quot; ||
+      isArray(nextState)
+    ) {
+      throw new TypeError(&quot;Widget state must be a JSON object&quot;);
+    }
+    const inputState = stringify(
+      nextState,
+      (_key, /** @type {unknown} */ value) =&gt; {
+        if (
+          typeof value === &quot;undefined&quot; ||
+          typeof value === &quot;function&quot; ||
+          typeof value === &quot;symbol&quot; ||
+          (typeof value === &quot;number&quot; &amp;&amp; !Number.isFinite(value))
+        ) {
+          throw new TypeError(&quot;Widget state must be a JSON object&quot;);
+        }
+        return value;
+      },
+    );
+    const parsedState = parse(inputState);
+    if (
+      parsedState == null ||
+      typeof parsedState !== &quot;object&quot; ||
+      isArray(parsedState)
+    ) {
+      throw new TypeError(&quot;Widget state must be a JSON object&quot;);
+    }
+    const storedState = {
+      modelContent: null,
+      privateContent: null,
+      ...parsedState,
+    };
+    const serializedState = stringify(storedState);
+    if (encode(serializedState).length &gt; 16 * 1024) {
+      throw new TypeError(
+        &quot;Widget state must be a JSON object of at most 16 KiB&quot;,
+      );
+    }
+    if (
+      hasOwn(storedState, &quot;imageIds&quot;) &amp;&amp;
+      (!isArray(storedState.imageIds) ||
+        storedState.imageIds.some(
+          (/** @type {unknown} */ id) =&gt; typeof id !== &quot;string&quot;,
+        ))
+    ) {
+      throw new TypeError(&quot;Widget state imageIds must be an array of strings&quot;);
+    }
+    if (storedState.imageIds?.length &gt; 0) {
+      throw Object.assign(
+        new TypeError(&quot;Visualization state does not support image attachments&quot;),
+        { code: -32602, data: { code: &quot;images_unsupported&quot; } },
+      );
+    }
+    state = storedState;
+    globalThis.openai.widgetState = state;
+    globalThis.dispatchEvent(
+      new CustomEvent(&quot;openai:set_globals&quot;, {
+        detail: { globals: { widgetState: state } },
+      }),
+    );
+    if (statePersistence === &quot;none&quot;) {
+      throw persistenceError();
+    }
+    const id = ++nextStateRequestId;
+    return new Promise((resolve, reject) =&gt; {
+      const timeout = globalThis.setTimeout(() =&gt; {
+        pendingStateWrites.delete(id);
+        reject(persistenceError());
+      }, 30_000);
+      pendingStateWrites.set(id, { resolve, reject, timeout, serializedState });
+      postToHost(&quot;widget-state-write&quot;, { id, state: serializedState });
+    });
+  };
+  const syncTheme = () =&gt; {
+    const theme = mediaQuery.matches ? &quot;dark&quot; : &quot;light&quot;;
+    root.dataset.theme = theme;
+    globalThis.openai = {
+      ...globalThis.openai,
+      openExternal,
+      sendFollowUpMessage,
+      setWidgetState,
+      theme,
+      visualizationStyleVariables: {},
+      visualizationTheme: theme,
+      widgetState: state,
+      statePersistence,
+      stateModelContext: &quot;none&quot;,
+    };
+    globalThis.dispatchEvent(
+      new CustomEvent(&quot;openai:set_globals&quot;, {
+        detail: { globals: globalThis.openai },
+      }),
+    );
+  };
+  const sendHeight = () =&gt; {
+    postToHost(&quot;height&quot;, {
+      height: Math.ceil(
+        Math.max(
+          document.body.scrollHeight,
+          document.body.getBoundingClientRect().height,
+        ),
+      ),
+    });
+  };
+
+  globalThis.addEventListener(
+    &quot;message&quot;,
+    (event) =&gt; {
+      const data = apply(getMessageData, event, []);
+      const ports = apply(getMessagePorts, event, []);
+      const source = apply(getMessageSource, event, []);
+      if (
+        hostPort != null ||
+        source !== parentWindow ||
+        typeof data !== &quot;object&quot; ||
+        data?.type !== &quot;codex-visualization-initialize&quot; ||
+        !isArray(ports) ||
+        ports.length !== 1
+      ) {
+        return;
+      }
+      apply(stopMessagePropagation, event, []);
+      const nextHostPort = ports[0];
+      try {
+        apply(addHostMessageListener, nextHostPort, [
+          &quot;message&quot;,
+          (event) =&gt; {
+            const data = apply(getMessageData, event, []);
+            if (typeof data === &quot;object&quot; &amp;&amp; data?.type === &quot;measure&quot;) {
+              sendHeight();
+            } else if (
+              typeof data === &quot;object&quot; &amp;&amp;
+              data?.type === &quot;widget-state-result&quot;
+            ) {
+              /** @type {unknown} */
+              const id = data.id;
+              if (typeof id !== &quot;number&quot;) {
+                return;
+              }
+              const pending = pendingStateWrites.get(id);
+              if (pending != null) {
+                pendingStateWrites.delete(id);
+                globalThis.clearTimeout(pending.timeout);
+                if (data.ok === true) {
+                  pending.resolve();
+                } else {
+                  pending.reject(persistenceError());
+                }
+              }
+            }
+          },
+        ]);
+        apply(startHostPort, nextHostPort, []);
+      } catch {
+        return;
+      }
+      hostPort = nextHostPort;
+      for (const [id, { serializedState }] of pendingStateWrites) {
+        postToHost(&quot;widget-state-write&quot;, { id, state: serializedState });
+      }
+      sendHeight();
+    },
+    { capture: true },
+  );
+  document.currentScript?.remove();
+  mediaQuery.addEventListener(&quot;change&quot;, syncTheme);
+  globalThis.addEventListener(&quot;click&quot;, (event) =&gt; {
+    if (event.defaultPrevented) {
+      return;
+    }
+    let element = null;
+    if (event.target instanceof globalThis.Element) {
+      element = event.target;
+    } else if (event.target instanceof globalThis.Node) {
+      element = event.target.parentElement;
+    }
+    const link = element?.closest(&quot;a[href]&quot;);
+    const href = link?.getAttribute(&quot;href&quot;);
+    if (href == null) {
+      return;
+    }
+    if (href.startsWith(&quot;#&quot;)) {
+      let id;
+      try {
+        id = decodeURIComponent(href.slice(1));
+      } catch {
+        return;
+      }
+      const target = id.length === 0 ? root : document.getElementById(id);
+      if (
+        target == null ||
+        globalThis.navigator.userActivation?.isActive !== true
+      ) {
+        return;
+      }
+      event.preventDefault();
+      postToHost(&quot;scroll-to&quot;, {
+        top: target.getBoundingClientRect().top + globalThis.scrollY,
+      });
+      return;
+    }
+    event.preventDefault();
+    openExternal({ href });
+  });
+  new ResizeObserver(sendHeight).observe(document.body);
+  syncTheme();
+})();
+&lt;/script&gt;
+&lt;div id=&quot;farm-friend-design&quot; aria-label=&quot;小小农场多好友拜访设计 v0.4&quot;&gt;
+&lt;style&gt;
+  #farm-friend-design { --paper:light-dark(#fbf7ec,#29332b); --ink:light-dark(#344c38,#e6ecdc); --muted:light-dark(#6b7866,#bcc8b2); --line:light-dark(#ddd8bf,#52604b); --green:light-dark(#456c4c,#b3c9a3); --on-green:light-dark(#fff9e9,#223321); --soft:light-dark(#e7ecda,#3a4832); font:14px/1.55 &quot;Microsoft YaHei&quot;,&quot;PingFang SC&quot;,sans-serif; color:var(--ink); }
+  #farm-friend-design * { box-sizing:border-box; }
+  #farm-friend-design [hidden] { display:none!important; }
+  #farm-friend-design .game { position:relative; border-radius:16px; overflow:hidden; }
+  #farm-friend-design .stage { position:relative; aspect-ratio:1400/800; min-height:440px; background:#93b275; }
+  #farm-friend-design .stage.shop { background:#b18c60; } #farm-friend-design .stage.home { background:#b49973; } #farm-friend-design .stage.explore { background:#223c37; }
+  #farm-friend-design canvas { display:block; width:100%; height:100%; position:absolute; inset:0; }
+  #farm-friend-design .hud { position:absolute; z-index:5; left:18px; right:18px; top:16px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; pointer-events:none; }
+  #farm-friend-design .location, #farm-friend-design .money { background:var(--paper); border-radius:10px; padding:9px 14px; box-shadow:0 3px 15px #25301c15; }
+  #farm-friend-design .location strong { display:block; font-weight:500; font-size:16px; }
+  #farm-friend-design .location small { color:var(--muted); font-size:11px; }
+  #farm-friend-design .money { display:flex; align-items:center; gap:7px; color:var(--ink); font-variant-numeric:tabular-nums; }
+  #farm-friend-design [data-lucide] { width:17px; height:17px; }
+  #farm-friend-design .objects { position:absolute; inset:0; pointer-events:none; }
+  #farm-friend-design button, #farm-friend-design select { font:inherit; color:inherit; }
+  #farm-friend-design button { background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:8px 12px; min-height:40px; }
+  #farm-friend-design button.primary { background:var(--green); border-color:var(--green); color:var(--on-green); }
+  #farm-friend-design button:disabled { opacity:.5; }
+  #farm-friend-design .object { position:absolute; pointer-events:auto; transform:translate(-50%,-50%); min-width:44px; min-height:44px; border:0; border-radius:12px; background:transparent; padding:0; }
+  #farm-friend-design .object:hover { background:#f0de9530; box-shadow:0 0 16px #fff1ad50; }
+  #farm-friend-design .object .obj-label { position:absolute; left:50%; top:calc(100% + 2px); transform:translateX(-50%); background:var(--paper); padding:3px 7px; border-radius:5px; white-space:nowrap; font-size:12px; opacity:0; pointer-events:none; }
+  #farm-friend-design .object:hover .obj-label, #farm-friend-design .object:focus-visible .obj-label { opacity:1; }
+  #farm-friend-design .bubble { position:absolute; width:20%; max-width:240px; padding:11px 13px; border-radius:12px; background:#fffbea; color:#41543b; border:1px solid #e0d8b8; pointer-events:auto; }
+  #farm-friend-design .bubble:after { content:&quot;&quot;; position:absolute; bottom:-7px; left:50%; width:12px; height:12px; transform:rotate(45deg); background:#fffbea; border-right:1px solid #e0d8b8; border-bottom:1px solid #e0d8b8; }
+  #farm-friend-design .bubble strong { display:flex; justify-content:space-between; align-items:center; gap:6px; font-size:13px; font-weight:500; }
+  #farm-friend-design .bubble p { margin:6px 0; font-size:13px; }
+  #farm-friend-design .bubble em { display:block; font-size:17px; color:#496d42; font-style:normal; }
+  #farm-friend-design .bubble.best { border-color:#7c9865; }
+  #farm-friend-design .tag { display:inline-block; font-size:11px; border-radius:4px; padding:1px 4px; color:#4c6340; background:#e6ecd2; }
+  #farm-friend-design .bubble.quiet p { display:none; }
+  #farm-friend-design .work { position:absolute; z-index:10; width:min(440px,calc(100% - 32px)); padding:18px; background:var(--paper); border:1px solid var(--line); border-radius:13px; box-shadow:0 12px 32px #28351e30; }
+  #farm-friend-design .work-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px; }
+  #farm-friend-design .work-head strong { font-size:17px; font-weight:500; }
+  #farm-friend-design .work-head button { min-height:34px; padding:4px 8px; font-size:12px; }
+  #farm-friend-design .work p { margin:0 0 12px; color:var(--muted); }
+  #farm-friend-design .actions { display:flex; flex-wrap:wrap; gap:8px; }
+  #farm-friend-design .actions button { flex:1 1 auto; }
+  #farm-friend-design .work select { width:100%; background:var(--paper); border:1px solid var(--line); border-radius:7px; padding:8px; margin:5px 0 12px; min-height:42px; }
+  #farm-friend-design .quantity { display:flex; align-items:center; gap:10px; margin:0 0 12px; }
+  #farm-friend-design .quantity output { font-variant-numeric:tabular-nums; min-width:52px; text-align:center; }
+  #farm-friend-design .item-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; margin:12px 0; }
+  #farm-friend-design .item-grid span { display:grid; place-items:center; min-height:42px; background:var(--soft); border:1px solid var(--line); border-radius:5px; font-size:12px; }
+  #farm-friend-design .item-grid .wide { grid-column:span 2; }
+  #farm-friend-design .note { position:absolute; left:18px; bottom:16px; z-index:3; max-width:calc(100% - 36px); background:#fbf7eceb; color:#4f6145; border-radius:6px; padding:6px 10px; font-size:12px; pointer-events:none; }
+  #farm-friend-design .toast { position:absolute; z-index:20; left:50%; bottom:54px; transform:translateX(-50%); max-width:calc(100% - 32px); width:max-content; border-radius:8px; background:#354d37; color:#fff9e5; padding:10px 16px; font-size:13px; pointer-events:none; }
+  @media(max-width:900px) { #farm-friend-design .bubble { padding:8px 10px; } #farm-friend-design .bubble p { font-size:12px; } #farm-friend-design .bubble em { font-size:15px; } }
+  @media(max-width:600px) {
+    #farm-friend-design .stage { aspect-ratio:auto; height:620px; }
+    #farm-friend-design canvas { height:48%; }
+    #farm-friend-design .hud { left:10px; right:10px; top:10px; gap:6px; }
+    #farm-friend-design .location, #farm-friend-design .money { padding:7px 10px; }
+    #farm-friend-design .location strong { font-size:14px; } #farm-friend-design .location small { font-size:11px; }
+    #farm-friend-design .object .obj-label { font-size:11px; padding:2px 4px; }
+    #farm-friend-design .bubble { width:calc(100% - 28px); max-width:none; left:14px!important; }
+    #farm-friend-design .bubble p { margin:3px 0; font-size:12px; } #farm-friend-design .bubble em { font-size:14px; }
+    #farm-friend-design .work { padding:14px; } #farm-friend-design .work-head strong { font-size:16px; }
+    #farm-friend-design .work select { font-size:16px; } #farm-friend-design .work button { min-height:44px; }
+    #farm-friend-design .note { left:14px; bottom:12px; font-size:11px; }
+    #farm-friend-design .stage.shop .note { top:82px; bottom:auto; }
+  }
+
+  #farm-friend-design .work.book { width:min(720px,calc(100% - 32px)); }
+  #farm-friend-design .book .work-head { margin-bottom:3px; }
+  #farm-friend-design .book .intro { margin:0 0 12px; font-size:13px; }
+  #farm-friend-design .book-search { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  #farm-friend-design .book-search label { white-space:nowrap; font-size:13px; }
+  #farm-friend-design .book-search input { width:100%; min-width:0; min-height:40px; padding:7px 10px; background:var(--paper); border:1px solid var(--line); border-radius:7px; color:var(--ink); font:inherit; font-size:16px; }
+  #farm-friend-design .friend-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+  #farm-friend-design .friend-entry { display:block; width:100%; text-align:left; padding:9px 11px; background:var(--soft); }
+  #farm-friend-design .friend-entry:hover:not(:disabled) { border-color:var(--green); }
+  #farm-friend-design .friend-entry:disabled { opacity:.7; }
+  #farm-friend-design .friend-entry canvas { position:static; display:block; width:100%; height:64px; }
+  #farm-friend-design .friend-name { display:flex; justify-content:space-between; align-items:center; gap:5px; font-weight:500; font-size:14px; }
+  #farm-friend-design .friend-name small { font-weight:400; font-size:11px; }
+  #farm-friend-design .friend-state { display:block; font-size:12px; margin-top:3px; }
+  #farm-friend-design .friend-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:12px; }
+  #farm-friend-design .friend-footer output { text-align:center; font-size:12px; font-variant-numeric:tabular-nums; }
+  #farm-friend-design .friend-footer button { min-height:40px; padding:6px 10px; }
+  #farm-friend-design .friend-empty { grid-column:1/-1; min-height:135px; display:grid; place-items:center; padding:12px; font-size:14px; }
+  @media(max-width:760px) { #farm-friend-design .friend-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media(max-width:600px) {
+    #farm-friend-design .friend-grid { grid-template-columns:1fr; gap:8px; }
+    #farm-friend-design .friend-entry { display:grid; grid-template-columns:78px minmax(0,1fr); column-gap:9px; padding:8px 10px; min-height:96px; align-content:center; }
+    #farm-friend-design .friend-entry canvas { grid-column:1; grid-row:1/3; height:68px; }
+    #farm-friend-design .friend-name { grid-column:2; flex-wrap:wrap; align-self:end; }
+    #farm-friend-design .friend-state { grid-column:2; align-self:start; line-height:1.5; }
+    #farm-friend-design .friend-footer button { min-height:44px; }
+  }
+
+&lt;/style&gt;
+&lt;div class=&quot;game&quot;&gt;&lt;div class=&quot;stage&quot; id=&quot;fo-stage&quot;&gt;
+  &lt;canvas id=&quot;fo-art&quot; width=&quot;1400&quot; height=&quot;735&quot; role=&quot;img&quot; aria-label=&quot;完整农庄中的店门、石阶、小桥、田地与房子都可以直接点击&quot;&gt;&lt;/canvas&gt;
+  &lt;header class=&quot;hud&quot;&gt;&lt;div class=&quot;location&quot;&gt;&lt;strong id=&quot;fo-location&quot;&gt;我的农场&lt;/strong&gt;&lt;small&gt;小小农场 · 邻里地址簿 v0.4&lt;/small&gt;&lt;/div&gt;&lt;div class=&quot;money&quot;&gt;&lt;i data-lucide=&quot;coins&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;span id=&quot;fo-money&quot;&gt;800&lt;/span&gt;&lt;/div&gt;&lt;/header&gt;
+  &lt;div class=&quot;objects&quot; id=&quot;fo-objects&quot; aria-label=&quot;可点击的场景物体&quot;&gt;&lt;/div&gt;
+  &lt;section class=&quot;work&quot; id=&quot;fo-work&quot; aria-label=&quot;所选物体的操作&quot; hidden&gt;&lt;/section&gt;
+  &lt;div class=&quot;note&quot; id=&quot;fo-note&quot; aria-live=&quot;polite&quot;&gt;我的农场 · 2 块地成熟&lt;/div&gt;
+  &lt;div class=&quot;toast&quot; id=&quot;fo-toast&quot; role=&quot;status&quot; hidden&gt;&lt;/div&gt;
+&lt;/div&gt;&lt;/div&gt;
+&lt;/div&gt;
+&lt;script&gt;
+(() =&gt; {
+  const root=document.getElementById(&#x27;farm-friend-design&#x27;),canvas=root.querySelector(&#x27;#fo-art&#x27;),c=canvas.getContext(&#x27;2d&#x27;),stage=root.querySelector(&#x27;#fo-stage&#x27;),objects=root.querySelector(&#x27;#fo-objects&#x27;),work=root.querySelector(&#x27;#fo-work&#x27;);
+  const saved=window.openai?.widgetState?.privateContent;
+
+const friends=[
+  {id:&#x27;f1&#x27;,name:&#x27;阿禾&#x27;,online:true,open:true,roof:&#x27;#849b82&#x27;,shirt:&#x27;#a88265&#x27;,plant:&#x27;岩芽菜&#x27;,welcome:&#x27;欢迎来坐坐！我刚把洞里带回的种子种下了。&#x27;},
+  {id:&#x27;f2&#x27;,name:&#x27;小满&#x27;,online:false,open:true,roof:&#x27;#78929e&#x27;,shirt:&#x27;#7c96a5&#x27;,plant:&#x27;白菜&#x27;,welcome:&#x27;我出门啦，院子和小屋都留给你参观。&#x27;},
+  {id:&#x27;f3&#x27;,name:&#x27;小翠&#x27;,online:true,open:true,roof:&#x27;#b38a65&#x27;,shirt:&#x27;#b9a369&#x27;,plant:&#x27;胡萝卜&#x27;,welcome:&#x27;今天的胡萝卜长得特别好，去院子看看吧。&#x27;},
+  {id:&#x27;f4&#x27;,name:&#x27;阿泽&#x27;,online:true,open:false,roof:&#x27;#8c8eaa&#x27;,shirt:&#x27;#87928b&#x27;,plant:&#x27;白菜&#x27;,welcome:&#x27;&#x27;},
+  {id:&#x27;f5&#x27;,name:&#x27;阿棉&#x27;,online:false,open:true,roof:&#x27;#a78491&#x27;,shirt:&#x27;#ac8d93&#x27;,plant:&#x27;胡萝卜&#x27;,welcome:&#x27;门口的花刚开，欢迎你来看看。&#x27;},
+  {id:&#x27;f6&#x27;,name:&#x27;阿棠&#x27;,online:false,open:false,roof:&#x27;#bc8e6b&#x27;,shirt:&#x27;#a69372&#x27;,plant:&#x27;岩芽菜&#x27;,welcome:&#x27;&#x27;},
+  {id:&#x27;f7&#x27;,name:&#x27;阿岚&#x27;,online:true,open:true,roof:&#x27;#75958b&#x27;,shirt:&#x27;#849e86&#x27;,plant:&#x27;萤果&#x27;,welcome:&#x27;上次探险的纪念品放在展示架上了。&#x27;},
+  {id:&#x27;f8&#x27;,name:&#x27;小朵&#x27;,online:false,open:true,roof:&#x27;#c48e80&#x27;,shirt:&#x27;#b68c78&#x27;,plant:&#x27;白菜&#x27;,welcome:&#x27;欢迎来串门，茶桌旁的窗户能看到小院。&#x27;}
+];
+function host(){return friends.find(f=&gt;f.id===state.visitId)||friends[0];}
+function welcome(){return state.visitedOwners[host().id]?&#x27;下次也带上你的冒险故事吧。&#x27;:host().welcome;}
+function escapeHtml(t){return String(t).replace(/[&amp;&lt;&gt;&quot;&#x27;]/g,ch=&gt;({&#x27;&amp;&#x27;:&#x27;&amp;amp;&#x27;,&#x27;&lt;&#x27;:&#x27;&amp;lt;&#x27;,&#x27;&gt;&#x27;:&#x27;&amp;gt;&#x27;,&#x27;&quot;&#x27;:&#x27;&amp;quot;&#x27;,&quot;&#x27;&quot;:&#x27;&amp;#39;&#x27;}[ch]));}
+function pageSize(){const columns=matchMedia(&#x27;(max-width:600px)&#x27;).matches?1:matchMedia(&#x27;(max-width:760px)&#x27;).matches?2:3;return columns*(stage.clientHeight&lt;570?1:2);}
+function directoryData(){const q=state.friendQuery.trim().toLowerCase();let list=friends.filter(f=&gt;f.name.toLowerCase().includes(q));if(!q&amp;&amp;state.lastVisitId)list=list.slice().sort((a,b)=&gt;Number(b.id===state.lastVisitId)-Number(a.id===state.lastVisitId));const size=pageSize(),pages=Math.max(1,Math.ceil(list.length/size));state.friendPage=Math.min(pages-1,Math.max(0,state.friendPage));return {list,size,pages,page:state.friendPage,visible:list.slice(state.friendPage*size,(state.friendPage+1)*size)};}
+function directory(){const d=directoryData();return panel(&#x27;邻里地址簿&#x27;,`&lt;p class=&quot;intro&quot;&gt;想去谁家坐坐？点击朋友的家，先到他的院子。&lt;/p&gt;&lt;div class=&quot;book-search&quot;&gt;&lt;label for=&quot;fo-friend-search&quot;&gt;找朋友&lt;/label&gt;&lt;input id=&quot;fo-friend-search&quot; type=&quot;search&quot; autocomplete=&quot;off&quot; placeholder=&quot;输入朋友名字&quot; value=&quot;${escapeHtml(state.friendQuery)}&quot;&gt;&lt;/div&gt;&lt;div class=&quot;friend-grid&quot; aria-label=&quot;朋友的家&quot;&gt;${d.visible.length?d.visible.map(f=&gt;`&lt;button type=&quot;button&quot; class=&quot;friend-entry cursor-interaction&quot; data-action=&quot;visit-${f.id}&quot; aria-label=&quot;拜访${f.name}，${f.online?&#x27;在线&#x27;:&#x27;离线&#x27;}，${f.open?&#x27;开放参观&#x27;:&#x27;暂未开放&#x27;}&quot; ${f.open?&#x27;&#x27;:&#x27;disabled&#x27;}&gt;&lt;canvas width=&quot;220&quot; height=&quot;100&quot; data-home-preview=&quot;${f.id}&quot; role=&quot;img&quot; aria-label=&quot;${f.name}家的房屋外观&quot;&gt;&lt;/canvas&gt;&lt;span class=&quot;friend-name&quot;&gt;${f.name}&lt;small&gt;${state.lastVisitId===f.id?&#x27;上次拜访&#x27;:f.open?&#x27;去拜访 →&#x27;:&#x27;&#x27;}&lt;/small&gt;&lt;/span&gt;&lt;span class=&quot;friend-state&quot;&gt;${f.online?&#x27;在线&#x27;:&#x27;离线&#x27;} · ${f.open?&#x27;开放参观&#x27;:&#x27;暂未开放&#x27;}&lt;/span&gt;&lt;/button&gt;`).join(&#x27;&#x27;):&#x27;&lt;div class=&quot;friend-empty&quot; role=&quot;status&quot;&gt;没有找到这个名字，试试别的名字。&lt;/div&gt;&#x27;}&lt;/div&gt;&lt;div class=&quot;friend-footer&quot;&gt;${button(&#x27;上一页&#x27;,&#x27;friend-prev&#x27;,false,!d.page)}&lt;output aria-live=&quot;polite&quot;&gt;${d.page+1} / ${d.pages} 页 · ${d.list.length} 位&lt;/output&gt;${button(&#x27;下一页&#x27;,&#x27;friend-next&#x27;,false,d.page&gt;=d.pages-1)}&lt;/div&gt;`);}
+function paintPreviews(){work.querySelectorAll(&#x27;[data-home-preview]&#x27;).forEach(canvas=&gt;{const f=friends.find(f=&gt;f.id===canvas.dataset.homePreview),ctx=canvas.getContext(&#x27;2d&#x27;);ctx.clearRect(0,0,220,100);function p(points,color){ctx.beginPath();points.forEach((a,i)=&gt;i?ctx.lineTo(...a):ctx.moveTo(...a));ctx.closePath();ctx.fillStyle=color;ctx.fill();}function r(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h);}p([[0,79],[64,63],[220,78],[220,100],[0,100]],&#x27;#9bb882&#x27;);p([[81,40],[136,35],[136,89],[81,94]],&#x27;#f0dfb4&#x27;);p([[136,35],[158,47],[158,98],[136,89]],&#x27;#c8b994&#x27;);p([[73,41],[106,12],[167,41],[127,51]],f.roof);p([[73,41],[127,51],[167,41],[167,48],[127,58],[73,48]],&#x27;#806b55&#x27;);r(100,65,20,26,f.open?&#x27;#6f7854&#x27;:&#x27;#876c50&#x27;);r(86,58,10,13,&#x27;#89a49b&#x27;);r(124,55,8,11,&#x27;#89a49b&#x27;);r(150,14,6,24,&#x27;#a58b72&#x27;);p([[57,72],[51,52],[35,45],[19,57],[21,76]],&#x27;#718d63&#x27;);r(35,69,5,20,&#x27;#8f7854&#x27;);r(177,79,12,9,&#x27;#a98965&#x27;);p([[176,79],[180,68],[189,72],[190,79]],&#x27;#84a26b&#x27;);if(!f.open){r(108,74,5,6,&#x27;#d4c39b&#x27;);} });}
+function mailbox(){line([[260,338],[260,397]],&#x27;#7b6c4d&#x27;,7);poly([[229,326],[247,308],[282,311],[293,325],[293,354],[229,356]],&#x27;#799a9f&#x27;);poly([[229,326],[247,308],[282,311],[264,327]],&#x27;#a8bec0&#x27;);rect(236,330,43,21,&#x27;#dce0c6&#x27;);line([[236,330],[257,341],[279,330]],&#x27;#7f9188&#x27;,2);line([[290,320],[290,296]],&#x27;#846a4d&#x27;,4);poly([[290,297],[313,296],[313,308],[290,309]],&#x27;#c78e70&#x27;);text(&#x27;邻里地址簿&#x27;,261,418,17,&#x27;#4b6746&#x27;);}
+
+  const state={scene:saved?.revision===4&amp;&amp;[&#x27;farm&#x27;,&#x27;shop&#x27;,&#x27;camp&#x27;,&#x27;explore&#x27;,&#x27;battle&#x27;,&#x27;home&#x27;,&#x27;yard&#x27;].includes(saved.scene)?saved.scene:&#x27;farm&#x27;,panel:&#x27;&#x27;,visitId:friends.some(f=&gt;f.id===saved?.visitId)?saved.visitId:&#x27;f1&#x27;,lastVisitId:friends.some(f=&gt;f.id===saved?.lastVisitId)?saved.lastVisitId:&#x27;&#x27;,friendQuery:&#x27;&#x27;,friendPage:0,visitedOwners:{},directorySource:&#x27;mailbox&#x27;,coins:800,kind:&#x27;cabbage&#x27;,quantity:5,inventory:{cabbage:10,carrot:8},harvest:false,planted:false,watered:false,seeds:6,guest:1,visited:false,enemyHp:12,hp:20};
+  const design={npcScale:110,dialogue:&#x27;短对话常显&#x27;};
+  const colors={grass:&#x27;#93b275&#x27;,grass2:&#x27;#aac68b&#x27;,grassDark:&#x27;#759463&#x27;,path:&#x27;#d0c09a&#x27;,soil:&#x27;#997253&#x27;,wood:&#x27;#8c6648&#x27;,woodDark:&#x27;#624b38&#x27;,cream:&#x27;#f2e2b8&#x27;,roof:&#x27;#b96e51&#x27;,roofDark:&#x27;#91543f&#x27;,ink:&#x27;#40533d&#x27;};
+  function poly(points,fill,stroke){c.beginPath();points.forEach((p,i)=&gt;i?c.lineTo(...p):c.moveTo(...p));c.closePath();c.fillStyle=fill;c.fill();if(stroke){c.strokeStyle=stroke;c.lineWidth=1;c.stroke();}}
+  function ellipse(x,y,rx,ry,fill){c.beginPath();c.ellipse(x,y,rx,ry,0,0,Math.PI*2);c.fillStyle=fill;c.fill();}
+  function rect(x,y,w,h,fill){c.fillStyle=fill;c.fillRect(x,y,w,h);}
+  function line(points,color,width=2){c.beginPath();points.forEach((p,i)=&gt;i?c.lineTo(...p):c.moveTo(...p));c.strokeStyle=color;c.lineWidth=width;c.lineCap=&#x27;round&#x27;;c.lineJoin=&#x27;round&#x27;;c.stroke();}
+  function text(t,x,y,size=16,color=colors.ink,align=&#x27;center&#x27;){c.fillStyle=color;c.font=`500 ${size}px &quot;Microsoft YaHei&quot;, sans-serif`;c.textAlign=align;c.fillText(t,x,y);}
+  function cloud(x,y,s){ellipse(x,y,s*1.3,s*.33,&#x27;#f5f6daaa&#x27;);ellipse(x-s*.5,y-s*.15,s*.7,s*.4,&#x27;#f5f6daaa&#x27;);ellipse(x+s*.2,y-s*.24,s*.8,s*.45,&#x27;#f5f6daaa&#x27;);}
+  function tree(x,y,s=1,tint=&#x27;#628354&#x27;){ellipse(x,y+5,29*s,12*s,&#x27;#4b653128&#x27;);rect(x-5*s,y-55*s,10*s,60*s,&#x27;#846443&#x27;);poly([[x,y-142*s],[x-39*s,y-105*s],[x-34*s,y-59*s],[x+2*s,y-43*s],[x+37*s,y-75*s],[x+31*s,y-119*s]],tint);poly([[x,y-142*s],[x-39*s,y-105*s],[x,y-92*s],[x+31*s,y-119*s]],&#x27;#90aa6d&#x27;);poly([[x,y-92*s],[x-34*s,y-59*s],[x+2*s,y-43*s],[x+37*s,y-75*s]],&#x27;#56784d&#x27;);}
+  function pine(x,y,s=1){ellipse(x,y+4,28*s,9*s,&#x27;#405d3325&#x27;);rect(x-4*s,y-50*s,8*s,53*s,&#x27;#79654c&#x27;);poly([[x,y-151*s],[x-31*s,y-91*s],[x-21*s,y-90*s],[x-43*s,y-48*s],[x+43*s,y-48*s],[x+21*s,y-90*s],[x+31*s,y-91*s]],&#x27;#4d7055&#x27;);poly([[x,y-151*s],[x,y-48*s],[x+43*s,y-48*s],[x+21*s,y-90*s],[x+31*s,y-91*s]],&#x27;#385d4b&#x27;);}
+  function rock(x,y,s=1){ellipse(x,y+3,27*s,9*s,&#x27;#43543d20&#x27;);poly([[x-27*s,y],[x-24*s,y-24*s],[x-2*s,y-38*s],[x+28*s,y-19*s],[x+30*s,y+3*s],[x,y+10*s]],&#x27;#899084&#x27;);poly([[x-24*s,y-24*s],[x-2*s,y-38*s],[x+28*s,y-19*s],[x,y-8*s]],&#x27;#afb3a0&#x27;);}
+  function flowers(x,y,s=1){for(let i=0;i&lt;4;i++){let a=x+i*9*s,b=y+(i%2)*6*s;line([[a,b],[a+1,b-13*s]],&#x27;#607d4a&#x27;,2*s);ellipse(a,b-15*s,3*s,3*s,i%2?&#x27;#edcf83&#x27;:&#x27;#f0e8bd&#x27;);}}
+  function bush(x,y,s=1){poly([[x-37*s,y],[x-34*s,y-21*s],[x-12*s,y-36*s],[x+20*s,y-33*s],[x+38*s,y-12*s],[x+30*s,y+9*s]],&#x27;#829f63&#x27;);}
+  function background(){rect(0,0,1400,735,&#x27;#c7dccc&#x27;);cloud(155,60,60);cloud(585,36,72);cloud(1120,68,88);poly([[0,178],[75,120],[190,133],[320,79],[465,154],[600,104],[720,147],[920,77],[1090,135],[1270,104],[1400,168],[1400,320],[0,320]],&#x27;#98b9a0&#x27;);poly([[0,220],[110,186],[230,203],[360,156],[530,196],[730,150],[900,211],[1020,175],[1240,150],[1400,205],[1400,340],[0,340]],&#x27;#88a882&#x27;);poly([[0,267],[180,207],[400,233],[600,196],[770,226],[1050,213],[1240,237],[1400,208],[1400,735],[0,735]],colors.grass);poly([[0,395],[140,315],[298,299],[430,335],[315,349],[147,405],[95,469],[156,524],[202,572],[194,735],[89,735],[97,587],[45,520],[0,478]],&#x27;#88b6ac&#x27;);line([[0,411],[140,333],[290,319]],&#x27;#c3dac4&#x27;,4);poly([[0,610],[175,555],[355,584],[460,665],[250,735],[0,735]],&#x27;#a3bd82&#x27;);poly([[975,490],[1220,428],[1400,494],[1400,735],[1030,735]],&#x27;#a1bc80&#x27;);for(let i=0;i&lt;14;i++){const x=i*108-12,y=252+Math.sin(i*3.3)*28;tree(x,y,.7+i%3*.09);}for(let i=0;i&lt;7;i++)flowers(110+i*190,660-(i%3)*33,.8);}
+  function building(x,y,w=145,h=113,roof=colors.roof){
+    ellipse(x,y+14,w*.7,24,&#x27;#38502c22&#x27;);
+    poly([[x-w*.5,y-h],[x+w*.42,y-h-20],[x+w*.42,y-11],[x-w*.5,y+8]],colors.cream);
+    poly([[x+w*.42,y-h-20],[x+w*.71,y-h+3],[x+w*.71,y+13],[x+w*.42,y-11]],&#x27;#c6b48c&#x27;);
+    poly([[x-w*.62,y-h-5],[x-9,y-h-65],[x+w*.68,y-h-10],[x,y-h+10]],roof);
+    poly([[x-w*.62,y-h-5],[x,y-h+10],[x+w*.68,y-h-10],[x+w*.71,y-h+3],[x,y-h+23],[x-w*.62,y-h+8]],colors.roofDark);
+    rect(x-22,y-69,35,70,&#x27;#866345&#x27;);rect(x-20,y-67,30,63,&#x27;#75593e&#x27;);ellipse(x+4,y-36,2,2,&#x27;#dbc794&#x27;);
+    rect(x-59,y-81,26,26,&#x27;#789d98&#x27;);rect(x+28,y-97,25,29,&#x27;#789d98&#x27;);line([[x-46,y-81],[x-46,y-55]],&#x27;#d4c69d&#x27;,3);line([[x-59,y-68],[x-33,y-68]],&#x27;#d4c69d&#x27;,3);rect(x+w*.38,y-h-50,14,46,&#x27;#a49077&#x27;);
+  }
+  function fence(points){line(points,&#x27;#ae9365&#x27;,5);line(points.map(p=&gt;[p[0],p[1]+15]),&#x27;#9b8056&#x27;,4);points.forEach(p=&gt;{rect(p[0]-4,p[1]-12,8,48,&#x27;#b69a6c&#x27;);poly([[p[0]-4,p[1]-12],[p[0],p[1]-18],[p[0]+4,p[1]-12]],&#x27;#ccb080&#x27;);});}
+  function plot(x,y,status=1){poly([[x,y],[x+118,y+24],[x+65,y+64],[x-53,y+38]],&#x27;#72543b&#x27;);poly([[x,y-7],[x+118,y+17],[x+65,y+57],[x-53,y+31]],&#x27;#b79a6c&#x27;);poly([[x+2,y],[x+103,y+20],[x+62,y+48],[x-37,y+28]],&#x27;#88634b&#x27;);for(let j=0;j&lt;3;j++)line([[x-25+j*28,y+25+j*6],[x+14+j*28,y+4+j*6]],&#x27;#634a3838&#x27;,3);if(status&gt;0){for(let j=0;j&lt;6;j++){let a=x+(j%3)*29-Math.floor(j/3)*20+9,b=y+(j%3)*6+Math.floor(j/3)*16+8;if(status===2){ellipse(a,b,13,6,&#x27;#4b6d3c55&#x27;);poly([[a-13,b],[a-12,b-12],[a,b-18],[a+13,b-10],[a+12,b+2],[a,b+6]],&#x27;#b4c88a&#x27;);poly([[a-12,b-12],[a,b-18],[a+13,b-10],[a,b-4]],&#x27;#d1dea5&#x27;);line([[a,b+3],[a,b-9]],&#x27;#8ca565&#x27;,2);}else{line([[a,b],[a,b-12]],&#x27;#577a43&#x27;,3);ellipse(a-4,b-9,7,3,&#x27;#8eaa65&#x27;);ellipse(a+4,b-13,7,3,&#x27;#aac57e&#x27;);}}}if(status===2){poly([[x+58,y-50],[x+69,y-38],[x+58,y-26],[x+47,y-38]],&#x27;#edca66&#x27;);}if(status===-1)text(&#x27;待扩建&#x27;,x+35,y+28,15,&#x27;#dfcfa5&#x27;);}
+  function crate(x,y,s=1){poly([[x-25*s,y-21*s],[x+20*s,y-27*s],[x+32*s,y-12*s],[x-13*s,y-6*s]],&#x27;#c29a66&#x27;);poly([[x-25*s,y-21*s],[x-13*s,y-6*s],[x-13*s,y+22*s],[x-25*s,y+7*s]],&#x27;#8d663d&#x27;);poly([[x-13*s,y-6*s],[x+32*s,y-12*s],[x+32*s,y+15*s],[x-13*s,y+22*s]],&#x27;#ac804c&#x27;);line([[x-10*s,y+3*s],[x+29*s,y-3*s]],&#x27;#70532d&#x27;,3*s);line([[x-10*s,y+13*s],[x+29*s,y+7*s]],&#x27;#70532d&#x27;,3*s);}
+  function character(x,y,s=1,shirt=&#x27;#b97954&#x27;,hat=1){c.save();c.translate(x,y);c.scale(s,s);ellipse(0,4,27,10,&#x27;#493d302b&#x27;);poly([[-17,-63],[16,-63],[19,-24],[-18,-24]],shirt);poly([[16,-63],[25,-43],[19,-22],[12,-29]],&#x27;#86684e&#x27;);rect(-16,-24,12,24,&#x27;#575c46&#x27;);rect(5,-24,12,24,&#x27;#575c46&#x27;);ellipse(-10,2,11,5,&#x27;#5f4b38&#x27;);ellipse(12,2,11,5,&#x27;#5f4b38&#x27;);poly([[-17,-64],[-26,-39],[-18,-33],[-9,-56]],shirt);ellipse(-21,-34,5,6,&#x27;#d9b488&#x27;);ellipse(22,-32,5,6,&#x27;#d9b488&#x27;);poly([[-17,-98],[0,-111],[18,-99],[17,-76],[5,-66],[-14,-76]],&#x27;#dfbc91&#x27;);poly([[-17,-98],[0,-111],[18,-99],[16,-93],[-16,-88]],&#x27;#6f563e&#x27;);ellipse(-5,-86,2,2,&#x27;#514a37&#x27;);ellipse(8,-88,2,2,&#x27;#514a37&#x27;);line([[-3,-75],[5,-76]],&#x27;#a27753&#x27;,2);poly([[-8,-65],[0,-59],[8,-66],[4,-45],[-4,-45]],&#x27;#ede1b4&#x27;);if(hat===1){ellipse(0,-101,27,9,&#x27;#bfa879&#x27;);poly([[-18,-117],[12,-122],[20,-105],[-18,-100]],&#x27;#d8c299&#x27;);line([[-19,-104],[18,-109]],&#x27;#997c52&#x27;,4);}else if(hat===2){poly([[-18,-98],[-17,-111],[13,-116],[23,-101]],&#x27;#658e95&#x27;);poly([[-4,-104],[23,-104],[32,-97],[0,-95]],&#x27;#456d76&#x27;);}else{poly([[-18,-98],[-18,-109],[0,-116],[19,-107],[20,-98]],&#x27;#795b43&#x27;);}c.restore();}
+  function farm(){background();poly([[303,309],[624,274],[797,329],[1080,291],[1140,324],[852,375],[684,337],[365,368]],colors.path);poly([[616,327],[678,336],[516,510],[663,618],[767,735],[687,735],[620,641],[445,514]],colors.path);building(405,303,136,103);building(706,277,130,105,&#x27;#849b82&#x27;);building(982,331,152,114,&#x27;#7b9092&#x27;);fence([[327,377],[479,406],[630,436],[785,465],[940,495]]);const startX=354,startY=405;for(let row=0;row&lt;2;row++)for(let col=0;col&lt;5;col++){let n=row*5+col;plot(startX+col*128-row*63,startY+col*25+row*57,n&lt;2?2:n&lt;5?1:n===5?0:-1);}fence([[226,518],[359,548],[495,578],[637,607],[780,637]]);tree(193,508,1.3);tree(1167,529,1.1);tree(1271,642,1.4);pine(1279,379,.9);bush(923,596,1.1);flowers(924,600);rock(229,630,.8);rock(1050,644,1.2);crate(1051,362,.75);character(582,655,.8,&#x27;#bc8a59&#x27;);line([[1132,300],[1233,370],[1321,351]],&#x27;#cbbf9c&#x27;,24);poly([[1180,293],[1194,224],[1249,200],[1309,247],[1345,319]],&#x27;#7b8573&#x27;);poly([[1222,304],[1221,260],[1248,237],[1271,257],[1281,312]],&#x27;#324943&#x27;);}
+  function roomBase(){rect(0,0,1400,735,&#x27;#b9baa0&#x27;);poly([[0,60],[685,15],[1400,78],[1400,313],[680,272],[0,314]],&#x27;#dfcfaa&#x27;);poly([[0,314],[680,272],[1400,313],[1400,735],[0,735]],&#x27;#b18c60&#x27;);for(let i=-8;i&lt;20;i++)line([[i*120,735],[i*95+255,287]],&#x27;#9c794f&#x27;,2);for(let y=340;y&lt;735;y+=65)line([[0,y],[1400,y-10]],&#x27;#ab8559&#x27;,2);rect(0,283,1400,19,&#x27;#8b7354&#x27;);rect(674,15,17,291,&#x27;#a58860&#x27;);line([[0,59],[683,16],[1400,78]],&#x27;#8d7658&#x27;,16);line([[0,90],[681,47],[1400,107]],&#x27;#eee1bd&#x27;,6);}
+  function shelf(x,y,w){rect(x,y-175,w,175,&#x27;#886944&#x27;);rect(x+10,y-166,w-20,157,&#x27;#5f5540&#x27;);for(let row=0;row&lt;3;row++){let a=y-136+row*52;for(let col=0;col&lt;4;col++){let b=x+23+col*(w-35)/4;rect(b,a-24,25,30,row===1?&#x27;#bfab73&#x27;:&#x27;#ddd0a7&#x27;);ellipse(b+12,a-13,7,8,row===1?&#x27;#8eab6c&#x27;:&#x27;#8da173&#x27;);}rect(x-3,a+9,w+6,8,&#x27;#c6a274&#x27;);}poly([[x,y],[x+w,y],[x+w+20,y+25],[x+16,y+25]],&#x27;#cba87d&#x27;);}
+  function shop(){roomBase();rect(794,113,162,129,&#x27;#947b54&#x27;);rect(803,120,144,111,&#x27;#a7c0a0&#x27;);poly([[806,206],[850,160],[896,185],[945,154],[945,228],[806,228]],&#x27;#82a181&#x27;);line([[872,119],[872,233]],&#x27;#e8d7ae&#x27;,9);line([[803,176],[945,176]],&#x27;#e8d7ae&#x27;,9);rect(780,234,190,13,&#x27;#a18960&#x27;);shelf(148,368,229);shelf(1024,350,199);text(&#x27;种子 · 肥料&#x27;,265,177,24,&#x27;#655b41&#x27;);rect(509,140,137,90,&#x27;#5c6c4e&#x27;);text(&#x27;今日收购&#x27;,577,174,19,&#x27;#f7eccb&#x27;);text(&#x27;每天 00:00 更新&#x27;,577,204,13,&#x27;#e5dcbb&#x27;);poly([[418,308],[985,302],[1060,389],[494,406]],&#x27;#d0aa78&#x27;);poly([[494,406],[1060,389],[1060,455],[494,471]],&#x27;#9c744c&#x27;);poly([[418,308],[494,406],[494,471],[418,375]],&#x27;#825f40&#x27;);line([[496,430],[1058,414]],&#x27;#bf9463&#x27;,7);crate(967,366,.9);for(let i=0;i&lt;5;i++){ellipse(568+i*29,348,15,11,&#x27;#a7bc7d&#x27;);ellipse(565+i*29,341,11,8,&#x27;#c1ce97&#x27;);}crate(439,496,1.1);crate(1179,487,1.1);flowers(1330,440,1.5);const s=1.38*design.npcScale/110;character(474,619,s,&#x27;#ba8260&#x27;,1);character(786,622,s,&#x27;#7c96a5&#x27;,2);character(1098,623,s,&#x27;#b9a369&#x27;,0);ellipse(294,593,48,16,&#x27;#79654125&#x27;);poly([[263,546],[312,546],[324,587],[253,587]],&#x27;#af8e62&#x27;);ellipse(282,541,37,9,&#x27;#7f704f&#x27;);for(let i=0;i&lt;4;i++)ellipse(266+i*11,535,8,6,&#x27;#c6cfa0&#x27;);text(&#x27;田 边 杂 货 铺&#x27;,684,105,26,&#x27;#7f6244&#x27;);}
+  function cave(){background();poly([[0,401],[169,329],[358,351],[421,430],[397,594],[215,655],[0,628]],&#x27;#6e8965&#x27;);poly([[759,277],[835,167],[1000,113],[1178,169],[1329,270],[1400,393],[1400,735],[925,735],[778,505]],&#x27;#778773&#x27;);poly([[835,167],[1000,113],[1115,242],[952,268],[870,356],[759,277]],&#x27;#a2a48b&#x27;);poly([[1115,242],[1178,169],[1329,270],[1220,375],[1032,348]],&#x27;#89957d&#x27;);poly([[916,444],[920,321],[982,236],[1083,227],[1172,294],[1202,475]],&#x27;#414d43&#x27;);poly([[952,452],[955,333],[994,283],[1080,266],[1144,330],[1173,461]],&#x27;#203e37&#x27;);poly([[967,443],[1003,315],[1060,304],[1124,369],[1121,465]],&#x27;#172e2b&#x27;);poly([[986,446],[1215,462],[1400,621],[1400,735],[814,735],[591,529],[667,484]],&#x27;#b7b396&#x27;);line([[1100,450],[1030,483],[796,566],[742,672]],&#x27;#ccc6a6&#x27;,18);poly([[0,603],[127,588],[233,628],[267,675],[210,693],[112,638],[0,660]],colors.path);pine(165,485,1.8);pine(327,328,1.2);pine(1244,541,1.2);tree(111,645,1.3);poly([[266,462],[400,392],[518,447],[426,514]],&#x27;#aa7e52&#x27;);poly([[266,462],[400,392],[369,493],[302,542]],&#x27;#c6a76b&#x27;);poly([[400,392],[518,447],[479,520],[369,493]],&#x27;#8f7650&#x27;);poly([[400,428],[422,497],[369,493]],&#x27;#4b4d3d&#x27;);crate(266,563,1.1);crate(326,576,.8);poly([[545,485],[691,470],[726,503],[579,521]],&#x27;#a58458&#x27;);poly([[579,521],[726,503],[725,563],[579,578]],&#x27;#7f6346&#x27;);line([[596,522],[596,603]],&#x27;#6c543b&#x27;,10);line([[710,507],[710,579]],&#x27;#6c543b&#x27;,10);ellipse(554,625,62,25,&#x27;#5f6b472c&#x27;);for(let i=0;i&lt;7;i++)rock(509+i*13,631+Math.sin(i)*10,.27);line([[530,630],[577,600]],&#x27;#785b3e&#x27;,9);line([[531,603],[579,630]],&#x27;#785b3e&#x27;,9);poly([[535,618],[541,578],[554,596],[559,564],[579,615],[558,633]],&#x27;#d6a653&#x27;);poly([[546,622],[552,594],[565,620],[554,631]],&#x27;#f0d397&#x27;);character(423,651,.93,&#x27;#a08261&#x27;);character(647,662,.9,&#x27;#7893a2&#x27;,2);rock(796,422,1.5);rock(1309,560,1.4);flowers(338,655,1.3);text(&#x27;苔石浅洞&#x27;,1060,218,24,&#x27;#e2debc&#x27;);}
+  function exploration(){rect(0,0,1400,735,&#x27;#223c37&#x27;);poly([[0,0],[433,0],[299,147],[382,295],[231,501],[0,495]],&#x27;#476051&#x27;);poly([[0,0],[168,0],[206,125],[158,262],[0,277]],&#x27;#687e62&#x27;);poly([[1021,0],[1400,0],[1400,735],[1168,735],[1215,565],[1121,402],[1190,252]],&#x27;#4c6050&#x27;);poly([[1190,252],[1400,212],[1400,411],[1278,448]],&#x27;#71836a&#x27;);poly([[439,196],[665,174],[775,301],[874,348],[830,456],[975,619],[990,735],[549,735],[453,601],[594,446],[543,329]],&#x27;#596d58&#x27;);line([[710,674],[658,576],[707,461],[650,351],[698,242]],&#x27;#b4b98d&#x27;,4);line([[707,461],[929,410],[991,327]],&#x27;#a9af88&#x27;,3);line([[650,351],[475,285],[430,183]],&#x27;#a9af88&#x27;,3);for(let i=0;i&lt;8;i++){ellipse(198+i*157,160+(i%3)*172,5,5,&#x27;#cad38988&#x27;);}poly([[155,478],[163,418],[181,398],[199,442],[191,483]],&#x27;#8aa7a4&#x27;);poly([[185,482],[208,426],[224,449],[216,493]],&#x27;#6c9391&#x27;);poly([[1239,592],[1251,526],[1278,501],[1298,564],[1280,604]],&#x27;#8daaa1&#x27;);character(689,653,1.1,&#x27;#b69b6c&#x27;);rock(365,617,1.8);rock(1121,170,1.4);}
+  function home(){roomBase();rect(0,0,1400,735,&#x27;#c3c6ae&#x27;);poly([[0,0],[660,0],[660,259],[0,355]],&#x27;#e6dcc1&#x27;);poly([[660,0],[1400,0],[1400,350],[660,259]],&#x27;#c9baa0&#x27;);poly([[0,355],[660,259],[1400,350],[1400,735],[0,735]],&#x27;#b49973&#x27;);for(let i=-7;i&lt;17;i++)line([[i*150,735],[i*94+230,306]],&#x27;#a08a66&#x27;,2);for(let y=405;y&lt;735;y+=76)line([[0,y],[1400,y-16]],&#x27;#b29a74&#x27;,2);rect(1042,88,165,132,&#x27;#8b7658&#x27;);rect(1050,96,149,113,&#x27;#bfd0b1&#x27;);poly([[1050,180],[1111,149],[1199,171],[1199,209],[1050,209]],&#x27;#7d9d70&#x27;);line([[1121,96],[1121,208]],&#x27;#e5d9b7&#x27;,7);line([[1050,151],[1199,151]],&#x27;#e5d9b7&#x27;,7);poly([[1028,226],[1226,226],[1243,249],[1016,249]],&#x27;#a6936b&#x27;);shelf(804,340,155);rect(190,130,111,92,&#x27;#8e7957&#x27;);rect(199,139,93,74,&#x27;#c2d0ae&#x27;);poly([[200,198],[230,164],[259,182],[290,154],[290,210],[200,210]],&#x27;#7e9e70&#x27;);text(&#x27;山间合影&#x27;,247,239,14,&#x27;#796c53&#x27;);poly([[283,482],[517,445],[601,553],[373,590]],&#x27;#889782&#x27;);poly([[283,482],[373,530],[373,590],[283,540]],&#x27;#657561&#x27;);poly([[302,402],[471,374],[517,445],[283,482]],&#x27;#aab295&#x27;);poly([[471,374],[509,376],[554,435],[517,445]],&#x27;#78896f&#x27;);poly([[350,514],[551,483],[634,538],[432,580]],&#x27;#c7ae7d&#x27;);poly([[432,580],[634,538],[634,560],[432,602]],&#x27;#a38a61&#x27;);line([[450,598],[450,659]],&#x27;#8c7652&#x27;,10);line([[610,560],[610,615]],&#x27;#8c7652&#x27;,10);ellipse(496,536,17,8,&#x27;#e5dbb9&#x27;);ellipse(498,532,10,5,&#x27;#8a7652&#x27;);ellipse(562,520,17,8,&#x27;#e5dbb9&#x27;);ellipse(564,516,10,5,&#x27;#8a7652&#x27;);poly([[266,582],[521,550],[788,643],[573,711],[294,677]],&#x27;#caad85&#x27;);line([[283,602],[564,690],[765,641]],&#x27;#ede0c4&#x27;,4);crate(925,432,1);rect(745,141,39,48,&#x27;#a58d68&#x27;);text(&#x27;家&#x27;,764,173,21,&#x27;#ede0bb&#x27;);rect(1248,292,25,95,&#x27;#8b7150&#x27;);ellipse(1259,290,48,18,&#x27;#e1ce9e&#x27;);poly([[1212,291],[1237,231],[1286,231],[1308,291]],&#x27;#e9d8b0&#x27;);character(846,569,1.65,host().shirt);poly([[942,480],[1006,466],[1030,513],[965,527]],&#x27;#80917a&#x27;);flowers(969,471,1.3);text(host().name+&#x27;的小屋&#x27;,467,123,25,&#x27;#867755&#x27;);}
+  function courtyard(){background();poly([[0,445],[545,360],[731,411],[1237,735],[1056,735],[591,451],[0,539]],colors.path);building(567,392,220,157,host().roof);tree(896,440,1.4);tree(1092,486,1.2);for(let i=0;i&lt;4;i++)plot(950+i%2*136-Math.floor(i/2)*65,496+i%2*25+Math.floor(i/2)*60,1);fence([[36,506],[115,490]]);fence([[357,446],[422,458],[495,473]]);tree(90,621,1.2);character(628,546,1.15,host().shirt);flowers(687,534,1.2);crate(389,417,.9);text(host().name+&#x27;的农庄&#x27;,537,191,28,&#x27;#f6f1d6&#x27;);}
+
+  function lantern(x,y,s=1){ellipse(x,y+3,19*s,7*s,&#x27;#43533125&#x27;);line([[x,y],[x,y-88*s],[x+24*s,y-95*s]],&#x27;#76684b&#x27;,5*s);ellipse(x+24*s,y-71*s,27*s,31*s,&#x27;#f5d38225&#x27;);poly([[x+12*s,y-89*s],[x+36*s,y-89*s],[x+39*s,y-56*s],[x+10*s,y-56*s]],&#x27;#786747&#x27;);rect(x+16*s,y-84*s,17*s,23*s,&#x27;#f2d38c&#x27;);poly([[x+9*s,y-89*s],[x+24*s,y-101*s],[x+40*s,y-89*s]],&#x27;#6c624b&#x27;);}
+  function shopPorch(){poly([[365,309],[442,296],[466,311],[388,326]],&#x27;#b8b292&#x27;);poly([[388,326],[466,311],[466,320],[388,336]],&#x27;#928a6f&#x27;);rect(383,234,35,69,&#x27;#465340&#x27;);poly([[413,238],[433,243],[433,307],[413,301]],&#x27;#a38356&#x27;);ellipse(428,277,2,2,&#x27;#ead59e&#x27;);for(let i=0;i&lt;6;i++){let x=342+i*21;poly([[x,222-i*2.5],[x+21,219.5-i*2.5],[x+40,242-i*2.5],[x+19,244.5-i*2.5]],i%2?&#x27;#e7dfbb&#x27;:&#x27;#789775&#x27;);poly([[x+19,244.5-i*2.5],[x+40,242-i*2.5],[x+40,253-i*2.5],[x+19,255.5-i*2.5]],i%2?&#x27;#d8ceaa&#x27;:&#x27;#5f805d&#x27;);}crate(337,320,.7);for(let i=0;i&lt;3;i++)ellipse(327+i*10,297,8,6,&#x27;#bbc88b&#x27;);rect(468,291,20,30,&#x27;#a67854&#x27;);flowers(465,293,.75);text(&#x27;杂货铺&#x27;,405,202,18,&#x27;#f5ebcd&#x27;);}
+  function homeDetails(){rect(681,190,49,18,&#x27;#d7d4b4&#x27;);text(&#x27;邻里人家&#x27;,705,204,11,&#x27;#53654b&#x27;);rect(743,264,28,20,&#x27;#b08661&#x27;);flowers(742,263,.9);}
+  function stoneBridge(){poly([[90,563],[195,535],[268,583],[158,615]],&#x27;#c5cbc1&#x27;);poly([[158,615],[268,583],[268,607],[158,640]],&#x27;#959f94&#x27;);poly([[90,563],[158,615],[158,640],[90,588]],&#x27;#abb5a6&#x27;);poly([[173,628],[181,606],[217,595],[233,612],[233,622]],&#x27;#88b6ac&#x27;);for(let i=1;i&lt;5;i++)line([[90+i*21,563-i*5.6],[158+i*22,615-i*6.4]],&#x27;#a5b09f&#x27;,2);line([[112,580],[219,550]],&#x27;#a5b09f&#x27;,2);line([[137,598],[245,568]],&#x27;#a5b09f&#x27;,2);line([[90,556],[195,528],[268,576]],&#x27;#d9ded1&#x27;,10);line([[90,566],[158,620],[268,588]],&#x27;#b8c0af&#x27;,8);poly([[268,581],[332,566],[356,584],[270,606]],colors.path);flowers(83,593,.9);flowers(264,630,.8);text(&#x27;邻里小桥&#x27;,158,668,17,&#x27;#556d48&#x27;);}
+  function trailSteps(){for(let i=0;i&lt;4;i++){let y=322+i*20,x=1152-i*12;poly([[x-25,y],[x+31,y+7],[x+15,y+20],[x-42,y+13]],i%2?&#x27;#b9bba2&#x27;:&#x27;#c7c8ac&#x27;);poly([[x-42,y+13],[x+15,y+20],[x+15,y+26],[x-42,y+19]],&#x27;#989e86&#x27;);}rock(1100,377,.6);lantern(1192,373,.8);text(&#x27;洞窟石阶&#x27;,1086,427,17,&#x27;#53664a&#x27;);}
+  function forestWay(){lantern(223,671,.8);flowers(154,686,.9);text(&#x27;下山回农庄&#x27;,135,684,18,&#x27;#53664a&#x27;);}
+  function daylightExit(){poly([[400,735],[411,578],[456,525],[547,536],[603,608],[607,735]],&#x27;#687863&#x27;);poly([[437,710],[439,597],[470,562],[522,566],[554,605],[556,711]],&#x27;#c8cfaa&#x27;);poly([[452,710],[452,609],[480,581],[516,586],[539,618],[539,711]],&#x27;#edf0c6&#x27;);poly([[452,680],[479,632],[511,650],[539,633],[539,711],[452,711]],&#x27;#a8bb82&#x27;);line([[685,660],[597,682],[550,705]],&#x27;#b7bb94&#x27;,14);lantern(424,695,.8);text(&#x27;出口天光&#x27;,499,520,18,&#x27;#e5e6c6&#x27;);}
+  function gardenGate(){poly([[172,411],[193,405],[203,416],[183,423]],&#x27;#d4d0b0&#x27;);poly([[172,411],[183,423],[183,540],[172,528]],&#x27;#a0a78d&#x27;);poly([[183,423],[203,416],[203,531],[183,540]],&#x27;#bdc0a3&#x27;);poly([[325,382],[346,376],[355,387],[335,394]],&#x27;#d4d0b0&#x27;);poly([[325,382],[335,394],[335,512],[325,500]],&#x27;#a0a78d&#x27;);poly([[335,394],[355,387],[355,503],[335,512]],&#x27;#bdc0a3&#x27;);line([[198,425],[253,446],[253,538],[198,531],[198,425]],&#x27;#5c7567&#x27;,5);for(let i=0;i&lt;4;i++)line([[205+i*12,428+i*4],[205+i*12,530+i*2]],&#x27;#6b8473&#x27;,3);line([[195,405],[218,369],[269,354],[312,363],[339,384]],&#x27;#748664&#x27;,6);for(let i=0;i&lt;7;i++){let x=193+i*23,y=396-Math.sin(i/6*Math.PI)*37;bush(x,y,.38);ellipse(x+4,y-4,5,4,i%2?&#x27;#d5bcce&#x27;:&#x27;#ecdbc9&#x27;);}flowers(364,510,.8);text(&#x27;回我的农庄&#x27;,266,568,18,&#x27;#52684a&#x27;);}
+
+  function door(x,y,label){poly([[x-36,y-82],[x+38,y-89],[x+38,y+80],[x-36,y+87]],&#x27;#6c5941&#x27;);poly([[x-29,y-75],[x+31,y-80],[x+31,y+73],[x-29,y+80]],&#x27;#98764f&#x27;);for(let i=0;i&lt;3;i++)line([[x-20+i*20,y-76],[x-20+i*20,y+74]],&#x27;#806342&#x27;,2);ellipse(x+19,y+10,3,3,&#x27;#e0c58b&#x27;);text(label,x,y-104,17,&#x27;#705d42&#x27;);}
+  function enemy(x,y,s=1){ellipse(x,y+6,55*s,17*s,&#x27;#14282455&#x27;);poly([[x-47*s,y],[x-63*s,y-63*s],[x-37*s,y-126*s],[x+14*s,y-138*s],[x+57*s,y-87*s],[x+47*s,y-9*s]],&#x27;#82917b&#x27;);poly([[x-37*s,y-126*s],[x+14*s,y-138*s],[x+57*s,y-87*s],[x-9*s,y-74*s]],&#x27;#a5ad92&#x27;);poly([[x-47*s,y],[x-9*s,y-74*s],[x+47*s,y-9*s],[x+13*s,y+10*s]],&#x27;#687d69&#x27;);ellipse(x-20*s,y-76*s,5*s,4*s,&#x27;#e0ca75&#x27;);ellipse(x+14*s,y-79*s,5*s,4*s,&#x27;#e0ca75&#x27;);line([[x-13*s,y-55*s],[x+11*s,y-56*s]],&#x27;#405c4c&#x27;,4*s);}
+  function battle(){rect(0,0,1400,735,&#x27;#263f37&#x27;);poly([[0,0],[255,0],[290,239],[184,479],[0,515]],&#x27;#596c55&#x27;);poly([[1040,0],[1400,0],[1400,594],[1169,557],[1050,388],[1123,215]],&#x27;#66785d&#x27;);poly([[0,515],[337,405],[938,430],[1400,594],[1400,735],[0,735]],&#x27;#798369&#x27;);character(355,592,2.3,&#x27;#b49463&#x27;);enemy(1000,473,2.1);text(&#x27;苔石守卫&#x27;,1000,143,28,&#x27;#e4e6cd&#x27;);text(`${state.enemyHp} / 12`,1000,181,24,&#x27;#e4e6cd&#x27;);text(`生命 ${state.hp} / 20`,355,308,22,&#x27;#e4e6cd&#x27;);rock(139,658,1.8);rock(1221,629,1.7);}
+  function paint(){c.clearRect(0,0,1400,735);if(state.scene===&#x27;farm&#x27;){farm();if(state.planted)plot(291,462,1);shopPorch();homeDetails();stoneBridge();trailSteps();mailbox();}
+    else if(state.scene===&#x27;shop&#x27;){shop();door(70,240,&#x27;回农庄&#x27;);text(&#x27;作物篮&#x27;,291,633,18,&#x27;#f6e6c2&#x27;);text(&#x27;设施委托&#x27;,1129,186,20,&#x27;#655b41&#x27;);}
+    else if(state.scene===&#x27;camp&#x27;){cave();forestWay();text(&#x27;战备台&#x27;,642,495,16,&#x27;#efe0b6&#x27;);}
+    else if(state.scene===&#x27;explore&#x27;){exploration();daylightExit();enemy(706,266,.75);crate(1000,347,1.8);rock(426,194,1.4);}
+    else if(state.scene===&#x27;battle&#x27;)battle();
+    else if(state.scene===&#x27;home&#x27;){home();door(75,220,&#x27;去院子&#x27;);rect(174,143,136,107,&#x27;#95744d&#x27;);rect(184,153,116,87,&#x27;#667a54&#x27;);text(&#x27;留 言 板&#x27;,242,190,20,&#x27;#f1e3b8&#x27;);text(&#x27;欢迎来坐坐&#x27;,242,218,14,&#x27;#e5d6ae&#x27;);text(&#x27;窗外的院子&#x27;,1121,251,16,&#x27;#786c4f&#x27;);}
+    else{courtyard();gardenGate();text(host().name+&#x27;家&#x27;,570,290,20,&#x27;#f7efd4&#x27;);}}
+
+  const mobile=()=&gt;stage.clientWidth&lt;=600;
+  function object(label,x,y,w,h,action){const scale=mobile()?.48:1;return `&lt;button type=&quot;button&quot; class=&quot;object cursor-interaction&quot; data-action=&quot;${action}&quot; data-object=&quot;${label}&quot; aria-label=&quot;${label}&quot; style=&quot;left:clamp(22px,${x/14}%,calc(100% - 22px));top:clamp(22px,${y/735*100*scale}%,calc(100% - 22px));width:${w/14}%;height:${h/735*100*scale}%&quot;&gt;&lt;span class=&quot;obj-label&quot;&gt;${label}&lt;/span&gt;&lt;/button&gt;`;}
+  function button(label,action,primary=false,disabled=false){return `&lt;button type=&quot;button&quot; class=&quot;${primary?&#x27;primary &#x27;:&#x27;&#x27;}cursor-interaction&quot; data-action=&quot;${action}&quot; ${disabled?&#x27;disabled&#x27;:&#x27;&#x27;}&gt;${label}&lt;/button&gt;`;}
+  function price(g){return Math.round((state.kind===&#x27;cabbage&#x27;?[17,17,14]:[18,18,22])[g-1]*state.quantity/5);}
+  const guests=[[&#x27;阿禾&#x27;,&#x27;今天想买点白菜，回家炖一锅汤。&#x27;,474],[&#x27;小满&#x27;,&#x27;纤维足一点的，吃起来才脆嘛。&#x27;,786],[&#x27;小翠&#x27;,&#x27;我更想要胡萝卜，你有带来吗？&#x27;,1098]];
+  function bubbles(){let best=Math.max(...[1,2,3].map(price));return guests.map((g,i)=&gt;{const top=mobile()?49+i*16:33,left=g[2]/14-10;return `&lt;div class=&quot;bubble ${price(i+1)===best&amp;&amp;state.quantity?&#x27;best&#x27;:&#x27;&#x27;} ${design.dialogue===&#x27;选中时展开&#x27;&amp;&amp;state.guest!==i+1?&#x27;quiet&#x27;:&#x27;&#x27;}&quot; style=&quot;left:${left}%;top:${top}%&quot; data-bubble=&quot;${i+1}&quot;&gt;&lt;strong&gt;${g[0]}${price(i+1)===best&amp;&amp;state.quantity?&#x27;&lt;span class=&quot;tag&quot;&gt;最高报价&lt;/span&gt;&#x27;:&#x27;&#x27;}&lt;/strong&gt;&lt;p&gt;${g[1]}&lt;/p&gt;&lt;em&gt;${state.quantity?`${state.quantity} 个 · ${price(i+1)} 金`:&#x27;当前作物已售罄&#x27;}&lt;/em&gt;&lt;/div&gt;`;}).join(&#x27;&#x27;);}
+  const anchors={directory:[700,400],field:[560,450],&#x27;seed-field&#x27;:[326,501],&#x27;care-field&#x27;:[678,495],&#x27;expand-field&#x27;:[702,605],warehouse:[980,330],shelf:[300,360],facilities:[1090,350],basket:[290,580],guest:[760,550],cave:[1050,380],loadout:[640,510],party:[552,610],encounter:[706,266],extract:[496,645],chest:[1000,347],gather:[426,194],owner:[846,569],greet:[242,210],display:[880,300],crops:[1030,550],cards:[710,600]};
+  function panel(title,body){return `&lt;div class=&quot;work-head&quot;&gt;&lt;strong&gt;${title}&lt;/strong&gt;${button(&#x27;收起&#x27;,&#x27;close&#x27;)}&lt;/div&gt;${body}`;}
+  function panelContent(){switch(state.panel){
+    case &#x27;directory&#x27;:return directory();
+    case &#x27;field&#x27;:return panel(&#x27;成熟的白菜&#x27;,`&lt;p&gt;${state.harvest?&#x27;这轮作物已收好，新的种子可以播下。&#x27;:&#x27;2 块地已成熟，收获进入自己的仓库。&#x27;}&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;${button(state.harvest?&#x27;这一轮已收获&#x27;:&#x27;收获这两块地&#x27;,&#x27;harvest&#x27;,true,state.harvest)}${button(&#x27;查看照料记录&#x27;,&#x27;care&#x27;)}&lt;/div&gt;`);
+    case &#x27;seed-field&#x27;:return panel(state.planted?&#x27;地块里的新芽&#x27;:&#x27;在这块空地播种&#x27;,`&lt;p&gt;${state.planted?&#x27;白菜已经种下了，接下来可以照料。&#x27;:`白菜种子 · 剩余 ${state.seeds} 粒`}&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;${button(state.planted?&#x27;已播种&#x27;:&#x27;播种白菜 · 用 1 粒&#x27;,&#x27;plant&#x27;,true,state.planted||!state.seeds)}&lt;/div&gt;`);
+    case &#x27;care-field&#x27;:return panel(&#x27;生长中的白菜&#x27;,`&lt;p&gt;${state.watered?&#x27;当前时段已经浇过水。&#x27;:&#x27;当前照料时段可以浇水，操作免费。&#x27;}&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;${button(state.watered?&#x27;这一时段已浇水&#x27;:&#x27;浇水&#x27;,&#x27;water&#x27;,true,state.watered)}${button(&#x27;查看肥料&#x27;,&#x27;fertilizer&#x27;)}&lt;/div&gt;`);
+    case &#x27;expand-field&#x27;:return panel(&#x27;开垦下一块地&#x27;,`&lt;p&gt;第 7 块地需要 1400 金，当前有 ${state.coins} 金。售价规则沿用现有设计。&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;${button(&#x27;开垦 · 1400 金&#x27;,&#x27;expand&#x27;,true,state.coins&lt;1400)}&lt;/div&gt;`);
+    case &#x27;warehouse&#x27;:return panel(&#x27;仓库与工坊&#x27;,&#x27;&lt;p&gt;种子、作物和洞窟材料都在这里整理。&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;&#x27;+button(&#x27;种子与育种&#x27;,&#x27;seed&#x27;)+button(&#x27;查看作物&#x27;,&#x27;stock&#x27;)+button(&#x27;制作&#x27;,&#x27;craft&#x27;)+&#x27;&lt;/div&gt;&#x27;);
+    case &#x27;shelf&#x27;:return panel(&#x27;种子与肥料&#x27;,`&lt;p&gt;白菜种子 · 库存不限 · 20 金 / 粒&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;${button(&#x27;买 1 粒 · 20 金&#x27;,&#x27;buy&#x27;,true,state.coins&lt;20)}${button(&#x27;查看肥料&#x27;,&#x27;fertilizer&#x27;)}&lt;/div&gt;`);
+    case &#x27;facilities&#x27;:return panel(&#x27;设施委托&#x27;,&#x27;&lt;p&gt;水壶、仓库、育种机与商店升级，在委托区查看。&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;&#x27;+button(&#x27;查看升级条件&#x27;,&#x27;upgrade&#x27;)+&#x27;&lt;/div&gt;&#x27;);
+    case &#x27;basket&#x27;:return panel(&#x27;带来的作物&#x27;,`&lt;label for=&quot;fo-crop&quot;&gt;选择作物批次&lt;/label&gt;&lt;select id=&quot;fo-crop&quot;&gt;&lt;option value=&quot;cabbage&quot; ${state.kind===&#x27;cabbage&#x27;?&#x27;selected&#x27;:&#x27;&#x27;}&gt;白菜 · 库存 ${state.inventory.cabbage}&lt;/option&gt;&lt;option value=&quot;carrot&quot; ${state.kind===&#x27;carrot&#x27;?&#x27;selected&#x27;:&#x27;&#x27;}&gt;胡萝卜 · 库存 ${state.inventory.carrot}&lt;/option&gt;&lt;/select&gt;&lt;div class=&quot;quantity&quot;&gt;${button(&#x27;−&#x27;,&#x27;minus&#x27;,false,state.quantity&lt;=1)}&lt;output&gt;${state.quantity} 个&lt;/output&gt;${button(&#x27;＋&#x27;,&#x27;plus&#x27;,false,state.quantity&gt;=state.inventory[state.kind])}&lt;/div&gt;&lt;div class=&quot;actions&quot;&gt;${button(&#x27;带这批菜问客人&#x27;,&#x27;close&#x27;,true)}${button(`整批兜底出售 · ${Math.round(state.inventory[state.kind]*3.4)} 金`,&#x27;default-sell&#x27;,false,!state.inventory[state.kind])}&lt;/div&gt;`);
+    case &#x27;guest&#x27;:{const g=guests[state.guest-1];return panel(`和${g[0]}交易`,`&lt;p&gt;${g[1]}&lt;/p&gt;&lt;p&gt;${state.kind===&#x27;cabbage&#x27;?&#x27;白菜&#x27;:&#x27;胡萝卜&#x27;} ${state.quantity} 个，报价 ${price(state.guest)} 金。&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;${button(`卖给${g[0]} · ${price(state.guest)} 金`,&#x27;sell&#x27;,true,!state.quantity)}${button(&#x27;换一批作物&#x27;,&#x27;basket&#x27;)}&lt;/div&gt;`);}
+    case &#x27;cave&#x27;:return panel(&#x27;苔石浅洞 · 出发&#x27;,`&lt;p&gt;第一层 · 战备已配置。进入后沿路线探索，战斗结束再决定深入或撤离。&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;${button(&#x27;进入洞窟&#x27;,&#x27;enter&#x27;,true)}${button(&#x27;调整战备&#x27;,&#x27;loadout&#x27;)}${button(&#x27;好友组队&#x27;,&#x27;party&#x27;)}&lt;/div&gt;`);
+    case &#x27;loadout&#x27;:return panel(&#x27;战备台&#x27;,`&lt;p&gt;胸挂先入牌；背包后入牌；保险箱保护物品。&lt;/p&gt;&lt;div class=&quot;item-grid&quot;&gt;&lt;span class=&quot;wide&quot;&gt;木剑 · 2 格&lt;/span&gt;&lt;span&gt;药水&lt;/span&gt;&lt;span&gt;空格&lt;/span&gt;&lt;span&gt;空格&lt;/span&gt;&lt;span&gt;空格&lt;/span&gt;&lt;span&gt;空格&lt;/span&gt;&lt;span&gt;空格&lt;/span&gt;&lt;/div&gt;&lt;div class=&quot;actions&quot;&gt;${button(&#x27;配置完成&#x27;,&#x27;close&#x27;,true)}&lt;/div&gt;`);
+    case &#x27;party&#x27;:return panel(&#x27;篝火旁等朋友&#x27;,`&lt;p&gt;示意：你已准备，朋友尚未准备。房间码 FARM23。&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;${button(&#x27;等待朋友准备&#x27;,&#x27;wait&#x27;,false,true)}${button(&#x27;单人出发&#x27;,&#x27;cave&#x27;)}&lt;/div&gt;`);
+    case &#x27;encounter&#x27;:return panel(&#x27;遇见苔石守卫&#x27;,`&lt;p&gt;点击敌人确认遭遇。接下来进入完整卡牌战斗画面。&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;${button(&#x27;开始战斗&#x27;,&#x27;fight&#x27;,true)}&lt;/div&gt;`);
+    case &#x27;extract&#x27;:return panel(&#x27;洞窟出口&#x27;,`&lt;p&gt;从这里撤离，带回本次收获并回到营地。&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;${button(&#x27;撤离到营地&#x27;,&#x27;leave-cave&#x27;,true)}&lt;/div&gt;`);
+    case &#x27;chest&#x27;:return panel(&#x27;岩缝里的宝箱&#x27;,&#x27;&lt;p&gt;物资要放入本次背包，撤离后才能带回。&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;&#x27;+button(&#x27;打开并查看物资&#x27;,&#x27;loot&#x27;,true)+&#x27;&lt;/div&gt;&#x27;);
+    case &#x27;gather&#x27;:return panel(&#x27;岩芽采集点&#x27;,&#x27;&lt;p&gt;这里生长着洞窟里的新种子。&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;&#x27;+button(&#x27;采集岩芽种子&#x27;,&#x27;collect&#x27;,true)+&#x27;&lt;/div&gt;&#x27;);
+    case &#x27;owner&#x27;:return panel(host().name+&#x27; · 主人留言&#x27;,`&lt;p&gt;${welcome()}&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;${button(&#x27;打个招呼&#x27;,&#x27;hello&#x27;,true)}&lt;/div&gt;`);
+    case &#x27;greet&#x27;:return panel(host().name+&#x27;家的留言板&#x27;,&#x27;&lt;p&gt;留一句简短的问候。此处是交互示意，不会发送真实消息。&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;&#x27;+button(&#x27;来串门啦！&#x27;,&#x27;hello&#x27;,true)+&#x27;&lt;/div&gt;&#x27;);
+    case &#x27;display&#x27;:return panel(host().name+&#x27;的展示架&#x27;,&#x27;&lt;p&gt;铁矿、岩芽种子与这一趟冒险的纪念。访客可以看，物品属于主人。&lt;/p&gt;&#x27;);
+    case &#x27;crops&#x27;:return panel(host().name+&#x27;种下的作物&#x27;,`&lt;p&gt;${host().plant}正在生长。访客可以参观，管理和收获由主人操作。&lt;/p&gt;`);
+    case &#x27;cards&#x27;:return panel(&#x27;卡牌战斗 · 演示&#x27;,`&lt;p&gt;苔石守卫生命 ${state.enemyHp} / 12；你的生命 ${state.hp} / 20。&lt;/p&gt;&lt;div class=&quot;actions&quot;&gt;${button(&#x27;木剑斩击 · 6 伤害&#x27;,&#x27;attack&#x27;,true)}${button(&#x27;结束回合&#x27;,&#x27;end-turn&#x27;)}&lt;/div&gt;`);
+    default:return &#x27;&#x27;;
+  }}
+  function placePanel(){if(!state.panel)return;work.style.width=state.panel===&#x27;directory&#x27;?&#x27;min(720px,calc(100% - 32px))&#x27;:state.panel===&#x27;guest&#x27;&amp;&amp;!mobile()?&#x27;min(380px,max(268px,27%))&#x27;:&#x27;&#x27;;const box=work.getBoundingClientRect(),w=stage.clientWidth,h=stage.clientHeight,anchor=anchors[state.panel]||[700,550];let x=anchor[0]/1400*w+24,y=anchor[1]/735*h-100;if(state.panel===&#x27;directory&#x27;){x=(w-box.width)/2;y=(h-box.height)/2;}else if(state.panel===&#x27;guest&#x27;){x=18;y=h-box.height-25;}else if(state.panel===&#x27;cards&#x27;){x=(w-box.width)/2;y=h-box.height-25;}if(mobile()){x=(w-box.width)/2;y=Math.max(108,(h-box.height)/2);}work.style.left=Math.max(16,Math.min(w-box.width-16,x))+&#x27;px&#x27;;work.style.top=Math.max(90,Math.min(h-box.height-18,y))+&#x27;px&#x27;;}
+  function render(){root.querySelector(&#x27;#fo-location&#x27;).textContent={farm:&#x27;我的农场&#x27;,shop:&#x27;田边杂货铺&#x27;,camp:&#x27;洞窟营地&#x27;,explore:&#x27;苔石浅洞 · 探索&#x27;,battle:&#x27;苔石浅洞 · 战斗&#x27;,home:host().name+&#x27;的小屋&#x27;,yard:host().name+&#x27;的院子&#x27;}[state.scene];root.querySelector(&#x27;#fo-money&#x27;).textContent=state.coins.toLocaleString();stage.className=&#x27;stage &#x27;+state.scene;
+    let targets=&#x27;&#x27;;
+    if(state.scene===&#x27;farm&#x27;)targets=object(&#x27;杂货铺门廊：进店&#x27;,405,267,168,135,&#x27;shop-porch&#x27;)+object(&#x27;邻里房屋：选择朋友&#x27;,706,244,210,190,&#x27;friend-house&#x27;)+object(&#x27;信箱：打开邻里地址簿&#x27;,264,349,93,107,&#x27;mailbox&#x27;)+object(&#x27;仓库工坊&#x27;,982,286,200,170,&#x27;warehouse&#x27;)+object(&#x27;提灯石阶：去洞窟营地&#x27;,1145,356,135,140,&#x27;mountain-steps&#x27;)+object(&#x27;成熟的白菜田&#x27;,430,459,285,105,&#x27;field&#x27;)+object(&#x27;空地：播种&#x27;,326,501,145,76,&#x27;seed-field&#x27;)+object(&#x27;生长中的作物：照料&#x27;,678,495,190,88,&#x27;care-field&#x27;)+object(&#x27;待开垦地块&#x27;,702,605,390,85,&#x27;expand-field&#x27;)+object(&#x27;溪上小桥：选择拜访朋友&#x27;,177,592,190,135,&#x27;neighbor-bridge&#x27;);
+    else if(state.scene===&#x27;shop&#x27;)targets=object(&#x27;商店的门：回农庄&#x27;,70,239,95,187,&#x27;shop-door&#x27;)+object(&#x27;种子与肥料货架&#x27;,262,288,248,190,&#x27;shelf&#x27;)+object(&#x27;设施委托货架&#x27;,1123,211,205,100,&#x27;facilities&#x27;)+object(&#x27;带来的作物篮&#x27;,291,565,125,97,&#x27;basket&#x27;)+guests.map((g,i)=&gt;object(`客人${g[0]}`,g[2],547,125,177,`guest-${i+1}`)).join(&#x27;&#x27;)+bubbles();
+    else if(state.scene===&#x27;camp&#x27;)targets=object(&#x27;山体里的洞口&#x27;,1060,350,310,262,&#x27;cave&#x27;)+object(&#x27;战备台&#x27;,640,520,195,136,&#x27;loadout&#x27;)+object(&#x27;组队篝火&#x27;,553,609,138,113,&#x27;party&#x27;)+object(&#x27;下山小路：回农庄&#x27;,152,641,180,120,&#x27;forest-path&#x27;);
+    else if(state.scene===&#x27;explore&#x27;)targets=object(&#x27;路线上的苔石守卫&#x27;,706,224,100,125,&#x27;encounter&#x27;)+object(&#x27;宝箱&#x27;,1000,347,125,135,&#x27;chest&#x27;)+object(&#x27;岩芽采集点&#x27;,426,180,120,105,&#x27;gather&#x27;)+object(&#x27;透着天光的洞口：撤离&#x27;,496,645,151,164,&#x27;extract&#x27;);
+    else if(state.scene===&#x27;battle&#x27;)targets=object(&#x27;查看本回合手牌&#x27;,355,451,260,300,&#x27;cards&#x27;);
+    else if(state.scene===&#x27;home&#x27;)targets=object(&#x27;房门：去院子&#x27;,75,220,91,190,&#x27;home-door&#x27;)+object(&#x27;窗户：看院子&#x27;,1121,153,175,145,&#x27;home-window&#x27;)+object(host().name+&#x27;家的留言板&#x27;,242,195,143,125,&#x27;greet&#x27;)+object(&#x27;主人&#x27;+host().name,846,469,145,245,&#x27;owner&#x27;)+object(host().name+&#x27;的展示架&#x27;,880,270,166,174,&#x27;display&#x27;)+`&lt;div class=&quot;bubble home-bubble&quot; style=&quot;left:51%;top:${mobile()?53:33}%;width:${mobile()?&#x27;calc(100% - 28px)&#x27;:&#x27;27%&#x27;};max-width:${mobile()?&#x27;none&#x27;:&#x27;310px&#x27;}&quot;&gt;&lt;strong&gt;${host().name} · 主人留言&lt;/strong&gt;&lt;p&gt;${welcome()}&lt;/p&gt;&lt;/div&gt;`;
+    else targets=object(host().name+&#x27;家的房子：进屋&#x27;,568,307,292,247,&#x27;yard-house&#x27;)+object(&#x27;花藤院门：回我的农场&#x27;,264,463,194,222,&#x27;yard-gate&#x27;)+object(host().name+&#x27;的作物田&#x27;,1030,556,315,147,&#x27;crops&#x27;);
+    objects.innerHTML=targets;root.querySelector(&#x27;#fo-note&#x27;).hidden=!!state.panel;work.hidden=!state.panel;work.classList.toggle(&#x27;book&#x27;,state.panel===&#x27;directory&#x27;);objects.inert=state.panel===&#x27;directory&#x27;;if(state.panel===&#x27;directory&#x27;){work.setAttribute(&#x27;role&#x27;,&#x27;dialog&#x27;);work.setAttribute(&#x27;aria-label&#x27;,&#x27;选择要拜访的朋友&#x27;);}else{work.removeAttribute(&#x27;role&#x27;);work.setAttribute(&#x27;aria-label&#x27;,&#x27;所选物体的操作&#x27;);}work.innerHTML=panelContent();paint();paintPreviews();placePanel();root.querySelector(&#x27;#fo-note&#x27;).textContent={farm:state.harvest?&#x27;我的农场 · 本轮已收获&#x27;:&#x27;成熟 ×2 · 信箱或小桥选朋友，再去串门&#x27;,shop:`作物篮：${state.kind===&#x27;cabbage&#x27;?&#x27;白菜&#x27;:&#x27;胡萝卜&#x27;} ${state.quantity} 个 · 今日客人 3 位`,camp:&#x27;营地 · 战备台与篝火&#x27;,explore:&#x27;探险进行中 · 天光洞口可撤离&#x27;,battle:&#x27;卡牌战斗示意 · 点击角色查看手牌&#x27;,home:host().name+&#x27;家 · &#x27;+(host().online?&#x27;在线&#x27;:&#x27;离线&#x27;)+&#x27; · 主人留言&#x27;,yard:host().name+&#x27;的院子 · &#x27;+(host().online?&#x27;在线&#x27;:&#x27;离线&#x27;)+&#x27; · 开放参观&#x27;}[state.scene];canvas.setAttribute(&#x27;aria-label&#x27;,root.querySelector(&#x27;#fo-location&#x27;).textContent+&#x27;，通过场景中的物体进行操作&#x27;);if(globalThis.lucide)lucide.createIcons();
+  }
+  function save(){if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:{revision:4,scene:state.scene,panel:state.panel,visiting:state.visitId,lastVisit:state.lastVisitId,interaction:&#x27;店门、小桥、石阶、院门自然导航；物体操作留在场内&#x27;},privateContent:{revision:4,scene:state.scene,visitId:state.visitId,lastVisitId:state.lastVisitId}}).catch(()=&gt;{});}
+  let timer;function toast(t){const box=root.querySelector(&#x27;#fo-toast&#x27;);box.textContent=t;box.hidden=false;clearTimeout(timer);timer=setTimeout(()=&gt;box.hidden=true,3200);}
+  function goto(s){state.scene=s;state.panel=s===&#x27;battle&#x27;?&#x27;cards&#x27;:&#x27;&#x27;;root.querySelector(&#x27;#fo-toast&#x27;).hidden=true;render();save();}
+  function action(a){const routes={&#x27;shop-porch&#x27;:&#x27;shop&#x27;,&#x27;shop-door&#x27;:&#x27;farm&#x27;,&#x27;mountain-steps&#x27;:&#x27;camp&#x27;,&#x27;forest-path&#x27;:&#x27;farm&#x27;,&#x27;home-door&#x27;:&#x27;yard&#x27;,&#x27;home-window&#x27;:&#x27;yard&#x27;,&#x27;yard-house&#x27;:&#x27;home&#x27;,&#x27;yard-gate&#x27;:&#x27;farm&#x27;};if(routes[a])return goto(routes[a]);
+    if([&#x27;mailbox&#x27;,&#x27;friend-house&#x27;,&#x27;neighbor-bridge&#x27;].includes(a)){state.directorySource=a;state.friendPage=0;state.friendQuery=&#x27;&#x27;;state.panel=&#x27;directory&#x27;;render();work.querySelector(&#x27;button&#x27;)?.focus({preventScroll:true});save();return;}
+    if(a.startsWith(&#x27;visit-&#x27;)){const f=friends.find(f=&gt;f.id===a.slice(6));if(!f?.open)return;state.visitId=f.id;state.lastVisitId=f.id;return goto(&#x27;yard&#x27;);}
+    if(a===&#x27;friend-prev&#x27;||a===&#x27;friend-next&#x27;){state.friendPage+=a===&#x27;friend-next&#x27;?1:-1;render();save();return;}
+    if(a===&#x27;enter&#x27;)return goto(&#x27;explore&#x27;);if(a===&#x27;leave-cave&#x27;){goto(&#x27;camp&#x27;);return toast(&#x27;已撤离 · 本次结算在营地查看&#x27;);}
+    if(a===&#x27;fight&#x27;){state.enemyHp=12;state.hp=20;return goto(&#x27;battle&#x27;);}
+    if(a===&#x27;close&#x27;){const fromDirectory=state.panel===&#x27;directory&#x27;;state.panel=&#x27;&#x27;;render();if(fromDirectory)objects.querySelector(`[data-action=&quot;${state.directorySource}&quot;]`)?.focus({preventScroll:true});save();return;}
+    if(a.startsWith(&#x27;guest-&#x27;)){state.guest=Number(a.slice(6));state.panel=&#x27;guest&#x27;;}
+    else if(Object.keys(anchors).includes(a))state.panel=a;
+    else if(a===&#x27;harvest&#x27;){if(!state.harvest){state.harvest=true;state.inventory.cabbage+=10;toast(&#x27;收获白菜 ×10 · 新种子 ×4&#x27;);}state.panel=&#x27;&#x27;;}
+    else if(a===&#x27;plant&#x27;){if(!state.planted&amp;&amp;state.seeds){state.planted=true;state.seeds-=1;state.panel=&#x27;&#x27;;toast(&#x27;这块地播下了白菜 · 种子 −1&#x27;);}}
+    else if(a===&#x27;water&#x27;){state.watered=true;state.panel=&#x27;&#x27;;toast(&#x27;已完成本时段浇水&#x27;);}
+    else if(a===&#x27;minus&#x27;||a===&#x27;plus&#x27;)state.quantity=Math.min(state.inventory[state.kind],Math.max(1,state.quantity+(a===&#x27;plus&#x27;?1:-1)));
+    else if(a===&#x27;sell&#x27;){if(state.quantity){let paid=price(state.guest),n=state.quantity;state.coins+=paid;state.inventory[state.kind]-=n;state.quantity=Math.min(5,state.inventory[state.kind]);state.panel=&#x27;&#x27;;toast(`卖给${guests[state.guest-1][0]} ${n} 个 · +${paid} 金`);}}
+    else if(a===&#x27;default-sell&#x27;){let n=state.inventory[state.kind],paid=Math.round(n*3.4);state.coins+=paid;state.inventory[state.kind]=0;state.quantity=0;state.panel=&#x27;&#x27;;toast(`整批 ${n} 个已出售 · +${paid} 金`);}
+    else if(a===&#x27;buy&#x27;){if(state.coins&gt;=20){state.coins-=20;toast(&#x27;买到白菜种子 ×1 · −20 金&#x27;);}}
+    else if(a===&#x27;hello&#x27;){state.visited=true;state.visitedOwners[host().id]=true;state.panel=&#x27;&#x27;;toast(&#x27;留下了一句问候 · 交互示意&#x27;);}
+    else if(a===&#x27;attack&#x27;){state.enemyHp=Math.max(0,state.enemyHp-6);if(!state.enemyHp){goto(&#x27;explore&#x27;);return toast(&#x27;战斗示意结束 · 回到当前探索路线&#x27;);}}
+    else if(a===&#x27;end-turn&#x27;){state.hp=Math.max(1,state.hp-2);toast(&#x27;守卫反击 · 生命 −2&#x27;);}
+    else{const replies={care:&#x27;这轮已完成照料，详细记录仍在场内打开&#x27;,seed:&#x27;查看仓库中的种子与育种模板&#x27;,stock:&#x27;作物按批次保存在仓库&#x27;,craft:&#x27;制作配方在工坊工作区查看&#x27;,fertilizer:&#x27;货架详情：基础肥料覆盖 2 小时&#x27;,upgrade:&#x27;设施升级前，在委托区查看实际价格与条件&#x27;,loot:&#x27;宝箱内容加入本次背包 · 交互示意&#x27;,collect:&#x27;采集岩芽种子 ×1 · 交互示意&#x27;};toast(replies[a]||&#x27;场景内操作示意&#x27;);}
+    render();save();
+  }
+  root.addEventListener(&#x27;click&#x27;,e=&gt;{const b=e.target.closest(&#x27;button&#x27;);if(b&amp;&amp;!b.disabled&amp;&amp;b.dataset.action)action(b.dataset.action);});
+  root.addEventListener(&#x27;input&#x27;,e=&gt;{if(e.target.id===&#x27;fo-friend-search&#x27;){const caret=e.target.selectionStart;state.friendQuery=e.target.value;state.friendPage=0;render();const input=work.querySelector(&#x27;#fo-friend-search&#x27;);input.focus({preventScroll:true});try{input.setSelectionRange(caret,caret);}catch{};}});
+  root.addEventListener(&#x27;change&#x27;,e=&gt;{if(e.target.id===&#x27;fo-crop&#x27;){state.kind=e.target.value;state.quantity=Math.min(5,state.inventory[state.kind]);render();save();}});
+  root.addEventListener(&#x27;keydown&#x27;,e=&gt;{if(e.key===&#x27;Escape&#x27;&amp;&amp;state.panel){state.panel=&#x27;&#x27;;render();save();}});
+  window.addEventListener(&#x27;openai:set_globals&#x27;,event=&gt;{const incoming=event.detail?.globals?.widgetState?.privateContent;if(incoming?.revision===4&amp;&amp;[&#x27;farm&#x27;,&#x27;shop&#x27;,&#x27;camp&#x27;,&#x27;explore&#x27;,&#x27;battle&#x27;,&#x27;home&#x27;,&#x27;yard&#x27;].includes(incoming.scene)&amp;&amp;state.scene!==incoming.scene){state.scene=incoming.scene;if(friends.some(f=&gt;f.id===incoming.visitId))state.visitId=incoming.visitId;if(friends.some(f=&gt;f.id===incoming.lastVisitId))state.lastVisitId=incoming.lastVisitId;state.panel=&#x27;&#x27;;render();}});
+  let lastWidth=0;new ResizeObserver(()=&gt;{if(stage.clientWidth!==lastWidth){lastWidth=stage.clientWidth;render();}}).observe(stage);
+  render();
+  if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:render});tweak.addSlider(design,&#x27;npcScale&#x27;,{label:&#x27;商店客人大小&#x27;,min:90,max:125,step:5,unit:&#x27;%&#x27;,reference:&#x27;shop.npcScale&#x27;});tweak.addSelect(design,&#x27;dialogue&#x27;,{label:&#x27;客人对白&#x27;,options:[&#x27;短对话常显&#x27;,&#x27;选中时展开&#x27;],reference:&#x27;shop.dialogue&#x27;});}
+})();
+&lt;/script&gt;
+
+&lt;script src=&quot;https://unpkg.com/@floating-ui/core@1.7.3/dist/floating-ui.core.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script src=&quot;https://unpkg.com/@floating-ui/dom@1.7.4/dist/floating-ui.dom.umd.min.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  if (window.FloatingUIDOM == null) {
+    return;
+  }
+  const { autoUpdate, computePosition, flip, offset, shift, size } =
+    window.FloatingUIDOM;
+  const tooltipPlacements = new Set([&quot;top&quot;, &quot;right&quot;, &quot;bottom&quot;, &quot;left&quot;]);
+  const tooltipId = `codex-visualization-tooltip-${
+    window.crypto?.randomUUID?.() ?? Date.now().toString(36)
+  }`;
+  const tooltipGap = 5;
+  const hoverDelay = 700;
+  const skipDelay = 300;
+  let activeTrigger = null;
+  let pendingTrigger = null;
+  let tooltip = null;
+  let openTimeout = null;
+  let autoUpdateCleanup = null;
+  let positionRequest = 0;
+  let skipDelayUntil = 0;
+  let lastPointerWasTouch = false;
+  let pinnedByTouch = false;
+
+  const getTrigger = (event) =&gt; {
+    for (const target of event.composedPath()) {
+      if (target?.nodeType === Node.ELEMENT_NODE) {
+        const trigger = target.closest(&quot;[data-tooltip]&quot;);
+        if (trigger) return trigger;
+      }
+    }
+    return null;
+  };
+  const containsTarget = (trigger, target) =&gt;
+    target?.nodeType != null &amp;&amp; trigger.contains(target);
+  const getContent = (trigger) =&gt;
+    trigger.getAttribute(&quot;data-tooltip&quot;)?.trim() ?? &quot;&quot;;
+  const getPlacement = (trigger) =&gt; {
+    const placement = trigger.getAttribute(&quot;data-tooltip-placement&quot;);
+    return tooltipPlacements.has(placement) ? placement : &quot;top&quot;;
+  };
+  const getTooltip = () =&gt; {
+    if (tooltip == null) {
+      tooltip = document.createElement(&quot;div&quot;);
+      tooltip.id = tooltipId;
+      tooltip.className = &quot;tooltip&quot;;
+      tooltip.setAttribute(&quot;role&quot;, &quot;tooltip&quot;);
+    }
+    return tooltip;
+  };
+  const setDescribedBy = (trigger, described) =&gt; {
+    const ids = new Set(
+      (trigger.getAttribute(&quot;aria-describedby&quot;) ?? &quot;&quot;)
+        .split(/\s+/)
+        .filter(Boolean),
+    );
+    if (described) {
+      ids.add(tooltipId);
+    } else {
+      ids.delete(tooltipId);
+    }
+    if (ids.size === 0) {
+      trigger.removeAttribute(&quot;aria-describedby&quot;);
+    } else {
+      trigger.setAttribute(&quot;aria-describedby&quot;, [...ids].join(&quot; &quot;));
+    }
+  };
+  const clearOpenTimeout = () =&gt; {
+    if (openTimeout != null) {
+      window.clearTimeout(openTimeout);
+      openTimeout = null;
+    }
+    pendingTrigger = null;
+  };
+  const closeTooltip = (activateSkipDelay = true) =&gt; {
+    clearOpenTimeout();
+    pinnedByTouch = false;
+    positionRequest += 1;
+    autoUpdateCleanup?.();
+    autoUpdateCleanup = null;
+    if (activeTrigger == null) {
+      return;
+    }
+    setDescribedBy(activeTrigger, false);
+    activeTrigger = null;
+    tooltip?.remove();
+    if (activateSkipDelay) {
+      skipDelayUntil = Date.now() + skipDelay;
+    }
+  };
+  const updatePosition = (trigger, floating) =&gt; {
+    const request = ++positionRequest;
+    void computePosition(trigger, floating, {
+      middleware: [
+        offset(tooltipGap),
+        flip({ padding: tooltipGap }),
+        shift({ padding: tooltipGap }),
+        size({
+          padding: tooltipGap,
+          apply({ availableHeight, availableWidth, elements }) {
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-width&quot;,
+              `${Math.max(0, availableWidth)}px`,
+            );
+            elements.floating.style.setProperty(
+              &quot;--tooltip-available-height&quot;,
+              `${Math.max(0, availableHeight)}px`,
+            );
+          },
+        }),
+      ],
+      placement: getPlacement(trigger),
+      strategy: &quot;fixed&quot;,
+    })
+      .then(({ x, y }) =&gt; {
+        if (activeTrigger !== trigger || request !== positionRequest) {
+          return;
+        }
+        const scale = window.devicePixelRatio || 1;
+        floating.style.transform = `translate(${Math.round(x * scale) / scale}px, ${Math.round(y * scale) / scale}px)`;
+        floating.style.visibility = &quot;visible&quot;;
+      })
+      .catch(() =&gt; {
+        if (activeTrigger === trigger &amp;&amp; request === positionRequest) {
+          closeTooltip(false);
+        }
+      });
+  };
+  const openTooltip = (trigger) =&gt; {
+    const content = getContent(trigger);
+    if (!trigger.isConnected || content.length === 0) {
+      return;
+    }
+    clearOpenTimeout();
+    if (activeTrigger === trigger) {
+      return;
+    }
+    closeTooltip();
+    const floating = getTooltip();
+    floating.textContent = content;
+    floating.style.visibility = &quot;hidden&quot;;
+    floating.style.transform = &quot;translate(0, 0)&quot;;
+    document.body.appendChild(floating);
+    activeTrigger = trigger;
+    setDescribedBy(trigger, true);
+    autoUpdateCleanup = autoUpdate(trigger, floating, () =&gt; {
+      updatePosition(trigger, floating);
+    });
+  };
+  const requestOpen = (trigger, immediate = false) =&gt; {
+    if (
+      getContent(trigger).length === 0 ||
+      activeTrigger === trigger ||
+      pendingTrigger === trigger
+    ) {
+      return;
+    }
+    clearOpenTimeout();
+    pendingTrigger = trigger;
+    const delay =
+      immediate || activeTrigger != null || Date.now() &lt; skipDelayUntil
+        ? 0
+        : hoverDelay;
+    if (delay === 0) {
+      openTooltip(trigger);
+      return;
+    }
+    openTimeout = window.setTimeout(() =&gt; {
+      openTimeout = null;
+      pendingTrigger = null;
+      openTooltip(trigger);
+    }, delay);
+  };
+  const handlePointerOpen = (event) =&gt; {
+    if (event.pointerType === &quot;touch&quot;) {
+      return;
+    }
+    const trigger = getTrigger(event);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    requestOpen(trigger);
+  };
+  const handlePointer = (event) =&gt; {
+    lastPointerWasTouch =
+      event.type === &quot;pointerdown&quot; &amp;&amp; event.pointerType === &quot;touch&quot;;
+  };
+  const handleTouchClick = (event) =&gt; {
+    const isTouch = event.pointerType === &quot;touch&quot; || lastPointerWasTouch;
+    lastPointerWasTouch = false;
+    if (!isTouch || event.detail === 0) {
+      return;
+    }
+    const trigger = getTrigger(event);
+    if (
+      trigger == null ||
+      !trigger.isConnected ||
+      getContent(trigger).length === 0 ||
+      (pinnedByTouch &amp;&amp; activeTrigger === trigger)
+    ) {
+      if (pinnedByTouch) {
+        closeTooltip();
+      }
+      return;
+    }
+    openTooltip(trigger);
+    pinnedByTouch = activeTrigger === trigger;
+    window.setTimeout(() =&gt; {
+      if (activeTrigger === trigger &amp;&amp; !trigger.isConnected) {
+        closeTooltip(false);
+      }
+    }, 0);
+  };
+  const handleLeave = (event) =&gt; {
+    if (pinnedByTouch) {
+      return;
+    }
+    const trigger = getTrigger(event);
+    if (trigger == null || containsTarget(trigger, event.relatedTarget)) {
+      return;
+    }
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handleFocusIn = (event) =&gt; {
+    const trigger = getTrigger(event);
+    if (trigger?.matches(&quot;:focus-visible&quot;)) {
+      requestOpen(trigger, true);
+    }
+  };
+  const handleKeyDown = (event) =&gt; {
+    if (event.key === &quot;Escape&quot;) {
+      closeTooltip();
+    }
+  };
+  const handleContextMenu = (event) =&gt; {
+    lastPointerWasTouch = false;
+    const trigger = getTrigger(event);
+    if (activeTrigger === trigger || pendingTrigger === trigger) {
+      closeTooltip();
+    }
+  };
+  const handlers = {
+    pointerover: handlePointerOpen,
+    pointerdown: handlePointer,
+    pointercancel: handlePointer,
+    click: handleTouchClick,
+    pointerout: handleLeave,
+    focusin: handleFocusIn,
+    focusout: handleLeave,
+    keydown: handleKeyDown,
+    contextmenu: handleContextMenu,
+  };
+  const roots = new Map();
+  const handledEvents = new WeakSet();
+  const handleEvent = (event) =&gt; {
+    if (handledEvents.has(event)) return;
+    handledEvents.add(event);
+    handlers[event.type](event);
+  };
+  const discoverRoots = (node) =&gt; {
+    if (node.shadowRoot) listen(node.shadowRoot);
+    for (const element of node.querySelectorAll(&quot;*&quot;)) {
+      if (element.shadowRoot) listen(element.shadowRoot);
+    }
+  };
+  const listen = (root) =&gt; {
+    if (roots.has(root)) return;
+    for (const type of Object.keys(handlers)) root.addEventListener(type, handleEvent);
+    const observer = new window.MutationObserver((records) =&gt; {
+      for (const { addedNodes } of records) {
+        for (const node of addedNodes) {
+          if (node.nodeType === Node.ELEMENT_NODE) discoverRoots(node);
+        }
+      }
+      for (const [root, cleanup] of roots) {
+        if (root.host &amp;&amp; !root.host.isConnected) {
+          cleanup();
+          roots.delete(root);
+        }
+      }
+      if (activeTrigger &amp;&amp; !activeTrigger.isConnected) closeTooltip(false);
+    });
+    observer.observe(root, { childList: true, subtree: true });
+    roots.set(root, () =&gt; {
+      observer.disconnect();
+      for (const type of Object.keys(handlers)) root.removeEventListener(type, handleEvent);
+    });
+    discoverRoots(root);
+  };
+  const destroy = () =&gt; {
+    closeTooltip(false);
+    lastPointerWasTouch = false;
+    for (const cleanup of roots.values()) cleanup();
+    roots.clear();
+    tooltip = null;
+  };
+
+  // Events between children of one shadow root never reach the document.
+  listen(document);
+  window.addEventListener(&quot;pagehide&quot;, destroy, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-tabs&quot;&gt;
+(() =&gt; {
+  const selector = &#x27;.nav[role=&quot;tablist&quot;] [role=&quot;tab&quot;]&#x27;;
+  const disabled = &#x27;:disabled,[aria-disabled=&quot;true&quot;]&#x27;;
+  const selectTab = (selected) =&gt; {
+    const panelId = selected.getAttribute(&quot;aria-controls&quot;);
+    for (const tab of selected.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;)) {
+      const active = tab === selected;
+      tab.classList.toggle(&quot;active&quot;, active);
+      tab.setAttribute(&quot;aria-selected&quot;, String(active));
+      const id = tab.getAttribute(&quot;aria-controls&quot;);
+      const panel = id &amp;&amp; document.getElementById(id);
+      if (panel != null) {
+        panel.hidden = id !== panelId;
+        if (!panel.hidden &amp;&amp; selected.id) {
+          panel.setAttribute(&quot;aria-labelledby&quot;, selected.id);
+        }
+      }
+    }
+  };
+  const interact = (event) =&gt; {
+    const tab = event.target?.closest?.(selector);
+    if (event.defaultPrevented || tab == null || tab.matches(disabled)) {
+      return;
+    }
+    if (event.type === &quot;click&quot;) {
+      selectTab(tab);
+      return;
+    }
+    const tabs = Array.from(
+      tab.closest(&#x27;[role=&quot;tablist&quot;]&#x27;).querySelectorAll(&#x27;[role=&quot;tab&quot;]&#x27;),
+    ).filter((candidate) =&gt; !candidate.matches(disabled));
+    const current = tabs.indexOf(tab);
+    let next;
+    if (event.key === &quot;ArrowRight&quot; || event.key === &quot;ArrowDown&quot;) {
+      next = (current + 1) % tabs.length;
+    } else if (event.key === &quot;ArrowLeft&quot; || event.key === &quot;ArrowUp&quot;) {
+      next = (current + tabs.length - 1) % tabs.length;
+    } else if (event.key === &quot;Home&quot;) {
+      next = 0;
+    } else if (event.key === &quot;End&quot;) {
+      next = tabs.length - 1;
+    } else {
+      return;
+    }
+    event.preventDefault();
+    tabs[next].focus();
+    selectTab(tabs[next]);
+  };
+
+  for (const list of document.querySelectorAll(&#x27;.nav[role=&quot;tablist&quot;]&#x27;)) {
+    const selected =
+      list.querySelector(&#x27;[role=&quot;tab&quot;][aria-selected=&quot;true&quot;]&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;].active&#x27;) ??
+      list.querySelector(&#x27;[role=&quot;tab&quot;]&#x27;);
+    if (selected != null) {
+      selectTab(selected);
+    }
+  }
+  document.addEventListener(&quot;click&quot;, interact);
+  document.addEventListener(&quot;keydown&quot;, interact);
+  window.addEventListener(&quot;pagehide&quot;, () =&gt; {
+    document.removeEventListener(&quot;click&quot;, interact);
+    document.removeEventListener(&quot;keydown&quot;, interact);
+  }, { once: true });
+})();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-carousel&quot;&gt;
+  (() =&gt; {
+    for (const root of document.querySelectorAll(&quot;.viz-carousel&quot;)) {
+      const panels = Array.from(
+        root.querySelectorAll(&quot;:scope &gt; [data-variant]&quot;),
+      );
+      if (panels.length === 0) {
+        continue;
+      }
+      root.setAttribute(&quot;role&quot;, &quot;group&quot;);
+      panels.forEach((panel, index) =&gt; {
+        panel.hidden = index !== 0;
+        panel.setAttribute(&quot;role&quot;, &quot;group&quot;);
+        if (!panel.hasAttribute(&quot;aria-label&quot;)) {
+          panel.setAttribute(&quot;aria-label&quot;, panel.dataset.variant);
+        }
+      });
+      root.dataset.activeVariant = panels[0].dataset.variant;
+      if (panels.length === 1) {
+        continue;
+      }
+
+      const controls = document.createElement(&quot;div&quot;);
+      controls.className = &quot;viz-carousel-controls&quot;;
+      // Portable copy of the settings dropdown&#x27;s legacy glyph; no 14px icon-package preset matches it.
+      // https://github.com/openai/openai/blob/master/codex/codex-apps/webview/src/icons/chevron.svg
+      controls.innerHTML = `
+      &lt;button type=&quot;button&quot; class=&quot;viz-carousel-previous cursor-interaction&quot;&gt;&lt;i data-lucide=&quot;chevron-left&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/button&gt;
+      &lt;details class=&quot;viz-carousel-picker&quot;&gt;
+        &lt;summary class=&quot;cursor-interaction&quot;&gt;
+          &lt;span class=&quot;viz-carousel-count tabular-nums&quot;&gt;&lt;/span&gt;
+          &lt;span class=&quot;viz-carousel-name&quot;&gt;&lt;/span&gt;
+          &lt;svg class=&quot;viz-carousel-caret&quot; width=&quot;14&quot; height=&quot;14&quot; viewBox=&quot;0 0 20 21&quot; fill=&quot;none&quot; aria-hidden=&quot;true&quot; focusable=&quot;false&quot;&gt;
+            &lt;path d=&quot;M15.2793 7.71101C15.539 7.45131 15.961 7.45131 16.2207 7.71101C16.4804 7.97071 16.4804 8.39272 16.2207 8.65242L10.4707 14.4024C10.211 14.6621 9.78902 14.6621 9.52932 14.4024L3.77932 8.65242L3.69436 8.54792C3.52385 8.28979 3.55205 7.93828 3.77932 7.71101C4.00659 7.48374 4.3581 7.45554 4.61623 7.62605L4.72073 7.71101L10 12.9903L15.2793 7.71101Z&quot; fill=&quot;currentColor&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;0.6&quot; /&gt;
+          &lt;/svg&gt;
+        &lt;/summary&gt;
+        &lt;div class=&quot;viz-carousel-options&quot;&gt;&lt;/div&gt;
+      &lt;/details&gt;
+      &lt;button type=&quot;button&quot; class=&quot;viz-carousel-next cursor-interaction&quot;&gt;&lt;i data-lucide=&quot;chevron-right&quot; aria-hidden=&quot;true&quot;&gt;&lt;/i&gt;&lt;/button&gt;`;
+      const previous = controls.querySelector(&quot;.viz-carousel-previous&quot;);
+      const next = controls.querySelector(&quot;.viz-carousel-next&quot;);
+      const picker = controls.querySelector(&quot;.viz-carousel-picker&quot;);
+      const summary = picker.querySelector(&quot;summary&quot;);
+      const count = controls.querySelector(&quot;.viz-carousel-count&quot;);
+      const name = controls.querySelector(&quot;.viz-carousel-name&quot;);
+      const options = controls.querySelector(&quot;.viz-carousel-options&quot;);
+      const status = document.createElement(&quot;span&quot;);
+      status.className = &quot;sr-only&quot;;
+      status.setAttribute(&quot;role&quot;, &quot;status&quot;);
+      status.setAttribute(&quot;aria-live&quot;, &quot;polite&quot;);
+      status.setAttribute(&quot;aria-atomic&quot;, &quot;true&quot;);
+      previous.setAttribute(
+        &quot;aria-label&quot;,
+        root.dataset.previousLabel ?? &quot;Previous variant&quot;,
+      );
+      next.setAttribute(&quot;aria-label&quot;, root.dataset.nextLabel ?? &quot;Next variant&quot;);
+
+      let active = 0;
+      let mousePointerId = null;
+      let summaryPointerHandled = false;
+      summary.addEventListener(&quot;pointerdown&quot;, (event) =&gt; {
+        summaryPointerHandled =
+          event.pointerType === &quot;mouse&quot; &amp;&amp; event.button === 0 &amp;&amp; !event.ctrlKey;
+        if (!summaryPointerHandled) {
+          return;
+        }
+        event.preventDefault();
+        summary.focus({ preventScroll: true });
+        picker.open = !picker.open;
+        mousePointerId = picker.open ? event.pointerId : null;
+      });
+      summary.addEventListener(&quot;click&quot;, (event) =&gt; {
+        if (summaryPointerHandled &amp;&amp; event.detail &gt; 0) {
+          event.preventDefault();
+        }
+      });
+      const choices = panels.map((panel, index) =&gt; {
+        const choice = document.createElement(&quot;button&quot;);
+        choice.type = &quot;button&quot;;
+        choice.className = &quot;cursor-interaction&quot;;
+        choice.textContent = panel.dataset.variant;
+        choice.addEventListener(&quot;click&quot;, () =&gt; {
+          select(index);
+          summary.focus();
+        });
+        choice.addEventListener(&quot;pointerup&quot;, (event) =&gt; {
+          if (
+            picker.open &amp;&amp;
+            event.pointerType === &quot;mouse&quot; &amp;&amp;
+            event.button === 0 &amp;&amp;
+            event.pointerId === mousePointerId
+          ) {
+            choice.click();
+          }
+        });
+        options.appendChild(choice);
+        return choice;
+      });
+      const select = (index) =&gt; {
+        const changed = active !== index;
+        active = index;
+        panels.forEach((panel, position) =&gt; {
+          panel.hidden = position !== active;
+          choices[position].setAttribute(
+            &quot;aria-current&quot;,
+            String(position === active),
+          );
+        });
+        root.dataset.activeVariant = panels[active].dataset.variant;
+        count.textContent = `${active + 1} / ${panels.length}`;
+        name.textContent = panels[active].dataset.variant;
+        picker.open = false;
+        mousePointerId = null;
+        if (changed) {
+          status.textContent = `${count.textContent}: ${name.textContent}`;
+        }
+      };
+      previous.addEventListener(&quot;click&quot;, () =&gt;
+        select((active + panels.length - 1) % panels.length),
+      );
+      next.addEventListener(&quot;click&quot;, () =&gt;
+        select((active + 1) % panels.length),
+      );
+      picker.addEventListener(&quot;keydown&quot;, (event) =&gt; {
+        if (event.key === &quot;Escape&quot; &amp;&amp; picker.open) {
+          event.preventDefault();
+          picker.open = false;
+          mousePointerId = null;
+          summary.focus();
+          return;
+        }
+        if (event.altKey || event.ctrlKey || event.metaKey) {
+          return;
+        }
+        const index = choices.indexOf(document.activeElement);
+        let nextIndex;
+        if (event.key === &quot;ArrowDown&quot;) {
+          nextIndex = index &lt; 0 ? active : (index + 1) % choices.length;
+        } else if (event.key === &quot;ArrowUp&quot;) {
+          nextIndex = index &lt; 0 ? active : (index + choices.length - 1) % choices.length;
+        } else if (picker.open &amp;&amp; event.key === &quot;Home&quot;) {
+          nextIndex = 0;
+        } else if (picker.open &amp;&amp; event.key === &quot;End&quot;) {
+          nextIndex = choices.length - 1;
+        } else {
+          return;
+        }
+        event.preventDefault();
+        picker.open = true;
+        choices[nextIndex].focus();
+      });
+      picker.addEventListener(&quot;focusout&quot;, (event) =&gt; {
+        if (!picker.contains(event.relatedTarget)) {
+          picker.open = false;
+          mousePointerId = null;
+        }
+      });
+      const dismiss = (event) =&gt; {
+        if (!summary.contains(event.target)) {
+          mousePointerId = null;
+        }
+        if (!picker.contains(event.target)) {
+          picker.open = false;
+        }
+      };
+      const endPointerSelection = () =&gt; {
+        mousePointerId = null;
+      };
+      const sizePicker = () =&gt; {
+        root.style.setProperty(
+          &quot;--viz-carousel-picker-height&quot;,
+          `${picker.open ? options.offsetHeight : 0}px`,
+        );
+      };
+      picker.addEventListener(&quot;toggle&quot;, sizePicker);
+      window.addEventListener(&quot;resize&quot;, sizePicker);
+      document.addEventListener(&quot;pointerdown&quot;, dismiss);
+      document.addEventListener(&quot;pointerup&quot;, endPointerSelection);
+      document.addEventListener(&quot;pointercancel&quot;, endPointerSelection);
+      window.addEventListener(&quot;blur&quot;, endPointerSelection);
+      window.addEventListener(
+        &quot;pagehide&quot;,
+        () =&gt; {
+          document.removeEventListener(&quot;pointerdown&quot;, dismiss);
+          document.removeEventListener(&quot;pointerup&quot;, endPointerSelection);
+          document.removeEventListener(&quot;pointercancel&quot;, endPointerSelection);
+          window.removeEventListener(&quot;blur&quot;, endPointerSelection);
+          window.removeEventListener(&quot;resize&quot;, sizePicker);
+        },
+        { once: true },
+      );
+      root.append(controls, status);
+      select(0);
+    }
+  })();
+&lt;/script&gt;
+&lt;script id=&quot;codex-visualization-lucide&quot; async src=&quot;https://unpkg.com/lucide@1.17.0/dist/umd/lucide.js&quot;&gt;&lt;/script&gt;
+&lt;script&gt;
+(() =&gt; {
+  const initialize = () =&gt; {
+    globalThis.lucide?.createIcons({ attrs: { width: 16, height: 16 } });
+  };
+  if (globalThis.lucide != null) {
+    initialize();
+    return;
+  }
+  document
+    .getElementById(&quot;codex-visualization-lucide&quot;)
+    ?.addEventListener(&quot;load&quot;, initialize, { once: true });
+})();
+&lt;/script&gt;
+
+&lt;/body&gt;
+&lt;/html&gt;
+"></iframe>
+<script>(() => {
+  const frame = document.getElementById("codex-visualization");
+  if (!(frame instanceof HTMLIFrameElement)) {
+    return;
+  }
+  let viewportHeight = globalThis.innerHeight;
+  const storageKey = `codex:visualization-widget-state-v2:${JSON.stringify([
+    globalThis.location.pathname,
+    globalThis.location.search,
+  ])}`;
+  const parseState = (serializedState) => {
+    if (
+      typeof serializedState !== "string" ||
+      new TextEncoder().encode(serializedState).length > 16 * 1024
+    ) {
+      throw new TypeError(
+        "Widget state must be a JSON object of at most 16 KiB",
+      );
+    }
+    /** @type {unknown} */
+    const state = JSON.parse(serializedState);
+    if (
+      state == null ||
+      typeof state !== "object" ||
+      Array.isArray(state) ||
+      ("imageIds" in state &&
+        (!Array.isArray(state.imageIds) || state.imageIds.length > 0))
+    ) {
+      throw new TypeError("Widget state must be a JSON object");
+    }
+    const storedState = { modelContent: null, privateContent: null, ...state };
+    const canonicalState = JSON.stringify(
+      storedState,
+      (_key, /** @type {unknown} */ value) => {
+        if (typeof value === "number" && !Number.isFinite(value)) {
+          throw new TypeError("Widget state must contain finite numbers");
+        }
+        return value;
+      },
+    );
+    if (new TextEncoder().encode(canonicalState).length > 16 * 1024) {
+      throw new TypeError(
+        "Widget state must be a JSON object of at most 16 KiB",
+      );
+    }
+    return storedState;
+  };
+  let storage = null;
+  let state = null;
+  try {
+    const localStorage = globalThis.localStorage;
+    const probeKey = `${storageKey}:probe`;
+    localStorage.setItem(probeKey, "1");
+    localStorage.removeItem(probeKey);
+    storage = localStorage;
+    const savedState = storage.getItem(storageKey);
+    if (savedState != null) {
+      try {
+        state = parseState(savedState);
+      } catch {
+        // Invalid saved state does not disable future writes.
+      }
+    }
+  } catch {
+    storage = null;
+  }
+  const initialGlobals = {
+    widgetState: state,
+    statePersistence: storage == null ? "none" : "local",
+  };
+
+  const channel = new MessageChannel();
+  channel.port1.addEventListener("message", (event) => {
+    const data = event.data;
+    if (typeof data !== "object" || data == null) {
+      return;
+    }
+    if (data.type === "widget-state-write") {
+      if (!Number.isSafeInteger(data.id) || data.id <= 0) {
+        return;
+      }
+      let ok = false;
+      try {
+        if (storage != null) {
+          const state = parseState(data.state);
+          storage.setItem(storageKey, JSON.stringify(state));
+          ok = true;
+        }
+      } catch {
+        // Storage denial, quota limits, and invalid state return a failed receipt.
+      }
+      channel.port1.postMessage({
+        type: "widget-state-result",
+        id: data.id,
+        ok,
+      });
+      return;
+    }
+    if (data.type === "height") {
+      const height = data.height;
+      if (
+        typeof height === "number" &&
+        Number.isFinite(height) &&
+        height >= 0 &&
+        height <= 10_000
+      ) {
+        frame.style.height = Math.ceil(height) + "px";
+      }
+      return;
+    }
+    if (data.type === "scroll-to") {
+      const top = data.top;
+      if (
+        typeof top === "number" &&
+        Number.isFinite(top) &&
+        top >= 0 &&
+        globalThis.navigator.userActivation?.isActive === true
+      ) {
+        globalThis.scrollTo({
+          top: Math.ceil(
+            globalThis.scrollY + frame.getBoundingClientRect().top + top,
+          ),
+        });
+      }
+      return;
+    }
+    if (data.type === "open-external") {
+      const rawHref = data.href;
+      if (typeof rawHref !== "string") {
+        return;
+      }
+      let href;
+      try {
+        const url = new URL(rawHref, document.baseURI);
+        if (url.protocol !== "https:") {
+          return;
+        }
+        href = url.href;
+      } catch {
+        return;
+      }
+      if (globalThis.navigator.userActivation?.isActive === true) {
+        const anchor = document.createElement("a");
+        anchor.href = href;
+        anchor.rel = "noopener noreferrer";
+        anchor.target = "_blank";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+      }
+      return;
+    }
+    if (data.type === "follow-up") {
+      const prompt = data.prompt;
+      if (
+        typeof prompt !== "string" ||
+        globalThis.navigator.userActivation?.isActive !== true
+      ) {
+        return;
+      }
+      const title = data.title;
+      globalThis.prompt(typeof title === "string" ? title : prompt, prompt);
+    }
+  });
+  channel.port1.start();
+  const srcdoc = frame.dataset.srcdoc;
+  if (srcdoc == null) {
+    return;
+  }
+  globalThis.addEventListener("resize", () => {
+    const height = Number.parseFloat(frame.style.height);
+    if (!Number.isFinite(height) || height <= viewportHeight) {
+      frame.style.removeProperty("height");
+    }
+    viewportHeight = globalThis.innerHeight;
+    channel.port1.postMessage({ type: "measure" });
+  });
+  frame.addEventListener(
+    "load",
+    () => {
+      frame.contentWindow?.postMessage(
+        { type: "codex-visualization-initialize" },
+        "*",
+        [channel.port2],
+      );
+    },
+    { once: true },
+  );
+  // Match the trusted bootstrap element, not the same text in an authored title.
+  frame.srcdoc = srcdoc.replace(
+    '<script type="application/json" id="codex-visualization-widget-state">__CODEX_VISUALIZATION_WIDGET_STATE__<\/script>',
+    () =>
+      '<script type="application/json" id="codex-visualization-widget-state">' +
+      JSON.stringify(initialGlobals).replaceAll("<", "\\u003c") +
+      "<\/script>",
+  );
+  delete frame.dataset.srcdoc;
+})();
+</script>
+</body>
+</html>

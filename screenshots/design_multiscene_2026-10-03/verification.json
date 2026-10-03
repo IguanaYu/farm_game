@@ -1,0 +1,198 @@
+{
+  "errors": [],
+  "interactionChecks": 15,
+  "layouts": [
+    {
+      "viewport": 1440,
+      "scene": "farm",
+      "width": 1408,
+      "scroll": 1408,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 1440,
+      "scene": "shop",
+      "width": 1408,
+      "scroll": 1408,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 1440,
+      "scene": "cave",
+      "width": 1408,
+      "scroll": 1408,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 1440,
+      "scene": "visit",
+      "width": 1408,
+      "scroll": 1408,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 1280,
+      "scene": "farm",
+      "width": 1248,
+      "scroll": 1248,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 1280,
+      "scene": "shop",
+      "width": 1248,
+      "scroll": 1248,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 1280,
+      "scene": "cave",
+      "width": 1248,
+      "scroll": 1248,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 1280,
+      "scene": "visit",
+      "width": 1248,
+      "scroll": 1248,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 1024,
+      "scene": "farm",
+      "width": 992,
+      "scroll": 992,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 1024,
+      "scene": "shop",
+      "width": 992,
+      "scroll": 992,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 1024,
+      "scene": "cave",
+      "width": 992,
+      "scroll": 992,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 1024,
+      "scene": "visit",
+      "width": 992,
+      "scroll": 992,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 736,
+      "scene": "farm",
+      "width": 704,
+      "scroll": 704,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 736,
+      "scene": "shop",
+      "width": 704,
+      "scroll": 704,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 736,
+      "scene": "cave",
+      "width": 704,
+      "scroll": 704,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 736,
+      "scene": "visit",
+      "width": 704,
+      "scroll": 704,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 360,
+      "scene": "farm",
+      "width": 328,
+      "scroll": 328,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 360,
+      "scene": "shop",
+      "width": 328,
+      "scroll": 328,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 360,
+      "scene": "cave",
+      "width": 328,
+      "scroll": 328,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 360,
+      "scene": "visit",
+      "width": 328,
+      "scroll": 328,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 320,
+      "scene": "farm",
+      "width": 288,
+      "scroll": 288,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 320,
+      "scene": "shop",
+      "width": 288,
+      "scroll": 288,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 320,
+      "scene": "cave",
+      "width": 288,
+      "scroll": 288,
+      "overflow": [],
+      "fontSmall": []
+    },
+    {
+      "viewport": 320,
+      "scene": "visit",
+      "width": 288,
+      "scroll": 288,
+      "overflow": [],
+      "fontSmall": []
+    }
+  ]
+}

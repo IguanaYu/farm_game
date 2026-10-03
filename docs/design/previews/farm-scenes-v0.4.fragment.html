@@ -1,0 +1,262 @@
+<div id="farm-friend-design" aria-label="小小农场多好友拜访设计 v0.4">
+<style>
+  #farm-friend-design { --paper:light-dark(#fbf7ec,#29332b); --ink:light-dark(#344c38,#e6ecdc); --muted:light-dark(#6b7866,#bcc8b2); --line:light-dark(#ddd8bf,#52604b); --green:light-dark(#456c4c,#b3c9a3); --on-green:light-dark(#fff9e9,#223321); --soft:light-dark(#e7ecda,#3a4832); font:14px/1.55 "Microsoft YaHei","PingFang SC",sans-serif; color:var(--ink); }
+  #farm-friend-design * { box-sizing:border-box; }
+  #farm-friend-design [hidden] { display:none!important; }
+  #farm-friend-design .game { position:relative; border-radius:16px; overflow:hidden; }
+  #farm-friend-design .stage { position:relative; aspect-ratio:1400/800; min-height:440px; background:#93b275; }
+  #farm-friend-design .stage.shop { background:#b18c60; } #farm-friend-design .stage.home { background:#b49973; } #farm-friend-design .stage.explore { background:#223c37; }
+  #farm-friend-design canvas { display:block; width:100%; height:100%; position:absolute; inset:0; }
+  #farm-friend-design .hud { position:absolute; z-index:5; left:18px; right:18px; top:16px; display:flex; justify-content:space-between; align-items:flex-start; gap:12px; pointer-events:none; }
+  #farm-friend-design .location, #farm-friend-design .money { background:var(--paper); border-radius:10px; padding:9px 14px; box-shadow:0 3px 15px #25301c15; }
+  #farm-friend-design .location strong { display:block; font-weight:500; font-size:16px; }
+  #farm-friend-design .location small { color:var(--muted); font-size:11px; }
+  #farm-friend-design .money { display:flex; align-items:center; gap:7px; color:var(--ink); font-variant-numeric:tabular-nums; }
+  #farm-friend-design [data-lucide] { width:17px; height:17px; }
+  #farm-friend-design .objects { position:absolute; inset:0; pointer-events:none; }
+  #farm-friend-design button, #farm-friend-design select { font:inherit; color:inherit; }
+  #farm-friend-design button { background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:8px 12px; min-height:40px; }
+  #farm-friend-design button.primary { background:var(--green); border-color:var(--green); color:var(--on-green); }
+  #farm-friend-design button:disabled { opacity:.5; }
+  #farm-friend-design .object { position:absolute; pointer-events:auto; transform:translate(-50%,-50%); min-width:44px; min-height:44px; border:0; border-radius:12px; background:transparent; padding:0; }
+  #farm-friend-design .object:hover { background:#f0de9530; box-shadow:0 0 16px #fff1ad50; }
+  #farm-friend-design .object .obj-label { position:absolute; left:50%; top:calc(100% + 2px); transform:translateX(-50%); background:var(--paper); padding:3px 7px; border-radius:5px; white-space:nowrap; font-size:12px; opacity:0; pointer-events:none; }
+  #farm-friend-design .object:hover .obj-label, #farm-friend-design .object:focus-visible .obj-label { opacity:1; }
+  #farm-friend-design .bubble { position:absolute; width:20%; max-width:240px; padding:11px 13px; border-radius:12px; background:#fffbea; color:#41543b; border:1px solid #e0d8b8; pointer-events:auto; }
+  #farm-friend-design .bubble:after { content:""; position:absolute; bottom:-7px; left:50%; width:12px; height:12px; transform:rotate(45deg); background:#fffbea; border-right:1px solid #e0d8b8; border-bottom:1px solid #e0d8b8; }
+  #farm-friend-design .bubble strong { display:flex; justify-content:space-between; align-items:center; gap:6px; font-size:13px; font-weight:500; }
+  #farm-friend-design .bubble p { margin:6px 0; font-size:13px; }
+  #farm-friend-design .bubble em { display:block; font-size:17px; color:#496d42; font-style:normal; }
+  #farm-friend-design .bubble.best { border-color:#7c9865; }
+  #farm-friend-design .tag { display:inline-block; font-size:11px; border-radius:4px; padding:1px 4px; color:#4c6340; background:#e6ecd2; }
+  #farm-friend-design .bubble.quiet p { display:none; }
+  #farm-friend-design .work { position:absolute; z-index:10; width:min(440px,calc(100% - 32px)); padding:18px; background:var(--paper); border:1px solid var(--line); border-radius:13px; box-shadow:0 12px 32px #28351e30; }
+  #farm-friend-design .work-head { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px; }
+  #farm-friend-design .work-head strong { font-size:17px; font-weight:500; }
+  #farm-friend-design .work-head button { min-height:34px; padding:4px 8px; font-size:12px; }
+  #farm-friend-design .work p { margin:0 0 12px; color:var(--muted); }
+  #farm-friend-design .actions { display:flex; flex-wrap:wrap; gap:8px; }
+  #farm-friend-design .actions button { flex:1 1 auto; }
+  #farm-friend-design .work select { width:100%; background:var(--paper); border:1px solid var(--line); border-radius:7px; padding:8px; margin:5px 0 12px; min-height:42px; }
+  #farm-friend-design .quantity { display:flex; align-items:center; gap:10px; margin:0 0 12px; }
+  #farm-friend-design .quantity output { font-variant-numeric:tabular-nums; min-width:52px; text-align:center; }
+  #farm-friend-design .item-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:5px; margin:12px 0; }
+  #farm-friend-design .item-grid span { display:grid; place-items:center; min-height:42px; background:var(--soft); border:1px solid var(--line); border-radius:5px; font-size:12px; }
+  #farm-friend-design .item-grid .wide { grid-column:span 2; }
+  #farm-friend-design .note { position:absolute; left:18px; bottom:16px; z-index:3; max-width:calc(100% - 36px); background:#fbf7eceb; color:#4f6145; border-radius:6px; padding:6px 10px; font-size:12px; pointer-events:none; }
+  #farm-friend-design .toast { position:absolute; z-index:20; left:50%; bottom:54px; transform:translateX(-50%); max-width:calc(100% - 32px); width:max-content; border-radius:8px; background:#354d37; color:#fff9e5; padding:10px 16px; font-size:13px; pointer-events:none; }
+  @media(max-width:900px) { #farm-friend-design .bubble { padding:8px 10px; } #farm-friend-design .bubble p { font-size:12px; } #farm-friend-design .bubble em { font-size:15px; } }
+  @media(max-width:600px) {
+    #farm-friend-design .stage { aspect-ratio:auto; height:620px; }
+    #farm-friend-design canvas { height:48%; }
+    #farm-friend-design .hud { left:10px; right:10px; top:10px; gap:6px; }
+    #farm-friend-design .location, #farm-friend-design .money { padding:7px 10px; }
+    #farm-friend-design .location strong { font-size:14px; } #farm-friend-design .location small { font-size:11px; }
+    #farm-friend-design .object .obj-label { font-size:11px; padding:2px 4px; }
+    #farm-friend-design .bubble { width:calc(100% - 28px); max-width:none; left:14px!important; }
+    #farm-friend-design .bubble p { margin:3px 0; font-size:12px; } #farm-friend-design .bubble em { font-size:14px; }
+    #farm-friend-design .work { padding:14px; } #farm-friend-design .work-head strong { font-size:16px; }
+    #farm-friend-design .work select { font-size:16px; } #farm-friend-design .work button { min-height:44px; }
+    #farm-friend-design .note { left:14px; bottom:12px; font-size:11px; }
+    #farm-friend-design .stage.shop .note { top:82px; bottom:auto; }
+  }
+
+  #farm-friend-design .work.book { width:min(720px,calc(100% - 32px)); }
+  #farm-friend-design .book .work-head { margin-bottom:3px; }
+  #farm-friend-design .book .intro { margin:0 0 12px; font-size:13px; }
+  #farm-friend-design .book-search { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  #farm-friend-design .book-search label { white-space:nowrap; font-size:13px; }
+  #farm-friend-design .book-search input { width:100%; min-width:0; min-height:40px; padding:7px 10px; background:var(--paper); border:1px solid var(--line); border-radius:7px; color:var(--ink); font:inherit; font-size:16px; }
+  #farm-friend-design .friend-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
+  #farm-friend-design .friend-entry { display:block; width:100%; text-align:left; padding:9px 11px; background:var(--soft); }
+  #farm-friend-design .friend-entry:hover:not(:disabled) { border-color:var(--green); }
+  #farm-friend-design .friend-entry:disabled { opacity:.7; }
+  #farm-friend-design .friend-entry canvas { position:static; display:block; width:100%; height:64px; }
+  #farm-friend-design .friend-name { display:flex; justify-content:space-between; align-items:center; gap:5px; font-weight:500; font-size:14px; }
+  #farm-friend-design .friend-name small { font-weight:400; font-size:11px; }
+  #farm-friend-design .friend-state { display:block; font-size:12px; margin-top:3px; }
+  #farm-friend-design .friend-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:12px; }
+  #farm-friend-design .friend-footer output { text-align:center; font-size:12px; font-variant-numeric:tabular-nums; }
+  #farm-friend-design .friend-footer button { min-height:40px; padding:6px 10px; }
+  #farm-friend-design .friend-empty { grid-column:1/-1; min-height:135px; display:grid; place-items:center; padding:12px; font-size:14px; }
+  @media(max-width:760px) { #farm-friend-design .friend-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+  @media(max-width:600px) {
+    #farm-friend-design .friend-grid { grid-template-columns:1fr; gap:8px; }
+    #farm-friend-design .friend-entry { display:grid; grid-template-columns:78px minmax(0,1fr); column-gap:9px; padding:8px 10px; min-height:96px; align-content:center; }
+    #farm-friend-design .friend-entry canvas { grid-column:1; grid-row:1/3; height:68px; }
+    #farm-friend-design .friend-name { grid-column:2; flex-wrap:wrap; align-self:end; }
+    #farm-friend-design .friend-state { grid-column:2; align-self:start; line-height:1.5; }
+    #farm-friend-design .friend-footer button { min-height:44px; }
+  }
+
+</style>
+<div class="game"><div class="stage" id="fo-stage">
+  <canvas id="fo-art" width="1400" height="735" role="img" aria-label="完整农庄中的店门、石阶、小桥、田地与房子都可以直接点击"></canvas>
+  <header class="hud"><div class="location"><strong id="fo-location">我的农场</strong><small>小小农场 · 邻里地址簿 v0.4</small></div><div class="money"><i data-lucide="coins" aria-hidden="true"></i><span id="fo-money">800</span></div></header>
+  <div class="objects" id="fo-objects" aria-label="可点击的场景物体"></div>
+  <section class="work" id="fo-work" aria-label="所选物体的操作" hidden></section>
+  <div class="note" id="fo-note" aria-live="polite">我的农场 · 2 块地成熟</div>
+  <div class="toast" id="fo-toast" role="status" hidden></div>
+</div></div>
+</div>
+<script>
+(() => {
+  const root=document.getElementById('farm-friend-design'),canvas=root.querySelector('#fo-art'),c=canvas.getContext('2d'),stage=root.querySelector('#fo-stage'),objects=root.querySelector('#fo-objects'),work=root.querySelector('#fo-work');
+  const saved=window.openai?.widgetState?.privateContent;
+
+const friends=[
+  {id:'f1',name:'阿禾',online:true,open:true,roof:'#849b82',shirt:'#a88265',plant:'岩芽菜',welcome:'欢迎来坐坐！我刚把洞里带回的种子种下了。'},
+  {id:'f2',name:'小满',online:false,open:true,roof:'#78929e',shirt:'#7c96a5',plant:'白菜',welcome:'我出门啦，院子和小屋都留给你参观。'},
+  {id:'f3',name:'小翠',online:true,open:true,roof:'#b38a65',shirt:'#b9a369',plant:'胡萝卜',welcome:'今天的胡萝卜长得特别好，去院子看看吧。'},
+  {id:'f4',name:'阿泽',online:true,open:false,roof:'#8c8eaa',shirt:'#87928b',plant:'白菜',welcome:''},
+  {id:'f5',name:'阿棉',online:false,open:true,roof:'#a78491',shirt:'#ac8d93',plant:'胡萝卜',welcome:'门口的花刚开，欢迎你来看看。'},
+  {id:'f6',name:'阿棠',online:false,open:false,roof:'#bc8e6b',shirt:'#a69372',plant:'岩芽菜',welcome:''},
+  {id:'f7',name:'阿岚',online:true,open:true,roof:'#75958b',shirt:'#849e86',plant:'萤果',welcome:'上次探险的纪念品放在展示架上了。'},
+  {id:'f8',name:'小朵',online:false,open:true,roof:'#c48e80',shirt:'#b68c78',plant:'白菜',welcome:'欢迎来串门，茶桌旁的窗户能看到小院。'}
+];
+function host(){return friends.find(f=>f.id===state.visitId)||friends[0];}
+function welcome(){return state.visitedOwners[host().id]?'下次也带上你的冒险故事吧。':host().welcome;}
+function escapeHtml(t){return String(t).replace(/[&<>"']/g,ch=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));}
+function pageSize(){const columns=matchMedia('(max-width:600px)').matches?1:matchMedia('(max-width:760px)').matches?2:3;return columns*(stage.clientHeight<570?1:2);}
+function directoryData(){const q=state.friendQuery.trim().toLowerCase();let list=friends.filter(f=>f.name.toLowerCase().includes(q));if(!q&&state.lastVisitId)list=list.slice().sort((a,b)=>Number(b.id===state.lastVisitId)-Number(a.id===state.lastVisitId));const size=pageSize(),pages=Math.max(1,Math.ceil(list.length/size));state.friendPage=Math.min(pages-1,Math.max(0,state.friendPage));return {list,size,pages,page:state.friendPage,visible:list.slice(state.friendPage*size,(state.friendPage+1)*size)};}
+function directory(){const d=directoryData();return panel('邻里地址簿',`<p class="intro">想去谁家坐坐？点击朋友的家，先到他的院子。</p><div class="book-search"><label for="fo-friend-search">找朋友</label><input id="fo-friend-search" type="search" autocomplete="off" placeholder="输入朋友名字" value="${escapeHtml(state.friendQuery)}"></div><div class="friend-grid" aria-label="朋友的家">${d.visible.length?d.visible.map(f=>`<button type="button" class="friend-entry cursor-interaction" data-action="visit-${f.id}" aria-label="拜访${f.name}，${f.online?'在线':'离线'}，${f.open?'开放参观':'暂未开放'}" ${f.open?'':'disabled'}><canvas width="220" height="100" data-home-preview="${f.id}" role="img" aria-label="${f.name}家的房屋外观"></canvas><span class="friend-name">${f.name}<small>${state.lastVisitId===f.id?'上次拜访':f.open?'去拜访 →':''}</small></span><span class="friend-state">${f.online?'在线':'离线'} · ${f.open?'开放参观':'暂未开放'}</span></button>`).join(''):'<div class="friend-empty" role="status">没有找到这个名字，试试别的名字。</div>'}</div><div class="friend-footer">${button('上一页','friend-prev',false,!d.page)}<output aria-live="polite">${d.page+1} / ${d.pages} 页 · ${d.list.length} 位</output>${button('下一页','friend-next',false,d.page>=d.pages-1)}</div>`);}
+function paintPreviews(){work.querySelectorAll('[data-home-preview]').forEach(canvas=>{const f=friends.find(f=>f.id===canvas.dataset.homePreview),ctx=canvas.getContext('2d');ctx.clearRect(0,0,220,100);function p(points,color){ctx.beginPath();points.forEach((a,i)=>i?ctx.lineTo(...a):ctx.moveTo(...a));ctx.closePath();ctx.fillStyle=color;ctx.fill();}function r(x,y,w,h,color){ctx.fillStyle=color;ctx.fillRect(x,y,w,h);}p([[0,79],[64,63],[220,78],[220,100],[0,100]],'#9bb882');p([[81,40],[136,35],[136,89],[81,94]],'#f0dfb4');p([[136,35],[158,47],[158,98],[136,89]],'#c8b994');p([[73,41],[106,12],[167,41],[127,51]],f.roof);p([[73,41],[127,51],[167,41],[167,48],[127,58],[73,48]],'#806b55');r(100,65,20,26,f.open?'#6f7854':'#876c50');r(86,58,10,13,'#89a49b');r(124,55,8,11,'#89a49b');r(150,14,6,24,'#a58b72');p([[57,72],[51,52],[35,45],[19,57],[21,76]],'#718d63');r(35,69,5,20,'#8f7854');r(177,79,12,9,'#a98965');p([[176,79],[180,68],[189,72],[190,79]],'#84a26b');if(!f.open){r(108,74,5,6,'#d4c39b');} });}
+function mailbox(){line([[260,338],[260,397]],'#7b6c4d',7);poly([[229,326],[247,308],[282,311],[293,325],[293,354],[229,356]],'#799a9f');poly([[229,326],[247,308],[282,311],[264,327]],'#a8bec0');rect(236,330,43,21,'#dce0c6');line([[236,330],[257,341],[279,330]],'#7f9188',2);line([[290,320],[290,296]],'#846a4d',4);poly([[290,297],[313,296],[313,308],[290,309]],'#c78e70');text('邻里地址簿',261,418,17,'#4b6746');}
+
+  const state={scene:saved?.revision===4&&['farm','shop','camp','explore','battle','home','yard'].includes(saved.scene)?saved.scene:'farm',panel:'',visitId:friends.some(f=>f.id===saved?.visitId)?saved.visitId:'f1',lastVisitId:friends.some(f=>f.id===saved?.lastVisitId)?saved.lastVisitId:'',friendQuery:'',friendPage:0,visitedOwners:{},directorySource:'mailbox',coins:800,kind:'cabbage',quantity:5,inventory:{cabbage:10,carrot:8},harvest:false,planted:false,watered:false,seeds:6,guest:1,visited:false,enemyHp:12,hp:20};
+  const design={npcScale:110,dialogue:'短对话常显'};
+  const colors={grass:'#93b275',grass2:'#aac68b',grassDark:'#759463',path:'#d0c09a',soil:'#997253',wood:'#8c6648',woodDark:'#624b38',cream:'#f2e2b8',roof:'#b96e51',roofDark:'#91543f',ink:'#40533d'};
+  function poly(points,fill,stroke){c.beginPath();points.forEach((p,i)=>i?c.lineTo(...p):c.moveTo(...p));c.closePath();c.fillStyle=fill;c.fill();if(stroke){c.strokeStyle=stroke;c.lineWidth=1;c.stroke();}}
+  function ellipse(x,y,rx,ry,fill){c.beginPath();c.ellipse(x,y,rx,ry,0,0,Math.PI*2);c.fillStyle=fill;c.fill();}
+  function rect(x,y,w,h,fill){c.fillStyle=fill;c.fillRect(x,y,w,h);}
+  function line(points,color,width=2){c.beginPath();points.forEach((p,i)=>i?c.lineTo(...p):c.moveTo(...p));c.strokeStyle=color;c.lineWidth=width;c.lineCap='round';c.lineJoin='round';c.stroke();}
+  function text(t,x,y,size=16,color=colors.ink,align='center'){c.fillStyle=color;c.font=`500 ${size}px "Microsoft YaHei", sans-serif`;c.textAlign=align;c.fillText(t,x,y);}
+  function cloud(x,y,s){ellipse(x,y,s*1.3,s*.33,'#f5f6daaa');ellipse(x-s*.5,y-s*.15,s*.7,s*.4,'#f5f6daaa');ellipse(x+s*.2,y-s*.24,s*.8,s*.45,'#f5f6daaa');}
+  function tree(x,y,s=1,tint='#628354'){ellipse(x,y+5,29*s,12*s,'#4b653128');rect(x-5*s,y-55*s,10*s,60*s,'#846443');poly([[x,y-142*s],[x-39*s,y-105*s],[x-34*s,y-59*s],[x+2*s,y-43*s],[x+37*s,y-75*s],[x+31*s,y-119*s]],tint);poly([[x,y-142*s],[x-39*s,y-105*s],[x,y-92*s],[x+31*s,y-119*s]],'#90aa6d');poly([[x,y-92*s],[x-34*s,y-59*s],[x+2*s,y-43*s],[x+37*s,y-75*s]],'#56784d');}
+  function pine(x,y,s=1){ellipse(x,y+4,28*s,9*s,'#405d3325');rect(x-4*s,y-50*s,8*s,53*s,'#79654c');poly([[x,y-151*s],[x-31*s,y-91*s],[x-21*s,y-90*s],[x-43*s,y-48*s],[x+43*s,y-48*s],[x+21*s,y-90*s],[x+31*s,y-91*s]],'#4d7055');poly([[x,y-151*s],[x,y-48*s],[x+43*s,y-48*s],[x+21*s,y-90*s],[x+31*s,y-91*s]],'#385d4b');}
+  function rock(x,y,s=1){ellipse(x,y+3,27*s,9*s,'#43543d20');poly([[x-27*s,y],[x-24*s,y-24*s],[x-2*s,y-38*s],[x+28*s,y-19*s],[x+30*s,y+3*s],[x,y+10*s]],'#899084');poly([[x-24*s,y-24*s],[x-2*s,y-38*s],[x+28*s,y-19*s],[x,y-8*s]],'#afb3a0');}
+  function flowers(x,y,s=1){for(let i=0;i<4;i++){let a=x+i*9*s,b=y+(i%2)*6*s;line([[a,b],[a+1,b-13*s]],'#607d4a',2*s);ellipse(a,b-15*s,3*s,3*s,i%2?'#edcf83':'#f0e8bd');}}
+  function bush(x,y,s=1){poly([[x-37*s,y],[x-34*s,y-21*s],[x-12*s,y-36*s],[x+20*s,y-33*s],[x+38*s,y-12*s],[x+30*s,y+9*s]],'#829f63');}
+  function background(){rect(0,0,1400,735,'#c7dccc');cloud(155,60,60);cloud(585,36,72);cloud(1120,68,88);poly([[0,178],[75,120],[190,133],[320,79],[465,154],[600,104],[720,147],[920,77],[1090,135],[1270,104],[1400,168],[1400,320],[0,320]],'#98b9a0');poly([[0,220],[110,186],[230,203],[360,156],[530,196],[730,150],[900,211],[1020,175],[1240,150],[1400,205],[1400,340],[0,340]],'#88a882');poly([[0,267],[180,207],[400,233],[600,196],[770,226],[1050,213],[1240,237],[1400,208],[1400,735],[0,735]],colors.grass);poly([[0,395],[140,315],[298,299],[430,335],[315,349],[147,405],[95,469],[156,524],[202,572],[194,735],[89,735],[97,587],[45,520],[0,478]],'#88b6ac');line([[0,411],[140,333],[290,319]],'#c3dac4',4);poly([[0,610],[175,555],[355,584],[460,665],[250,735],[0,735]],'#a3bd82');poly([[975,490],[1220,428],[1400,494],[1400,735],[1030,735]],'#a1bc80');for(let i=0;i<14;i++){const x=i*108-12,y=252+Math.sin(i*3.3)*28;tree(x,y,.7+i%3*.09);}for(let i=0;i<7;i++)flowers(110+i*190,660-(i%3)*33,.8);}
+  function building(x,y,w=145,h=113,roof=colors.roof){
+    ellipse(x,y+14,w*.7,24,'#38502c22');
+    poly([[x-w*.5,y-h],[x+w*.42,y-h-20],[x+w*.42,y-11],[x-w*.5,y+8]],colors.cream);
+    poly([[x+w*.42,y-h-20],[x+w*.71,y-h+3],[x+w*.71,y+13],[x+w*.42,y-11]],'#c6b48c');
+    poly([[x-w*.62,y-h-5],[x-9,y-h-65],[x+w*.68,y-h-10],[x,y-h+10]],roof);
+    poly([[x-w*.62,y-h-5],[x,y-h+10],[x+w*.68,y-h-10],[x+w*.71,y-h+3],[x,y-h+23],[x-w*.62,y-h+8]],colors.roofDark);
+    rect(x-22,y-69,35,70,'#866345');rect(x-20,y-67,30,63,'#75593e');ellipse(x+4,y-36,2,2,'#dbc794');
+    rect(x-59,y-81,26,26,'#789d98');rect(x+28,y-97,25,29,'#789d98');line([[x-46,y-81],[x-46,y-55]],'#d4c69d',3);line([[x-59,y-68],[x-33,y-68]],'#d4c69d',3);rect(x+w*.38,y-h-50,14,46,'#a49077');
+  }
+  function fence(points){line(points,'#ae9365',5);line(points.map(p=>[p[0],p[1]+15]),'#9b8056',4);points.forEach(p=>{rect(p[0]-4,p[1]-12,8,48,'#b69a6c');poly([[p[0]-4,p[1]-12],[p[0],p[1]-18],[p[0]+4,p[1]-12]],'#ccb080');});}
+  function plot(x,y,status=1){poly([[x,y],[x+118,y+24],[x+65,y+64],[x-53,y+38]],'#72543b');poly([[x,y-7],[x+118,y+17],[x+65,y+57],[x-53,y+31]],'#b79a6c');poly([[x+2,y],[x+103,y+20],[x+62,y+48],[x-37,y+28]],'#88634b');for(let j=0;j<3;j++)line([[x-25+j*28,y+25+j*6],[x+14+j*28,y+4+j*6]],'#634a3838',3);if(status>0){for(let j=0;j<6;j++){let a=x+(j%3)*29-Math.floor(j/3)*20+9,b=y+(j%3)*6+Math.floor(j/3)*16+8;if(status===2){ellipse(a,b,13,6,'#4b6d3c55');poly([[a-13,b],[a-12,b-12],[a,b-18],[a+13,b-10],[a+12,b+2],[a,b+6]],'#b4c88a');poly([[a-12,b-12],[a,b-18],[a+13,b-10],[a,b-4]],'#d1dea5');line([[a,b+3],[a,b-9]],'#8ca565',2);}else{line([[a,b],[a,b-12]],'#577a43',3);ellipse(a-4,b-9,7,3,'#8eaa65');ellipse(a+4,b-13,7,3,'#aac57e');}}}if(status===2){poly([[x+58,y-50],[x+69,y-38],[x+58,y-26],[x+47,y-38]],'#edca66');}if(status===-1)text('待扩建',x+35,y+28,15,'#dfcfa5');}
+  function crate(x,y,s=1){poly([[x-25*s,y-21*s],[x+20*s,y-27*s],[x+32*s,y-12*s],[x-13*s,y-6*s]],'#c29a66');poly([[x-25*s,y-21*s],[x-13*s,y-6*s],[x-13*s,y+22*s],[x-25*s,y+7*s]],'#8d663d');poly([[x-13*s,y-6*s],[x+32*s,y-12*s],[x+32*s,y+15*s],[x-13*s,y+22*s]],'#ac804c');line([[x-10*s,y+3*s],[x+29*s,y-3*s]],'#70532d',3*s);line([[x-10*s,y+13*s],[x+29*s,y+7*s]],'#70532d',3*s);}
+  function character(x,y,s=1,shirt='#b97954',hat=1){c.save();c.translate(x,y);c.scale(s,s);ellipse(0,4,27,10,'#493d302b');poly([[-17,-63],[16,-63],[19,-24],[-18,-24]],shirt);poly([[16,-63],[25,-43],[19,-22],[12,-29]],'#86684e');rect(-16,-24,12,24,'#575c46');rect(5,-24,12,24,'#575c46');ellipse(-10,2,11,5,'#5f4b38');ellipse(12,2,11,5,'#5f4b38');poly([[-17,-64],[-26,-39],[-18,-33],[-9,-56]],shirt);ellipse(-21,-34,5,6,'#d9b488');ellipse(22,-32,5,6,'#d9b488');poly([[-17,-98],[0,-111],[18,-99],[17,-76],[5,-66],[-14,-76]],'#dfbc91');poly([[-17,-98],[0,-111],[18,-99],[16,-93],[-16,-88]],'#6f563e');ellipse(-5,-86,2,2,'#514a37');ellipse(8,-88,2,2,'#514a37');line([[-3,-75],[5,-76]],'#a27753',2);poly([[-8,-65],[0,-59],[8,-66],[4,-45],[-4,-45]],'#ede1b4');if(hat===1){ellipse(0,-101,27,9,'#bfa879');poly([[-18,-117],[12,-122],[20,-105],[-18,-100]],'#d8c299');line([[-19,-104],[18,-109]],'#997c52',4);}else if(hat===2){poly([[-18,-98],[-17,-111],[13,-116],[23,-101]],'#658e95');poly([[-4,-104],[23,-104],[32,-97],[0,-95]],'#456d76');}else{poly([[-18,-98],[-18,-109],[0,-116],[19,-107],[20,-98]],'#795b43');}c.restore();}
+  function farm(){background();poly([[303,309],[624,274],[797,329],[1080,291],[1140,324],[852,375],[684,337],[365,368]],colors.path);poly([[616,327],[678,336],[516,510],[663,618],[767,735],[687,735],[620,641],[445,514]],colors.path);building(405,303,136,103);building(706,277,130,105,'#849b82');building(982,331,152,114,'#7b9092');fence([[327,377],[479,406],[630,436],[785,465],[940,495]]);const startX=354,startY=405;for(let row=0;row<2;row++)for(let col=0;col<5;col++){let n=row*5+col;plot(startX+col*128-row*63,startY+col*25+row*57,n<2?2:n<5?1:n===5?0:-1);}fence([[226,518],[359,548],[495,578],[637,607],[780,637]]);tree(193,508,1.3);tree(1167,529,1.1);tree(1271,642,1.4);pine(1279,379,.9);bush(923,596,1.1);flowers(924,600);rock(229,630,.8);rock(1050,644,1.2);crate(1051,362,.75);character(582,655,.8,'#bc8a59');line([[1132,300],[1233,370],[1321,351]],'#cbbf9c',24);poly([[1180,293],[1194,224],[1249,200],[1309,247],[1345,319]],'#7b8573');poly([[1222,304],[1221,260],[1248,237],[1271,257],[1281,312]],'#324943');}
+  function roomBase(){rect(0,0,1400,735,'#b9baa0');poly([[0,60],[685,15],[1400,78],[1400,313],[680,272],[0,314]],'#dfcfaa');poly([[0,314],[680,272],[1400,313],[1400,735],[0,735]],'#b18c60');for(let i=-8;i<20;i++)line([[i*120,735],[i*95+255,287]],'#9c794f',2);for(let y=340;y<735;y+=65)line([[0,y],[1400,y-10]],'#ab8559',2);rect(0,283,1400,19,'#8b7354');rect(674,15,17,291,'#a58860');line([[0,59],[683,16],[1400,78]],'#8d7658',16);line([[0,90],[681,47],[1400,107]],'#eee1bd',6);}
+  function shelf(x,y,w){rect(x,y-175,w,175,'#886944');rect(x+10,y-166,w-20,157,'#5f5540');for(let row=0;row<3;row++){let a=y-136+row*52;for(let col=0;col<4;col++){let b=x+23+col*(w-35)/4;rect(b,a-24,25,30,row===1?'#bfab73':'#ddd0a7');ellipse(b+12,a-13,7,8,row===1?'#8eab6c':'#8da173');}rect(x-3,a+9,w+6,8,'#c6a274');}poly([[x,y],[x+w,y],[x+w+20,y+25],[x+16,y+25]],'#cba87d');}
+  function shop(){roomBase();rect(794,113,162,129,'#947b54');rect(803,120,144,111,'#a7c0a0');poly([[806,206],[850,160],[896,185],[945,154],[945,228],[806,228]],'#82a181');line([[872,119],[872,233]],'#e8d7ae',9);line([[803,176],[945,176]],'#e8d7ae',9);rect(780,234,190,13,'#a18960');shelf(148,368,229);shelf(1024,350,199);text('种子 · 肥料',265,177,24,'#655b41');rect(509,140,137,90,'#5c6c4e');text('今日收购',577,174,19,'#f7eccb');text('每天 00:00 更新',577,204,13,'#e5dcbb');poly([[418,308],[985,302],[1060,389],[494,406]],'#d0aa78');poly([[494,406],[1060,389],[1060,455],[494,471]],'#9c744c');poly([[418,308],[494,406],[494,471],[418,375]],'#825f40');line([[496,430],[1058,414]],'#bf9463',7);crate(967,366,.9);for(let i=0;i<5;i++){ellipse(568+i*29,348,15,11,'#a7bc7d');ellipse(565+i*29,341,11,8,'#c1ce97');}crate(439,496,1.1);crate(1179,487,1.1);flowers(1330,440,1.5);const s=1.38*design.npcScale/110;character(474,619,s,'#ba8260',1);character(786,622,s,'#7c96a5',2);character(1098,623,s,'#b9a369',0);ellipse(294,593,48,16,'#79654125');poly([[263,546],[312,546],[324,587],[253,587]],'#af8e62');ellipse(282,541,37,9,'#7f704f');for(let i=0;i<4;i++)ellipse(266+i*11,535,8,6,'#c6cfa0');text('田 边 杂 货 铺',684,105,26,'#7f6244');}
+  function cave(){background();poly([[0,401],[169,329],[358,351],[421,430],[397,594],[215,655],[0,628]],'#6e8965');poly([[759,277],[835,167],[1000,113],[1178,169],[1329,270],[1400,393],[1400,735],[925,735],[778,505]],'#778773');poly([[835,167],[1000,113],[1115,242],[952,268],[870,356],[759,277]],'#a2a48b');poly([[1115,242],[1178,169],[1329,270],[1220,375],[1032,348]],'#89957d');poly([[916,444],[920,321],[982,236],[1083,227],[1172,294],[1202,475]],'#414d43');poly([[952,452],[955,333],[994,283],[1080,266],[1144,330],[1173,461]],'#203e37');poly([[967,443],[1003,315],[1060,304],[1124,369],[1121,465]],'#172e2b');poly([[986,446],[1215,462],[1400,621],[1400,735],[814,735],[591,529],[667,484]],'#b7b396');line([[1100,450],[1030,483],[796,566],[742,672]],'#ccc6a6',18);poly([[0,603],[127,588],[233,628],[267,675],[210,693],[112,638],[0,660]],colors.path);pine(165,485,1.8);pine(327,328,1.2);pine(1244,541,1.2);tree(111,645,1.3);poly([[266,462],[400,392],[518,447],[426,514]],'#aa7e52');poly([[266,462],[400,392],[369,493],[302,542]],'#c6a76b');poly([[400,392],[518,447],[479,520],[369,493]],'#8f7650');poly([[400,428],[422,497],[369,493]],'#4b4d3d');crate(266,563,1.1);crate(326,576,.8);poly([[545,485],[691,470],[726,503],[579,521]],'#a58458');poly([[579,521],[726,503],[725,563],[579,578]],'#7f6346');line([[596,522],[596,603]],'#6c543b',10);line([[710,507],[710,579]],'#6c543b',10);ellipse(554,625,62,25,'#5f6b472c');for(let i=0;i<7;i++)rock(509+i*13,631+Math.sin(i)*10,.27);line([[530,630],[577,600]],'#785b3e',9);line([[531,603],[579,630]],'#785b3e',9);poly([[535,618],[541,578],[554,596],[559,564],[579,615],[558,633]],'#d6a653');poly([[546,622],[552,594],[565,620],[554,631]],'#f0d397');character(423,651,.93,'#a08261');character(647,662,.9,'#7893a2',2);rock(796,422,1.5);rock(1309,560,1.4);flowers(338,655,1.3);text('苔石浅洞',1060,218,24,'#e2debc');}
+  function exploration(){rect(0,0,1400,735,'#223c37');poly([[0,0],[433,0],[299,147],[382,295],[231,501],[0,495]],'#476051');poly([[0,0],[168,0],[206,125],[158,262],[0,277]],'#687e62');poly([[1021,0],[1400,0],[1400,735],[1168,735],[1215,565],[1121,402],[1190,252]],'#4c6050');poly([[1190,252],[1400,212],[1400,411],[1278,448]],'#71836a');poly([[439,196],[665,174],[775,301],[874,348],[830,456],[975,619],[990,735],[549,735],[453,601],[594,446],[543,329]],'#596d58');line([[710,674],[658,576],[707,461],[650,351],[698,242]],'#b4b98d',4);line([[707,461],[929,410],[991,327]],'#a9af88',3);line([[650,351],[475,285],[430,183]],'#a9af88',3);for(let i=0;i<8;i++){ellipse(198+i*157,160+(i%3)*172,5,5,'#cad38988');}poly([[155,478],[163,418],[181,398],[199,442],[191,483]],'#8aa7a4');poly([[185,482],[208,426],[224,449],[216,493]],'#6c9391');poly([[1239,592],[1251,526],[1278,501],[1298,564],[1280,604]],'#8daaa1');character(689,653,1.1,'#b69b6c');rock(365,617,1.8);rock(1121,170,1.4);}
+  function home(){roomBase();rect(0,0,1400,735,'#c3c6ae');poly([[0,0],[660,0],[660,259],[0,355]],'#e6dcc1');poly([[660,0],[1400,0],[1400,350],[660,259]],'#c9baa0');poly([[0,355],[660,259],[1400,350],[1400,735],[0,735]],'#b49973');for(let i=-7;i<17;i++)line([[i*150,735],[i*94+230,306]],'#a08a66',2);for(let y=405;y<735;y+=76)line([[0,y],[1400,y-16]],'#b29a74',2);rect(1042,88,165,132,'#8b7658');rect(1050,96,149,113,'#bfd0b1');poly([[1050,180],[1111,149],[1199,171],[1199,209],[1050,209]],'#7d9d70');line([[1121,96],[1121,208]],'#e5d9b7',7);line([[1050,151],[1199,151]],'#e5d9b7',7);poly([[1028,226],[1226,226],[1243,249],[1016,249]],'#a6936b');shelf(804,340,155);rect(190,130,111,92,'#8e7957');rect(199,139,93,74,'#c2d0ae');poly([[200,198],[230,164],[259,182],[290,154],[290,210],[200,210]],'#7e9e70');text('山间合影',247,239,14,'#796c53');poly([[283,482],[517,445],[601,553],[373,590]],'#889782');poly([[283,482],[373,530],[373,590],[283,540]],'#657561');poly([[302,402],[471,374],[517,445],[283,482]],'#aab295');poly([[471,374],[509,376],[554,435],[517,445]],'#78896f');poly([[350,514],[551,483],[634,538],[432,580]],'#c7ae7d');poly([[432,580],[634,538],[634,560],[432,602]],'#a38a61');line([[450,598],[450,659]],'#8c7652',10);line([[610,560],[610,615]],'#8c7652',10);ellipse(496,536,17,8,'#e5dbb9');ellipse(498,532,10,5,'#8a7652');ellipse(562,520,17,8,'#e5dbb9');ellipse(564,516,10,5,'#8a7652');poly([[266,582],[521,550],[788,643],[573,711],[294,677]],'#caad85');line([[283,602],[564,690],[765,641]],'#ede0c4',4);crate(925,432,1);rect(745,141,39,48,'#a58d68');text('家',764,173,21,'#ede0bb');rect(1248,292,25,95,'#8b7150');ellipse(1259,290,48,18,'#e1ce9e');poly([[1212,291],[1237,231],[1286,231],[1308,291]],'#e9d8b0');character(846,569,1.65,host().shirt);poly([[942,480],[1006,466],[1030,513],[965,527]],'#80917a');flowers(969,471,1.3);text(host().name+'的小屋',467,123,25,'#867755');}
+  function courtyard(){background();poly([[0,445],[545,360],[731,411],[1237,735],[1056,735],[591,451],[0,539]],colors.path);building(567,392,220,157,host().roof);tree(896,440,1.4);tree(1092,486,1.2);for(let i=0;i<4;i++)plot(950+i%2*136-Math.floor(i/2)*65,496+i%2*25+Math.floor(i/2)*60,1);fence([[36,506],[115,490]]);fence([[357,446],[422,458],[495,473]]);tree(90,621,1.2);character(628,546,1.15,host().shirt);flowers(687,534,1.2);crate(389,417,.9);text(host().name+'的农庄',537,191,28,'#f6f1d6');}
+
+  function lantern(x,y,s=1){ellipse(x,y+3,19*s,7*s,'#43533125');line([[x,y],[x,y-88*s],[x+24*s,y-95*s]],'#76684b',5*s);ellipse(x+24*s,y-71*s,27*s,31*s,'#f5d38225');poly([[x+12*s,y-89*s],[x+36*s,y-89*s],[x+39*s,y-56*s],[x+10*s,y-56*s]],'#786747');rect(x+16*s,y-84*s,17*s,23*s,'#f2d38c');poly([[x+9*s,y-89*s],[x+24*s,y-101*s],[x+40*s,y-89*s]],'#6c624b');}
+  function shopPorch(){poly([[365,309],[442,296],[466,311],[388,326]],'#b8b292');poly([[388,326],[466,311],[466,320],[388,336]],'#928a6f');rect(383,234,35,69,'#465340');poly([[413,238],[433,243],[433,307],[413,301]],'#a38356');ellipse(428,277,2,2,'#ead59e');for(let i=0;i<6;i++){let x=342+i*21;poly([[x,222-i*2.5],[x+21,219.5-i*2.5],[x+40,242-i*2.5],[x+19,244.5-i*2.5]],i%2?'#e7dfbb':'#789775');poly([[x+19,244.5-i*2.5],[x+40,242-i*2.5],[x+40,253-i*2.5],[x+19,255.5-i*2.5]],i%2?'#d8ceaa':'#5f805d');}crate(337,320,.7);for(let i=0;i<3;i++)ellipse(327+i*10,297,8,6,'#bbc88b');rect(468,291,20,30,'#a67854');flowers(465,293,.75);text('杂货铺',405,202,18,'#f5ebcd');}
+  function homeDetails(){rect(681,190,49,18,'#d7d4b4');text('邻里人家',705,204,11,'#53654b');rect(743,264,28,20,'#b08661');flowers(742,263,.9);}
+  function stoneBridge(){poly([[90,563],[195,535],[268,583],[158,615]],'#c5cbc1');poly([[158,615],[268,583],[268,607],[158,640]],'#959f94');poly([[90,563],[158,615],[158,640],[90,588]],'#abb5a6');poly([[173,628],[181,606],[217,595],[233,612],[233,622]],'#88b6ac');for(let i=1;i<5;i++)line([[90+i*21,563-i*5.6],[158+i*22,615-i*6.4]],'#a5b09f',2);line([[112,580],[219,550]],'#a5b09f',2);line([[137,598],[245,568]],'#a5b09f',2);line([[90,556],[195,528],[268,576]],'#d9ded1',10);line([[90,566],[158,620],[268,588]],'#b8c0af',8);poly([[268,581],[332,566],[356,584],[270,606]],colors.path);flowers(83,593,.9);flowers(264,630,.8);text('邻里小桥',158,668,17,'#556d48');}
+  function trailSteps(){for(let i=0;i<4;i++){let y=322+i*20,x=1152-i*12;poly([[x-25,y],[x+31,y+7],[x+15,y+20],[x-42,y+13]],i%2?'#b9bba2':'#c7c8ac');poly([[x-42,y+13],[x+15,y+20],[x+15,y+26],[x-42,y+19]],'#989e86');}rock(1100,377,.6);lantern(1192,373,.8);text('洞窟石阶',1086,427,17,'#53664a');}
+  function forestWay(){lantern(223,671,.8);flowers(154,686,.9);text('下山回农庄',135,684,18,'#53664a');}
+  function daylightExit(){poly([[400,735],[411,578],[456,525],[547,536],[603,608],[607,735]],'#687863');poly([[437,710],[439,597],[470,562],[522,566],[554,605],[556,711]],'#c8cfaa');poly([[452,710],[452,609],[480,581],[516,586],[539,618],[539,711]],'#edf0c6');poly([[452,680],[479,632],[511,650],[539,633],[539,711],[452,711]],'#a8bb82');line([[685,660],[597,682],[550,705]],'#b7bb94',14);lantern(424,695,.8);text('出口天光',499,520,18,'#e5e6c6');}
+  function gardenGate(){poly([[172,411],[193,405],[203,416],[183,423]],'#d4d0b0');poly([[172,411],[183,423],[183,540],[172,528]],'#a0a78d');poly([[183,423],[203,416],[203,531],[183,540]],'#bdc0a3');poly([[325,382],[346,376],[355,387],[335,394]],'#d4d0b0');poly([[325,382],[335,394],[335,512],[325,500]],'#a0a78d');poly([[335,394],[355,387],[355,503],[335,512]],'#bdc0a3');line([[198,425],[253,446],[253,538],[198,531],[198,425]],'#5c7567',5);for(let i=0;i<4;i++)line([[205+i*12,428+i*4],[205+i*12,530+i*2]],'#6b8473',3);line([[195,405],[218,369],[269,354],[312,363],[339,384]],'#748664',6);for(let i=0;i<7;i++){let x=193+i*23,y=396-Math.sin(i/6*Math.PI)*37;bush(x,y,.38);ellipse(x+4,y-4,5,4,i%2?'#d5bcce':'#ecdbc9');}flowers(364,510,.8);text('回我的农庄',266,568,18,'#52684a');}
+
+  function door(x,y,label){poly([[x-36,y-82],[x+38,y-89],[x+38,y+80],[x-36,y+87]],'#6c5941');poly([[x-29,y-75],[x+31,y-80],[x+31,y+73],[x-29,y+80]],'#98764f');for(let i=0;i<3;i++)line([[x-20+i*20,y-76],[x-20+i*20,y+74]],'#806342',2);ellipse(x+19,y+10,3,3,'#e0c58b');text(label,x,y-104,17,'#705d42');}
+  function enemy(x,y,s=1){ellipse(x,y+6,55*s,17*s,'#14282455');poly([[x-47*s,y],[x-63*s,y-63*s],[x-37*s,y-126*s],[x+14*s,y-138*s],[x+57*s,y-87*s],[x+47*s,y-9*s]],'#82917b');poly([[x-37*s,y-126*s],[x+14*s,y-138*s],[x+57*s,y-87*s],[x-9*s,y-74*s]],'#a5ad92');poly([[x-47*s,y],[x-9*s,y-74*s],[x+47*s,y-9*s],[x+13*s,y+10*s]],'#687d69');ellipse(x-20*s,y-76*s,5*s,4*s,'#e0ca75');ellipse(x+14*s,y-79*s,5*s,4*s,'#e0ca75');line([[x-13*s,y-55*s],[x+11*s,y-56*s]],'#405c4c',4*s);}
+  function battle(){rect(0,0,1400,735,'#263f37');poly([[0,0],[255,0],[290,239],[184,479],[0,515]],'#596c55');poly([[1040,0],[1400,0],[1400,594],[1169,557],[1050,388],[1123,215]],'#66785d');poly([[0,515],[337,405],[938,430],[1400,594],[1400,735],[0,735]],'#798369');character(355,592,2.3,'#b49463');enemy(1000,473,2.1);text('苔石守卫',1000,143,28,'#e4e6cd');text(`${state.enemyHp} / 12`,1000,181,24,'#e4e6cd');text(`生命 ${state.hp} / 20`,355,308,22,'#e4e6cd');rock(139,658,1.8);rock(1221,629,1.7);}
+  function paint(){c.clearRect(0,0,1400,735);if(state.scene==='farm'){farm();if(state.planted)plot(291,462,1);shopPorch();homeDetails();stoneBridge();trailSteps();mailbox();}
+    else if(state.scene==='shop'){shop();door(70,240,'回农庄');text('作物篮',291,633,18,'#f6e6c2');text('设施委托',1129,186,20,'#655b41');}
+    else if(state.scene==='camp'){cave();forestWay();text('战备台',642,495,16,'#efe0b6');}
+    else if(state.scene==='explore'){exploration();daylightExit();enemy(706,266,.75);crate(1000,347,1.8);rock(426,194,1.4);}
+    else if(state.scene==='battle')battle();
+    else if(state.scene==='home'){home();door(75,220,'去院子');rect(174,143,136,107,'#95744d');rect(184,153,116,87,'#667a54');text('留 言 板',242,190,20,'#f1e3b8');text('欢迎来坐坐',242,218,14,'#e5d6ae');text('窗外的院子',1121,251,16,'#786c4f');}
+    else{courtyard();gardenGate();text(host().name+'家',570,290,20,'#f7efd4');}}
+
+  const mobile=()=>stage.clientWidth<=600;
+  function object(label,x,y,w,h,action){const scale=mobile()?.48:1;return `<button type="button" class="object cursor-interaction" data-action="${action}" data-object="${label}" aria-label="${label}" style="left:clamp(22px,${x/14}%,calc(100% - 22px));top:clamp(22px,${y/735*100*scale}%,calc(100% - 22px));width:${w/14}%;height:${h/735*100*scale}%"><span class="obj-label">${label}</span></button>`;}
+  function button(label,action,primary=false,disabled=false){return `<button type="button" class="${primary?'primary ':''}cursor-interaction" data-action="${action}" ${disabled?'disabled':''}>${label}</button>`;}
+  function price(g){return Math.round((state.kind==='cabbage'?[17,17,14]:[18,18,22])[g-1]*state.quantity/5);}
+  const guests=[['阿禾','今天想买点白菜，回家炖一锅汤。',474],['小满','纤维足一点的，吃起来才脆嘛。',786],['小翠','我更想要胡萝卜，你有带来吗？',1098]];
+  function bubbles(){let best=Math.max(...[1,2,3].map(price));return guests.map((g,i)=>{const top=mobile()?49+i*16:33,left=g[2]/14-10;return `<div class="bubble ${price(i+1)===best&&state.quantity?'best':''} ${design.dialogue==='选中时展开'&&state.guest!==i+1?'quiet':''}" style="left:${left}%;top:${top}%" data-bubble="${i+1}"><strong>${g[0]}${price(i+1)===best&&state.quantity?'<span class="tag">最高报价</span>':''}</strong><p>${g[1]}</p><em>${state.quantity?`${state.quantity} 个 · ${price(i+1)} 金`:'当前作物已售罄'}</em></div>`;}).join('');}
+  const anchors={directory:[700,400],field:[560,450],'seed-field':[326,501],'care-field':[678,495],'expand-field':[702,605],warehouse:[980,330],shelf:[300,360],facilities:[1090,350],basket:[290,580],guest:[760,550],cave:[1050,380],loadout:[640,510],party:[552,610],encounter:[706,266],extract:[496,645],chest:[1000,347],gather:[426,194],owner:[846,569],greet:[242,210],display:[880,300],crops:[1030,550],cards:[710,600]};
+  function panel(title,body){return `<div class="work-head"><strong>${title}</strong>${button('收起','close')}</div>${body}`;}
+  function panelContent(){switch(state.panel){
+    case 'directory':return directory();
+    case 'field':return panel('成熟的白菜',`<p>${state.harvest?'这轮作物已收好，新的种子可以播下。':'2 块地已成熟，收获进入自己的仓库。'}</p><div class="actions">${button(state.harvest?'这一轮已收获':'收获这两块地','harvest',true,state.harvest)}${button('查看照料记录','care')}</div>`);
+    case 'seed-field':return panel(state.planted?'地块里的新芽':'在这块空地播种',`<p>${state.planted?'白菜已经种下了，接下来可以照料。':`白菜种子 · 剩余 ${state.seeds} 粒`}</p><div class="actions">${button(state.planted?'已播种':'播种白菜 · 用 1 粒','plant',true,state.planted||!state.seeds)}</div>`);
+    case 'care-field':return panel('生长中的白菜',`<p>${state.watered?'当前时段已经浇过水。':'当前照料时段可以浇水，操作免费。'}</p><div class="actions">${button(state.watered?'这一时段已浇水':'浇水','water',true,state.watered)}${button('查看肥料','fertilizer')}</div>`);
+    case 'expand-field':return panel('开垦下一块地',`<p>第 7 块地需要 1400 金，当前有 ${state.coins} 金。售价规则沿用现有设计。</p><div class="actions">${button('开垦 · 1400 金','expand',true,state.coins<1400)}</div>`);
+    case 'warehouse':return panel('仓库与工坊','<p>种子、作物和洞窟材料都在这里整理。</p><div class="actions">'+button('种子与育种','seed')+button('查看作物','stock')+button('制作','craft')+'</div>');
+    case 'shelf':return panel('种子与肥料',`<p>白菜种子 · 库存不限 · 20 金 / 粒</p><div class="actions">${button('买 1 粒 · 20 金','buy',true,state.coins<20)}${button('查看肥料','fertilizer')}</div>`);
+    case 'facilities':return panel('设施委托','<p>水壶、仓库、育种机与商店升级，在委托区查看。</p><div class="actions">'+button('查看升级条件','upgrade')+'</div>');
+    case 'basket':return panel('带来的作物',`<label for="fo-crop">选择作物批次</label><select id="fo-crop"><option value="cabbage" ${state.kind==='cabbage'?'selected':''}>白菜 · 库存 ${state.inventory.cabbage}</option><option value="carrot" ${state.kind==='carrot'?'selected':''}>胡萝卜 · 库存 ${state.inventory.carrot}</option></select><div class="quantity">${button('−','minus',false,state.quantity<=1)}<output>${state.quantity} 个</output>${button('＋','plus',false,state.quantity>=state.inventory[state.kind])}</div><div class="actions">${button('带这批菜问客人','close',true)}${button(`整批兜底出售 · ${Math.round(state.inventory[state.kind]*3.4)} 金`,'default-sell',false,!state.inventory[state.kind])}</div>`);
+    case 'guest':{const g=guests[state.guest-1];return panel(`和${g[0]}交易`,`<p>${g[1]}</p><p>${state.kind==='cabbage'?'白菜':'胡萝卜'} ${state.quantity} 个，报价 ${price(state.guest)} 金。</p><div class="actions">${button(`卖给${g[0]} · ${price(state.guest)} 金`,'sell',true,!state.quantity)}${button('换一批作物','basket')}</div>`);}
+    case 'cave':return panel('苔石浅洞 · 出发',`<p>第一层 · 战备已配置。进入后沿路线探索，战斗结束再决定深入或撤离。</p><div class="actions">${button('进入洞窟','enter',true)}${button('调整战备','loadout')}${button('好友组队','party')}</div>`);
+    case 'loadout':return panel('战备台',`<p>胸挂先入牌；背包后入牌；保险箱保护物品。</p><div class="item-grid"><span class="wide">木剑 · 2 格</span><span>药水</span><span>空格</span><span>空格</span><span>空格</span><span>空格</span><span>空格</span></div><div class="actions">${button('配置完成','close',true)}</div>`);
+    case 'party':return panel('篝火旁等朋友',`<p>示意：你已准备，朋友尚未准备。房间码 FARM23。</p><div class="actions">${button('等待朋友准备','wait',false,true)}${button('单人出发','cave')}</div>`);
+    case 'encounter':return panel('遇见苔石守卫',`<p>点击敌人确认遭遇。接下来进入完整卡牌战斗画面。</p><div class="actions">${button('开始战斗','fight',true)}</div>`);
+    case 'extract':return panel('洞窟出口',`<p>从这里撤离，带回本次收获并回到营地。</p><div class="actions">${button('撤离到营地','leave-cave',true)}</div>`);
+    case 'chest':return panel('岩缝里的宝箱','<p>物资要放入本次背包，撤离后才能带回。</p><div class="actions">'+button('打开并查看物资','loot',true)+'</div>');
+    case 'gather':return panel('岩芽采集点','<p>这里生长着洞窟里的新种子。</p><div class="actions">'+button('采集岩芽种子','collect',true)+'</div>');
+    case 'owner':return panel(host().name+' · 主人留言',`<p>${welcome()}</p><div class="actions">${button('打个招呼','hello',true)}</div>`);
+    case 'greet':return panel(host().name+'家的留言板','<p>留一句简短的问候。此处是交互示意，不会发送真实消息。</p><div class="actions">'+button('来串门啦！','hello',true)+'</div>');
+    case 'display':return panel(host().name+'的展示架','<p>铁矿、岩芽种子与这一趟冒险的纪念。访客可以看，物品属于主人。</p>');
+    case 'crops':return panel(host().name+'种下的作物',`<p>${host().plant}正在生长。访客可以参观，管理和收获由主人操作。</p>`);
+    case 'cards':return panel('卡牌战斗 · 演示',`<p>苔石守卫生命 ${state.enemyHp} / 12；你的生命 ${state.hp} / 20。</p><div class="actions">${button('木剑斩击 · 6 伤害','attack',true)}${button('结束回合','end-turn')}</div>`);
+    default:return '';
+  }}
+  function placePanel(){if(!state.panel)return;work.style.width=state.panel==='directory'?'min(720px,calc(100% - 32px))':state.panel==='guest'&&!mobile()?'min(380px,max(268px,27%))':'';const box=work.getBoundingClientRect(),w=stage.clientWidth,h=stage.clientHeight,anchor=anchors[state.panel]||[700,550];let x=anchor[0]/1400*w+24,y=anchor[1]/735*h-100;if(state.panel==='directory'){x=(w-box.width)/2;y=(h-box.height)/2;}else if(state.panel==='guest'){x=18;y=h-box.height-25;}else if(state.panel==='cards'){x=(w-box.width)/2;y=h-box.height-25;}if(mobile()){x=(w-box.width)/2;y=Math.max(108,(h-box.height)/2);}work.style.left=Math.max(16,Math.min(w-box.width-16,x))+'px';work.style.top=Math.max(90,Math.min(h-box.height-18,y))+'px';}
+  function render(){root.querySelector('#fo-location').textContent={farm:'我的农场',shop:'田边杂货铺',camp:'洞窟营地',explore:'苔石浅洞 · 探索',battle:'苔石浅洞 · 战斗',home:host().name+'的小屋',yard:host().name+'的院子'}[state.scene];root.querySelector('#fo-money').textContent=state.coins.toLocaleString();stage.className='stage '+state.scene;
+    let targets='';
+    if(state.scene==='farm')targets=object('杂货铺门廊：进店',405,267,168,135,'shop-porch')+object('邻里房屋：选择朋友',706,244,210,190,'friend-house')+object('信箱：打开邻里地址簿',264,349,93,107,'mailbox')+object('仓库工坊',982,286,200,170,'warehouse')+object('提灯石阶：去洞窟营地',1145,356,135,140,'mountain-steps')+object('成熟的白菜田',430,459,285,105,'field')+object('空地：播种',326,501,145,76,'seed-field')+object('生长中的作物：照料',678,495,190,88,'care-field')+object('待开垦地块',702,605,390,85,'expand-field')+object('溪上小桥：选择拜访朋友',177,592,190,135,'neighbor-bridge');
+    else if(state.scene==='shop')targets=object('商店的门：回农庄',70,239,95,187,'shop-door')+object('种子与肥料货架',262,288,248,190,'shelf')+object('设施委托货架',1123,211,205,100,'facilities')+object('带来的作物篮',291,565,125,97,'basket')+guests.map((g,i)=>object(`客人${g[0]}`,g[2],547,125,177,`guest-${i+1}`)).join('')+bubbles();
+    else if(state.scene==='camp')targets=object('山体里的洞口',1060,350,310,262,'cave')+object('战备台',640,520,195,136,'loadout')+object('组队篝火',553,609,138,113,'party')+object('下山小路：回农庄',152,641,180,120,'forest-path');
+    else if(state.scene==='explore')targets=object('路线上的苔石守卫',706,224,100,125,'encounter')+object('宝箱',1000,347,125,135,'chest')+object('岩芽采集点',426,180,120,105,'gather')+object('透着天光的洞口：撤离',496,645,151,164,'extract');
+    else if(state.scene==='battle')targets=object('查看本回合手牌',355,451,260,300,'cards');
+    else if(state.scene==='home')targets=object('房门：去院子',75,220,91,190,'home-door')+object('窗户：看院子',1121,153,175,145,'home-window')+object(host().name+'家的留言板',242,195,143,125,'greet')+object('主人'+host().name,846,469,145,245,'owner')+object(host().name+'的展示架',880,270,166,174,'display')+`<div class="bubble home-bubble" style="left:51%;top:${mobile()?53:33}%;width:${mobile()?'calc(100% - 28px)':'27%'};max-width:${mobile()?'none':'310px'}"><strong>${host().name} · 主人留言</strong><p>${welcome()}</p></div>`;
+    else targets=object(host().name+'家的房子：进屋',568,307,292,247,'yard-house')+object('花藤院门：回我的农场',264,463,194,222,'yard-gate')+object(host().name+'的作物田',1030,556,315,147,'crops');
+    objects.innerHTML=targets;root.querySelector('#fo-note').hidden=!!state.panel;work.hidden=!state.panel;work.classList.toggle('book',state.panel==='directory');objects.inert=state.panel==='directory';if(state.panel==='directory'){work.setAttribute('role','dialog');work.setAttribute('aria-label','选择要拜访的朋友');}else{work.removeAttribute('role');work.setAttribute('aria-label','所选物体的操作');}work.innerHTML=panelContent();paint();paintPreviews();placePanel();root.querySelector('#fo-note').textContent={farm:state.harvest?'我的农场 · 本轮已收获':'成熟 ×2 · 信箱或小桥选朋友，再去串门',shop:`作物篮：${state.kind==='cabbage'?'白菜':'胡萝卜'} ${state.quantity} 个 · 今日客人 3 位`,camp:'营地 · 战备台与篝火',explore:'探险进行中 · 天光洞口可撤离',battle:'卡牌战斗示意 · 点击角色查看手牌',home:host().name+'家 · '+(host().online?'在线':'离线')+' · 主人留言',yard:host().name+'的院子 · '+(host().online?'在线':'离线')+' · 开放参观'}[state.scene];canvas.setAttribute('aria-label',root.querySelector('#fo-location').textContent+'，通过场景中的物体进行操作');if(globalThis.lucide)lucide.createIcons();
+  }
+  function save(){if(window.openai?.setWidgetState)window.openai.setWidgetState({modelContent:{revision:4,scene:state.scene,panel:state.panel,visiting:state.visitId,lastVisit:state.lastVisitId,interaction:'店门、小桥、石阶、院门自然导航；物体操作留在场内'},privateContent:{revision:4,scene:state.scene,visitId:state.visitId,lastVisitId:state.lastVisitId}}).catch(()=>{});}
+  let timer;function toast(t){const box=root.querySelector('#fo-toast');box.textContent=t;box.hidden=false;clearTimeout(timer);timer=setTimeout(()=>box.hidden=true,3200);}
+  function goto(s){state.scene=s;state.panel=s==='battle'?'cards':'';root.querySelector('#fo-toast').hidden=true;render();save();}
+  function action(a){const routes={'shop-porch':'shop','shop-door':'farm','mountain-steps':'camp','forest-path':'farm','home-door':'yard','home-window':'yard','yard-house':'home','yard-gate':'farm'};if(routes[a])return goto(routes[a]);
+    if(['mailbox','friend-house','neighbor-bridge'].includes(a)){state.directorySource=a;state.friendPage=0;state.friendQuery='';state.panel='directory';render();work.querySelector('button')?.focus({preventScroll:true});save();return;}
+    if(a.startsWith('visit-')){const f=friends.find(f=>f.id===a.slice(6));if(!f?.open)return;state.visitId=f.id;state.lastVisitId=f.id;return goto('yard');}
+    if(a==='friend-prev'||a==='friend-next'){state.friendPage+=a==='friend-next'?1:-1;render();save();return;}
+    if(a==='enter')return goto('explore');if(a==='leave-cave'){goto('camp');return toast('已撤离 · 本次结算在营地查看');}
+    if(a==='fight'){state.enemyHp=12;state.hp=20;return goto('battle');}
+    if(a==='close'){const fromDirectory=state.panel==='directory';state.panel='';render();if(fromDirectory)objects.querySelector(`[data-action="${state.directorySource}"]`)?.focus({preventScroll:true});save();return;}
+    if(a.startsWith('guest-')){state.guest=Number(a.slice(6));state.panel='guest';}
+    else if(Object.keys(anchors).includes(a))state.panel=a;
+    else if(a==='harvest'){if(!state.harvest){state.harvest=true;state.inventory.cabbage+=10;toast('收获白菜 ×10 · 新种子 ×4');}state.panel='';}
+    else if(a==='plant'){if(!state.planted&&state.seeds){state.planted=true;state.seeds-=1;state.panel='';toast('这块地播下了白菜 · 种子 −1');}}
+    else if(a==='water'){state.watered=true;state.panel='';toast('已完成本时段浇水');}
+    else if(a==='minus'||a==='plus')state.quantity=Math.min(state.inventory[state.kind],Math.max(1,state.quantity+(a==='plus'?1:-1)));
+    else if(a==='sell'){if(state.quantity){let paid=price(state.guest),n=state.quantity;state.coins+=paid;state.inventory[state.kind]-=n;state.quantity=Math.min(5,state.inventory[state.kind]);state.panel='';toast(`卖给${guests[state.guest-1][0]} ${n} 个 · +${paid} 金`);}}
+    else if(a==='default-sell'){let n=state.inventory[state.kind],paid=Math.round(n*3.4);state.coins+=paid;state.inventory[state.kind]=0;state.quantity=0;state.panel='';toast(`整批 ${n} 个已出售 · +${paid} 金`);}
+    else if(a==='buy'){if(state.coins>=20){state.coins-=20;toast('买到白菜种子 ×1 · −20 金');}}
+    else if(a==='hello'){state.visited=true;state.visitedOwners[host().id]=true;state.panel='';toast('留下了一句问候 · 交互示意');}
+    else if(a==='attack'){state.enemyHp=Math.max(0,state.enemyHp-6);if(!state.enemyHp){goto('explore');return toast('战斗示意结束 · 回到当前探索路线');}}
+    else if(a==='end-turn'){state.hp=Math.max(1,state.hp-2);toast('守卫反击 · 生命 −2');}
+    else{const replies={care:'这轮已完成照料，详细记录仍在场内打开',seed:'查看仓库中的种子与育种模板',stock:'作物按批次保存在仓库',craft:'制作配方在工坊工作区查看',fertilizer:'货架详情：基础肥料覆盖 2 小时',upgrade:'设施升级前，在委托区查看实际价格与条件',loot:'宝箱内容加入本次背包 · 交互示意',collect:'采集岩芽种子 ×1 · 交互示意'};toast(replies[a]||'场景内操作示意');}
+    render();save();
+  }
+  root.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&!b.disabled&&b.dataset.action)action(b.dataset.action);});
+  root.addEventListener('input',e=>{if(e.target.id==='fo-friend-search'){const caret=e.target.selectionStart;state.friendQuery=e.target.value;state.friendPage=0;render();const input=work.querySelector('#fo-friend-search');input.focus({preventScroll:true});try{input.setSelectionRange(caret,caret);}catch{};}});
+  root.addEventListener('change',e=>{if(e.target.id==='fo-crop'){state.kind=e.target.value;state.quantity=Math.min(5,state.inventory[state.kind]);render();save();}});
+  root.addEventListener('keydown',e=>{if(e.key==='Escape'&&state.panel){state.panel='';render();save();}});
+  window.addEventListener('openai:set_globals',event=>{const incoming=event.detail?.globals?.widgetState?.privateContent;if(incoming?.revision===4&&['farm','shop','camp','explore','battle','home','yard'].includes(incoming.scene)&&state.scene!==incoming.scene){state.scene=incoming.scene;if(friends.some(f=>f.id===incoming.visitId))state.visitId=incoming.visitId;if(friends.some(f=>f.id===incoming.lastVisitId))state.lastVisitId=incoming.lastVisitId;state.panel='';render();}});
+  let lastWidth=0;new ResizeObserver(()=>{if(stage.clientWidth!==lastWidth){lastWidth=stage.clientWidth;render();}}).observe(stage);
+  render();
+  if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:render});tweak.addSlider(design,'npcScale',{label:'商店客人大小',min:90,max:125,step:5,unit:'%',reference:'shop.npcScale'});tweak.addSelect(design,'dialogue',{label:'客人对白',options:['短对话常显','选中时展开'],reference:'shop.dialogue'});}
+})();
+</script>
