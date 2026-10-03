@@ -199,6 +199,7 @@ func _on_hello(sender: int, message: Dictionary) -> Dictionary:
 					"name": str(guest.get("name", "队友")),
 					"player_id": player_id,
 					"loadout": (guest.get("inventory", {}) as Dictionary).get("loadout", {}),
+					"container_levels": guest.get("inventory", {}).get("container_levels", {}),
 					"carried": guest.get("carried_from_farm", []),
 					"next_instance_id": int(expedition.run.get("next_instance_id", 1000)),
 					"hp": int(guest.get("hp", ExpeditionBaseline.MAX_HP)),
@@ -225,6 +226,7 @@ func _on_hello(sender: int, message: Dictionary) -> Dictionary:
 			"name": str(message.get("name", "队友")),
 			"player_id": player_id,
 			"loadout": message.get("loadout", {}),
+			"container_levels": message.get("container_levels", {}),
 			"carried": message.get("carried", []),
 			"next_instance_id": int(message.get("next_instance_id", 1000)),
 			"hp": int(message.get("hp", ExpeditionBaseline.MAX_HP)),
@@ -241,6 +243,7 @@ func _on_ready(sender: int, message: Dictionary) -> void:
 	member["ready"] = bool(message.get("ready", false))
 	var profile: Dictionary = member.get("profile", {})
 	profile["loadout"] = message.get("loadout", profile.get("loadout", {}))
+	profile["container_levels"] = message.get("container_levels", profile.get("container_levels", {}))
 	profile["carried"] = message.get("carried", profile.get("carried", []))
 	member["profile"] = profile
 	broadcast({"t": "room", "room": _room_view()})
@@ -388,18 +391,20 @@ func _execute_action(member_key: String, kind: String, args: Dictionary) -> Dict
 			return r
 		"claim_reward":
 			## 领取走规则层事务（F-02）：校验→放置→按成员记录领取；满包失败不消费候选。
-			var node_key := expedition.node_id(int(run["current"]["row"]), int(run["current"]["col"]))
-			var r: Dictionary = expedition.claim_node_reward(member_key, node_key, str(args.get("def_id", "")), str(args.get("container", "pack")))
+			var r: Dictionary = expedition.loot_action(member_key, "claim_reward", args)
 			r["run_changed"] = true
 			return r
 		"claim_public":
-			var public_key := expedition.node_id(int(run["current"]["row"]), int(run["current"]["col"]))
-			var r: Dictionary = expedition.claim_node_public(member_key, public_key, str(args.get("def_id", "")))
+			var r: Dictionary = expedition.loot_action(member_key, "claim_public", args)
 			r["run_changed"] = true
 			return r
 		"pick_drop":
-			var r := expedition.pick_node_drop(member_key, int(args.get("instance_id", 0)))
+			var r := expedition.loot_action(member_key, "pick_drop", args)
 			r["run_changed"] = true
+			return r
+		"loot_manage":
+			var r := expedition.loot_action(member_key, kind, args)
+			r["run_changed"] = bool(r.get("ok", false))
 			return r
 		"take_rest":
 			var r := expedition.take_rest(str(args.get("option", "")))

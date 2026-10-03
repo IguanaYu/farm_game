@@ -27,6 +27,35 @@ func _draw() -> void:
 	var light := tint.lightened(0.3)
 	draw_circle(Vector2(100, 100), 82, Color(tint, 0.055))
 	match subject:
+		"ore":
+			_poly([[33, 144], [51, 82], [87, 63], [110, 81], [142, 69], [171, 119], [151, 158], [69, 169]], tint)
+			_poly([[51, 82], [87, 63], [110, 81], [101, 122], [64, 131]], light)
+			_poly([[111, 94], [142, 69], [171, 119], [139, 137]], tint.lightened(0.15))
+		"fiber":
+			for i in range(7):
+				draw_arc(Vector2(71 + i * 9, 104), 42 - i * 2, -1.5, 1.9, 24, tint.lightened(i * 0.025), 8, true)
+			draw_line(Vector2(80, 64), Vector2(116, 151), Color("#80634c"), 9, true)
+		"bandage":
+			draw_style_box(ExpeditionUI.style(Color("#e0d6be"), tint, 14, 0), Rect2(44, 59, 111, 92))
+			for x in [67, 85, 103, 121]:
+				draw_line(Vector2(x, 64), Vector2(x + 12, 147), Color("#b3af9b"), 2, true)
+			draw_circle(Vector2(100, 104), 25, tint)
+			draw_line(Vector2(100, 89), Vector2(100, 119), Color("#f6e9c8"), 8)
+			draw_line(Vector2(85, 104), Vector2(115, 104), Color("#f6e9c8"), 8)
+		"seed":
+			draw_style_box(ExpeditionUI.style(Color("#977957"), Color("#cbb082"), 8, 0), Rect2(51, 65, 99, 102))
+			draw_line(Vector2(53, 78), Vector2(149, 78), Color("#dfc393"), 5)
+			draw_line(Vector2(100, 143), Vector2(100, 102), tint, 6, true)
+			_poly([[100, 122], [72, 115], [70, 96], [89, 100], [100, 113]], light)
+			_poly([[100, 111], [113, 87], [132, 85], [126, 109], [100, 124]], tint)
+		"relic":
+			_poly([[57, 151], [69, 124], [70, 67], [100, 36], [134, 70], [131, 125], [148, 151], [142, 167], [58, 167]], Color("#ad8c57"))
+			_poly([[100, 36], [134, 70], [131, 125], [100, 140]], light)
+			draw_circle(Vector2(101, 89), 13, tint.darkened(0.3))
+			draw_line(Vector2(70, 148), Vector2(134, 148), light, 5)
+		"tools":
+			draw_line(Vector2(60, 159), Vector2(128, 52), Color("#a08261"), 16, true)
+			draw_polyline(PackedVector2Array([Vector2(65, 59), Vector2(109, 36), Vector2(143, 58), Vector2(163, 91)]), tint, 17, true)
 		"attack":
 			_poly([[70, 125], [134, 35], [156, 28], [154, 54], [89, 140]], light)
 			_poly([[78, 129], [148, 37], [89, 140]], tint)

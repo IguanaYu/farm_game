@@ -75,6 +75,7 @@ static func _snapshot_loadout(farm_game: FarmGame) -> Dictionary:
 	return {
 		"warehouse": [],
 		"loadout": loadout.duplicate(true),
+		"container_levels": (farm_game.state["expedition"].get("crafting", {}).get("upgrade_levels", {}) as Dictionary).duplicate(true),
 		"occupied_by_run": "",
 	}
 
@@ -169,6 +170,7 @@ static func _guest_member(profile: Dictionary) -> Dictionary:
 		"inventory": {
 			"warehouse": [],
 			"loadout": (profile.get("loadout", {}) as Dictionary).duplicate(true),
+			"container_levels": (profile.get("container_levels", {}) as Dictionary).duplicate(true),
 			"occupied_by_run": "",
 		},
 		"carried_from_farm": (profile.get("carried", []) as Array).duplicate(),
@@ -653,7 +655,7 @@ func _add_run_reward(def_id: String) -> void:
 # 多件节点（gather/chest）：每个成员每条候选各可领一次。合作局两位成员各自计领（2.6 语义）。
 
 
-func claim_node_reward(member_key: String, key: String, def_id: String, container: String) -> Dictionary:
+func claim_node_reward(member_key: String, key: String, def_id: String, container: String, cell := Vector2i(-1, -1), rotated := false) -> Dictionary:
 	if not member_keys().has(member_key):
 		return _fail("未知成员")
 	var resolved: Dictionary = run["resolved"].get(key, {})
@@ -669,7 +671,7 @@ func claim_node_reward(member_key: String, key: String, def_id: String, containe
 	if mine.has(def_id):
 		return _fail("已领取过「%s」" % str(ItemDefs.get_item(def_id).get("name", def_id)))
 	var inventory := member_inventory(member_key)
-	var result := inventory.claim_reward(def_id, container)
+	var result := inventory.claim_reward(def_id, container, cell, rotated)
 	if not result["ok"]:
 		## 满包/白名单拒绝：候选保留，腾出空间后可重试（不产生半领取状态）。
 		return result
@@ -683,7 +685,7 @@ func claim_node_reward(member_key: String, key: String, def_id: String, containe
 	return {"ok": true, "reason": "", "instance_id": int(result["instance_id"])}
 
 
-func claim_node_public(member_key: String, key: String, def_id: String) -> Dictionary:
+func claim_node_public(member_key: String, key: String, def_id: String, container := "pack", cell := Vector2i(-1, -1), rotated := false) -> Dictionary:
 	## 公共物资：全队一份、先到先得（领取成功即从列表移除，与修复前语义一致）。
 	if not member_keys().has(member_key):
 		return _fail("未知成员")
@@ -692,7 +694,7 @@ func claim_node_public(member_key: String, key: String, def_id: String) -> Dicti
 	if not public_items.has(def_id):
 		return _fail("公共物资不在列表或已被领走")
 	var inventory := member_inventory(member_key)
-	var result := inventory.claim_reward(def_id, "pack")
+	var result := inventory.claim_reward(def_id, container, cell, rotated)
 	if not result["ok"]:
 		return result
 	public_items.erase(def_id)
@@ -708,19 +710,82 @@ func _reward_choose_one(resolved: Dictionary) -> bool:
 
 
 ## 从节点公共丢弃区捡回一件（F-04：规则层事务，客机经主机裁定复用同一路径）。
-func pick_node_drop(member_key: String, instance_id: int) -> Dictionary:
+func pick_node_drop(member_key: String, instance_id: int, container := "pack", cell := Vector2i(-1, -1), rotated := false) -> Dictionary:
 	if not member_keys().has(member_key):
 		return _fail("未知成员")
 	for instance in run["node_drops"]:
 		if int(instance["instance_id"]) == instance_id:
+			if ItemDefs.is_basic(str(instance["def_id"])) and str(instance.get("drop_owner", member_key)) != member_key:
+				return _fail("基础装备只能由原主人捡回")
+			var inventory := member_inventory(member_key)
+			if ItemDefs.is_basic(str(instance["def_id"])) and inventory.count_of_def(str(instance["def_id"])) > 0:
+				return _fail("已经拥有这件基础装备")
+			var placed: Dictionary = instance.duplicate(true)
+			placed["container"] = "warehouse"
+			inventory.restore_to_warehouse(placed)
+			var result := inventory.place_at(instance_id, container, cell, rotated) if cell.x >= 0 else inventory.move_to_loadout(instance_id, container)
+			if not bool(result["ok"]):
+				inventory.expedition["inventory"]["warehouse"].erase(placed)
+				return result
 			run["node_drops"].erase(instance)
-			instance["container"] = "warehouse"
-			instance["cell"] = [0, 0]
-			member_inventory(member_key).restore_to_warehouse(instance)
 			run["log"].append("%s 捡回：%s" % [member(member_key)["name"], str(ItemDefs.get_item(str(instance["def_id"])).get("name", "?"))])
 			save()
-			return {"ok": true, "reason": ""}
+			return {"ok": true, "reason": "", "instance_id": instance_id}
 	return _fail("丢弃区没有这件物品")
+
+
+## 搜刮台的唯一裁定入口；主机与单人复用，客机不能直接修改镜像。
+func loot_action(member_key: String, kind: String, args: Dictionary) -> Dictionary:
+	if not member_keys().has(member_key) or str(run.get("phase", "")) != "node":
+		return _fail("当前不能整理或领取战利品")
+	var node := current_node()
+	if str(node.get("type", "")) in ["battle", "elite", "gate"]:
+		var battle_key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
+		if not bool(run["resolved"].get(battle_key, {}).get("battle_won", false)):
+			return _fail("先完成这里的战斗")
+	var cell := Vector2i(-1, -1)
+	if args.has("cell"):
+		var input: Variant = args["cell"]
+		if not input is Array or input.size() != 2:
+			return _fail("放置坐标无效")
+		for coordinate in input:
+			if not (coordinate is int or coordinate is float) or coordinate < 0 or coordinate != int(coordinate):
+				return _fail("放置坐标无效")
+		cell = Vector2i(input[0], input[1])
+	var container := str(args.get("container", "pack"))
+	var rotated := bool(args.get("rotated", false))
+	var key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
+	match kind:
+		"claim_reward": return claim_node_reward(member_key, key, str(args.get("def_id", "")), container, cell, rotated)
+		"claim_public": return claim_node_public(member_key, key, str(args.get("def_id", "")), container, cell, rotated)
+		"pick_drop": return pick_node_drop(member_key, int(args.get("instance_id", -1)), container, cell, rotated)
+		"loot_manage":
+			var inventory := member_inventory(member_key)
+			var operation := str(args.get("operation", ""))
+			var id := int(args.get("instance_id", -1))
+			var result: Dictionary
+			if operation == "tidy":
+				result = inventory.auto_tidy(container)
+			else:
+				var instance := inventory.find_instance(id)
+				if instance.is_empty():
+					return _fail("这件物品不属于你或已不在背包里")
+				if int(run.get("share_offer", {}).get("instance_id", -2)) == id:
+					return _fail("这件物品正在分享中，请先完成或取消分享")
+				match operation:
+					"move": result = inventory.place_at(id, container, cell, rotated) if cell.x >= 0 else inventory.move_to_loadout(id, container)
+					"rotate": result = inventory.rotate_instance(id)
+					"drop":
+						result = inventory.discard_instance(id)
+						if bool(result["ok"]):
+							instance["drop_owner"] = member_key
+							run["node_drops"].append(instance)
+							run["log"].append("现场丢弃：%s（离开前可捡回）" % str(ItemDefs.get_item(str(instance["def_id"]))["name"]))
+					_: return _fail("未知的整理操作")
+			if bool(result["ok"]):
+				save()
+			return result
+	return _fail("未知的搜刮操作")
 
 
 func _record_consumed() -> void:

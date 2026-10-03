@@ -102,7 +102,7 @@ func find_first_fit(container: String, size: Vector2i) -> Variant:
 	for rotated in [false, true]:
 		for y in range(bounds.y):
 			for x in range(bounds.x):
-				if ExpeditionBaseline.can_place(container, size, Vector2i(x, y), rotated, occupied):
+				if ExpeditionBaseline.can_place_in(bounds, size, Vector2i(x, y), rotated, occupied):
 					return [x, y, rotated]
 	return null
 
@@ -190,7 +190,7 @@ func rotate_instance(instance_id: int) -> Dictionary:
 	var def := ItemDefs.get_item(str(instance["def_id"]))
 	var container := str(instance["container"])
 	var occupied := ExpeditionBaseline.occupancy_map(_inventory()["loadout"].get(container, []), container)
-	if not ExpeditionBaseline.can_place(container, def["size"], cell, rotated, occupied, int(instance["instance_id"])):
+	if not ExpeditionBaseline.can_place_in(ExpeditionBaseline.size_for(expedition, container), def["size"], cell, rotated, occupied, int(instance["instance_id"])):
 		return _fail("旋转后放不下（会越界或重叠）")
 	instance["rotated"] = rotated
 	return {"ok": true, "reason": ""}
@@ -245,7 +245,7 @@ func discard_instance(instance_id: int) -> Dictionary:
 
 
 ## 战后奖励领取事务：奖励区 → 指定容器（只找合法空位，不替玩家丢装备、不自动占保险箱）。
-func claim_reward(def_id: String, container: String) -> Dictionary:
+func claim_reward(def_id: String, container: String, cell := Vector2i(-1, -1), rotated := false) -> Dictionary:
 	if is_run_occupied():
 		return _fail("物品正在探险中")
 	var def := ItemDefs.get_item(def_id)
@@ -253,10 +253,10 @@ func claim_reward(def_id: String, container: String) -> Dictionary:
 		return _fail("未知物品：%s" % def_id)
 	if container == "safe" and not bool(def.get("safe_allowed", false)):
 		return _fail("%s 不在保险箱白名单内" % def["name"])
-	var added := add_instance(def_id, "loot")
+	var added := add_instance(def_id, "loot", int(def.get("quality", 1)))
 	if not added["ok"]:
 		return added
-	var moved := move_to_loadout(int(added["instance_id"]), container)
+	var moved := place_at(int(added["instance_id"]), container, cell, rotated) if cell.x >= 0 else move_to_loadout(int(added["instance_id"]), container)
 	if not moved["ok"]:
 		# 放不下就退回：奖励留在奖励区，不产生半领取状态（ID 作废不复用，无害）。
 		var stale := find_instance(int(added["instance_id"]))

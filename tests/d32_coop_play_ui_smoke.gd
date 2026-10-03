@@ -164,6 +164,9 @@ func _run() -> void:
 		if not _click(coop_panel, "离开本节点"):
 			_check(false, "节点：客机离开按钮存在（第 %d 排前）" % target_row)
 		await _pump(10)
+		if coop_panel.loot_panel.visible and coop_panel.loot_panel.modal.visible:
+			_check(_click(coop_panel, "确认离开本节点"), "搜刮：确认放弃剩余物资")
+			await _pump(10)
 		map_panel._on_move(target_row, 0)
 		await _pump(6)
 		if not _click(coop_panel, "·列 0"):
@@ -189,7 +192,7 @@ func _run() -> void:
 
 func _click(panel: Control, text: String) -> bool:
 	for button in panel.find_children("*", "Button", true, false):
-		if str(button.text).find(text) != -1 and not button.disabled:
+		if button.is_visible_in_tree() and str(button.text).find(text) != -1 and not button.disabled:
 			button.pressed.emit()
 			return true
 	return false

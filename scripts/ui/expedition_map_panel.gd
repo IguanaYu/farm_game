@@ -38,6 +38,8 @@ var layer_title: Label
 var overlay_scroll: ScrollContainer
 var modal_shade: ColorRect
 var settlement_visible := false
+var map_frame: MarginContainer
+var loot_panel: ExpeditionLootPanel
 
 
 func _ready() -> void:
@@ -59,11 +61,13 @@ func open(instance: ExpeditionGame) -> void:
 func close() -> void:
 	visible = false
 	expedition = null
+	loot_panel.visible = false
 
 
 func _build() -> void:
 	ExpeditionUI.backdrop(self)
 	var frame := ExpeditionUI.frame(self, 20)
+	map_frame = frame
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 10)
 	frame.add_child(column)
@@ -127,6 +131,12 @@ func _build() -> void:
 	log_label.add_theme_font_size_override("normal_font_size", 13)
 	log_label.add_theme_color_override("default_color", ExpeditionUI.MUTED)
 	log_box.add_child(log_label)
+	loot_panel = ExpeditionLootPanel.new()
+	loot_panel.z_index = 10
+	loot_panel.action_sink = _loot_action
+	loot_panel.input_blocked = func() -> bool: return overlay_panel.visible
+	loot_panel.menu_requested.connect(_open_menu)
+	add_child(loot_panel)
 	modal_shade = ColorRect.new()
 	modal_shade.color = Color(0.02, 0.05, 0.07, 0.62)
 	modal_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -158,6 +168,9 @@ func _refresh() -> void:
 	if expedition == null or expedition.run.is_empty():
 		return
 	var run: Dictionary = expedition.run
+	var looting := ExpeditionLootPanel.is_loot_phase(run)
+	map_frame.visible = not looting
+	loot_panel.display(run)
 	var inventory := expedition.run_inventory()
 	var supplies := 0
 	for container in ExpeditionBaseline.CONTAINERS:
@@ -185,6 +198,20 @@ func _refresh() -> void:
 	capacity_label.text = "\n".join(capacities)
 	var entries: Array = run.get("log", [])
 	log_label.text = "\n".join(entries.slice(maxi(0, entries.size() - 8), entries.size()))
+
+
+func _loot_action(kind: String, args: Dictionary) -> Dictionary:
+	var result: Dictionary
+	if host_action_sink.is_valid():
+		result = _arbitrate(kind, args)
+	elif kind == "leave_node":
+		result = expedition.leave_node()
+	else:
+		result = expedition.loot_action("p1", kind, args)
+	_refresh()
+	if result.has("settlement") or result.has("settlements"):
+		_handle_run_result(result)
+	return result
 
 
 func _coop_note(run: Dictionary) -> String:
@@ -224,6 +251,8 @@ func _refresh_node() -> void:
 	for child in node_column.get_children():
 		node_column.remove_child(child)
 		child.queue_free()
+	if ExpeditionLootPanel.is_loot_phase(expedition.run):
+		return
 	var run: Dictionary = expedition.run
 	if str(run["phase"]) == "map":
 		_refresh_route_preview()
