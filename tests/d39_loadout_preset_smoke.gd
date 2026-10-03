@@ -159,7 +159,7 @@ func _panel_flow() -> void:
 
 	inventory.clear_loadout()
 	_check((inventory.loadout_list("chest") as Array).is_empty(), "面板：清空后胸挂为空")
-	var applied: Dictionary = panel.apply_selected()
+	var applied: Dictionary = await panel.apply_selected()
 	_check(bool(applied["ok"]) and int(applied["applied"]) == 2, "面板：应用预设 2 件就位")
 	_check((inventory.loadout_list("chest") as Array).size() == 2, "面板：胸挂恢复 2 件")
 	_check(bool(panel.dirty), "面板：应用后面板标记 dirty（走关闭保存链）")

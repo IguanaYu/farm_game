@@ -6,6 +6,8 @@ extends Control
 signal close_requested
 signal save_requested
 signal open_loadout_requested
+## M2：线上命令口（farm_hud.open_equipment_warehouse 注入；空 Callable = 单机直改本地档）。
+var online_request: Callable = Callable()
 
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
@@ -99,6 +101,9 @@ func _build() -> void:
 
 
 func _refresh() -> void:
+	## 快照会整体替换 game.state，长持有的绑定会变悬空：每次刷新先重绑（M2 实测坑）。
+	inventory.bind(game.state["expedition"])
+	crafting.bind(game)
 	var equipment_used := 0
 	var resource_used := 0
 	for instance in inventory.warehouse_list():
@@ -176,36 +181,81 @@ func _on_into_loadout(def_id: String) -> void:
 			break
 	if target < 0:
 		return
-	var result := inventory.move_to_loadout(target, "chest")
-	if not result["ok"]:
-		result = inventory.move_to_loadout(target, "pack")
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("inv.move_to_loadout", {"instance_id": target, "container": "chest"})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+		if not result["ok"]:
+			reply = await online_request.call("inv.move_to_loadout", {"instance_id": target, "container": "pack"})
+			result = _online_result(reply)
+			if result.is_empty():
+				return
+	else:
+		result = inventory.move_to_loadout(target, "chest")
+		if not result["ok"]:
+			result = inventory.move_to_loadout(target, "pack")
 	if result["ok"]:
 		status_label.text = "已移入战备（%s）。去战备箱查看牌组变化。" % ItemDefs.get_item(def_id)["name"]
-		save_requested.emit()
+		if not _is_online():
+			save_requested.emit()
 	else:
 		status_label.text = result["reason"]
 	_refresh()
 
 
 func _on_sell(def_id: String) -> void:
-	var result := crafting.sell_instance(def_id)
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("craft.sell_instance", {"def_id": def_id})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+	else:
+		result = crafting.sell_instance(def_id)
 	if result["ok"]:
 		status_label.text = "出售 1 件 %s，+%d 金币（货物出售才变金币）。" % [ItemDefs.get_item(def_id)["name"], int(result["coins"])]
-		save_requested.emit()
+		if not _is_online():
+			save_requested.emit()
 	else:
 		status_label.text = result["reason"]
 	_refresh()
 
 
 func _on_claim_pending() -> void:
-	var result := crafting.claim_pending()
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("craft.claim_pending", {})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+	else:
+		result = crafting.claim_pending()
 	status_label.text = "领取 %d 件，剩 %d 件（先整理仓库再领）。" % [int(result["moved"]), int(result["remaining"])]
-	save_requested.emit()
+	if not _is_online():
+		save_requested.emit()
 	_refresh()
 
 
 func _on_close() -> void:
 	close_requested.emit()
+
+
+func _is_online() -> bool:
+	return online_request.is_valid()
+
+
+## 线上应答 → 规则返回值；失败已写状态栏并返回 {}（调用方直接 return）。
+func _online_result(reply: Dictionary) -> Dictionary:
+	if reply.is_empty():
+		status_label.text = "操作未完成：连接中断或超时，稍后重试。"
+		return {}
+	if str(reply.get("t", "")) == "req_err":
+		status_label.text = str(reply.get("msg", "操作失败"))
+		return {}
+	var result: Variant = reply.get("result", null)
+	return result if result is Dictionary else {}
 
 
 func _panel(fill: Color, border: Color, radius: int) -> PanelContainer:

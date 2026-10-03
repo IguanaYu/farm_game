@@ -16,6 +16,8 @@ const GOOD_GREEN := Color("#3f7048")
 
 var game: FarmGame
 var crafting: CraftingGame
+## M2：线上命令口（farm_hud.open_crafting 注入；空 Callable = 单机直改本地档）。
+var online_request: Callable = Callable()
 var status_label: Label
 var recipes_column: VBoxContainer
 var upgrades_column: VBoxContainer
@@ -108,6 +110,8 @@ func _section(parent: HBoxContainer, title: String, width: int) -> VBoxContainer
 
 
 func _refresh() -> void:
+	## 快照会整体替换 game.state，长持有的绑定会变悬空：每次刷新先重绑（M2 实测坑）。
+	crafting.bind(game)
 	coins_label.text = "金币 %d ｜ 制作台" % int(game.state["coins"])
 	var pending: Array = crafting._crafting().get("pending_items", [])
 	if pending.is_empty():
@@ -220,41 +224,87 @@ func _refresh_goals() -> void:
 
 
 func _on_craft(recipe_id: String) -> void:
-	var result := crafting.craft(recipe_id)
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("craft.craft", {"recipe_id": recipe_id})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+	else:
+		result = crafting.craft(recipe_id)
 	if result["ok"]:
 		var name_text: String = CraftingDefs.RECIPES[recipe_id]["name"]
 		status_label.text = "制作了 %s%s。" % [name_text, "（仓库分区已满，进待领取区）" if result["to_pending"] else ""]
-		save_requested.emit()
+		if not _is_online():
+			save_requested.emit()
 	else:
 		status_label.text = result["reason"]
 	_refresh()
 
 
 func _on_upgrade(upgrade_id: String) -> void:
-	var result := crafting.buy_upgrade(upgrade_id)
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("craft.buy_upgrade", {"upgrade_id": upgrade_id})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+	else:
+		result = crafting.buy_upgrade(upgrade_id)
 	status_label.text = "升级完成，容量/布局立即生效。" if result["ok"] else result["reason"]
-	if result["ok"]:
+	if result["ok"] and not _is_online():
 		save_requested.emit()
 	_refresh()
 
 
 func _on_claim_pending() -> void:
-	var result := crafting.claim_pending()
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("craft.claim_pending", {})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+	else:
+		result = crafting.claim_pending()
 	status_label.text = "领取 %d 件入仓，剩 %d 件待整理。" % [int(result["moved"]), int(result["remaining"])]
-	save_requested.emit()
+	if not _is_online():
+		save_requested.emit()
 	_refresh()
 
 
 func _on_claim_goal(goal_id: String) -> void:
-	var result := crafting.claim_goal(goal_id)
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("craft.claim_goal", {"goal_id": goal_id})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+	else:
+		result = crafting.claim_goal(goal_id)
 	status_label.text = "奖励已发放（物品入仓或待领取区）。" if result["ok"] else result["reason"]
-	if result["ok"]:
+	if result["ok"] and not _is_online():
 		save_requested.emit()
 	_refresh()
 
 
 func _on_close() -> void:
 	close_requested.emit()
+
+
+func _is_online() -> bool:
+	return online_request.is_valid()
+
+
+## 线上应答 → 规则返回值；失败已写状态栏并返回 {}（调用方直接 return）。
+func _online_result(reply: Dictionary) -> Dictionary:
+	if reply.is_empty():
+		status_label.text = "操作未完成：连接中断或超时，稍后重试。"
+		return {}
+	if str(reply.get("t", "")) == "req_err":
+		status_label.text = str(reply.get("msg", "操作失败"))
+		return {}
+	var result: Variant = reply.get("result", null)
+	return result if result is Dictionary else {}
 
 
 func _panel(fill: Color, border: Color, radius: int) -> PanelContainer:

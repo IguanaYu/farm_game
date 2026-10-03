@@ -19,6 +19,7 @@ var _runtimes := {}  # account_id -> _Runtime
 class _Runtime:
 	var farm: FarmGame
 	var crafting: CraftingGame
+	var inventory: InventoryGame
 	var seq := 0
 
 
@@ -58,6 +59,7 @@ func load_runtime(account_id: int) -> _Runtime:
 			push_error("账户 %d 登录结算落库失败" % account_id)
 			return null
 	runtime.crafting = _bind_crafting(runtime.farm)
+	runtime.inventory = _bind_inventory(runtime.farm)
 	_runtimes[account_id] = runtime
 	return runtime
 
@@ -164,6 +166,14 @@ func _bind_crafting(farm: FarmGame) -> CraftingGame:
 	return crafting
 
 
+## InventoryGame 绑定的是 state["expedition"] 字典本身；快照/换档会整体替换 state，
+## 每次装载/换入候选副本后必须重绑，否则会在游离字典上改动（M2 实测坑，勿省）。
+func _bind_inventory(farm: FarmGame) -> InventoryGame:
+	var inventory := InventoryGame.new()
+	inventory.bind(farm.state["expedition"])
+	return inventory
+
+
 ## 候选副本：深拷贝当前档 → 独立 FarmGame/CraftingGame；提交成功前不碰正式副本。
 func _build_candidate(runtime: _Runtime) -> _Runtime:
 	var candidate := _Runtime.new()
@@ -171,6 +181,7 @@ func _build_candidate(runtime: _Runtime) -> _Runtime:
 	if not candidate.farm.load_state(runtime.farm.state.duplicate(true)):
 		return null
 	candidate.crafting = _bind_crafting(candidate.farm)
+	candidate.inventory = _bind_inventory(candidate.farm)
 	return candidate
 
 
@@ -184,6 +195,40 @@ func _command_table() -> Dictionary:
 		"farm.fertilize": {"feature": OnlineProtocol.FEATURE_FARM_BASIC, "run": _cmd_fertilize},
 		"farm.harvest": {"feature": OnlineProtocol.FEATURE_FARM_BASIC, "run": _cmd_harvest},
 		"farm.harvest_all": {"feature": OnlineProtocol.FEATURE_FARM_BASIC, "run": _cmd_harvest_all},
+		"farm.buy_seeds": {"feature": OnlineProtocol.FEATURE_FARM_SHOP, "run": _cmd_buy_seeds},
+		"farm.buy_fertilizer": {"feature": OnlineProtocol.FEATURE_FARM_SHOP, "run": _cmd_buy_fertilizer},
+		"farm.upgrade_shop": {"feature": OnlineProtocol.FEATURE_FARM_SHOP, "run": _cmd_upgrade_shop},
+		"farm.buy_can2": {"feature": OnlineProtocol.FEATURE_FARM_SHOP, "run": _cmd_buy_can2},
+		"farm.buy_plot": {"feature": OnlineProtocol.FEATURE_FARM_SHOP, "run": _cmd_buy_plot},
+		"farm.upgrade_warehouse": {"feature": OnlineProtocol.FEATURE_FARM_SHOP, "run": _cmd_upgrade_warehouse},
+		"farm.recycle_seed": {"feature": OnlineProtocol.FEATURE_FARM_BREEDING, "run": _cmd_recycle_seed},
+		"farm.recycle_pending_seed": {"feature": OnlineProtocol.FEATURE_FARM_BREEDING, "run": _cmd_recycle_pending_seed},
+		"farm.claim_pending": {"feature": OnlineProtocol.FEATURE_FARM_BREEDING, "run": _cmd_claim_pending},
+		"farm.buy_breeder": {"feature": OnlineProtocol.FEATURE_FARM_BREEDING, "run": _cmd_buy_breeder},
+		"farm.upgrade_breeder": {"feature": OnlineProtocol.FEATURE_FARM_BREEDING, "run": _cmd_upgrade_breeder},
+		"farm.set_breeder_template": {"feature": OnlineProtocol.FEATURE_FARM_BREEDING, "run": _cmd_set_breeder_template},
+		"farm.clear_breeder_template": {"feature": OnlineProtocol.FEATURE_FARM_BREEDING, "run": _cmd_clear_breeder_template},
+		"farm.collect_breeder": {"feature": OnlineProtocol.FEATURE_FARM_BREEDING, "run": _cmd_collect_breeder},
+		"farm.sell_batch": {"feature": OnlineProtocol.FEATURE_FARM_MARKET, "run": _cmd_sell_batch},
+		"farm.sell_all_batches": {"feature": OnlineProtocol.FEATURE_FARM_MARKET, "run": _cmd_sell_all_batches},
+		"farm.sell_pending_crop": {"feature": OnlineProtocol.FEATURE_FARM_MARKET, "run": _cmd_sell_pending_crop},
+		"farm.lock_guest": {"feature": OnlineProtocol.FEATURE_FARM_MARKET, "run": _cmd_lock_guest},
+		"farm.lock_formula": {"feature": OnlineProtocol.FEATURE_FARM_MARKET, "run": _cmd_lock_formula},
+		"farm.unlock_formula": {"feature": OnlineProtocol.FEATURE_FARM_MARKET, "run": _cmd_unlock_formula},
+		"farm.sell_batch_to": {"feature": OnlineProtocol.FEATURE_FARM_MARKET, "run": _cmd_sell_batch_to},
+		"craft.craft": {"feature": OnlineProtocol.FEATURE_FARM_CRAFT, "run": _cmd_craft},
+		"craft.claim_pending": {"feature": OnlineProtocol.FEATURE_FARM_CRAFT, "run": _cmd_craft_claim_pending},
+		"craft.buy_upgrade": {"feature": OnlineProtocol.FEATURE_FARM_CRAFT, "run": _cmd_craft_buy_upgrade},
+		"craft.claim_goal": {"feature": OnlineProtocol.FEATURE_FARM_CRAFT, "run": _cmd_craft_claim_goal},
+		"craft.sell_instance": {"feature": OnlineProtocol.FEATURE_FARM_CRAFT, "run": _cmd_craft_sell_instance},
+		"inv.move_to_loadout": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_move_to_loadout},
+		"inv.move_to_warehouse": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_move_to_warehouse},
+		"inv.place_at": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_place_at},
+		"inv.rotate": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_rotate},
+		"inv.auto_tidy": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_auto_tidy},
+		"inv.clear_loadout": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_clear_loadout},
+		"inv.grant_basic_kit": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_grant_basic_kit},
+		"inv.apply_preset": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_apply_preset},
 	}
 
 
@@ -224,6 +269,197 @@ func _cmd_harvest_all(candidate: _Runtime, _args: Dictionary, now_s: int) -> Dic
 	return {"ok": bool(result.get("ok", false)), "reason": "现在没有成熟的地块。", "result": result}
 
 
+# —— M2：商店/扩地/升级 ————————————————————————————————————————
+
+func _cmd_buy_seeds(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var message: String = candidate.farm.buy_seeds(_arg_int(args, "quantity", 1), str(args.get("kind", "cabbage")))
+	return {"ok": message == "", "reason": message, "result": message}
+
+
+func _cmd_buy_fertilizer(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var message: String = candidate.farm.buy_fertilizer(str(args.get("kind", "")), _arg_int(args, "quantity", 1))
+	return {"ok": message == "", "reason": message, "result": message}
+
+
+func _cmd_upgrade_shop(candidate: _Runtime, _args: Dictionary, _now_s: int) -> Dictionary:
+	var message: String = candidate.farm.upgrade_shop()
+	return {"ok": message == "", "reason": message, "result": message}
+
+
+func _cmd_buy_can2(candidate: _Runtime, _args: Dictionary, _now_s: int) -> Dictionary:
+	var message: String = candidate.farm.buy_can2()
+	return {"ok": message == "", "reason": message, "result": message}
+
+
+func _cmd_buy_plot(candidate: _Runtime, _args: Dictionary, _now_s: int) -> Dictionary:
+	var message: String = candidate.farm.buy_plot()
+	return {"ok": message == "", "reason": message, "result": message}
+
+
+func _cmd_upgrade_warehouse(candidate: _Runtime, _args: Dictionary, _now_s: int) -> Dictionary:
+	var message: String = candidate.farm.upgrade_warehouse()
+	return {"ok": message == "", "reason": message, "result": message}
+
+
+# —— M2：育种机/回收/待领取 ——————————————————————————————————————
+
+func _cmd_recycle_seed(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.farm.recycle_seed(_arg_int(args, "seed_id"))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("message", "")), "result": result}
+
+
+func _cmd_recycle_pending_seed(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.farm.recycle_pending_seed(_arg_int(args, "seed_id"))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("message", "")), "result": result}
+
+
+func _cmd_claim_pending(candidate: _Runtime, _args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.farm.claim_pending()
+	return {"ok": true, "reason": "", "result": result}
+
+
+func _cmd_buy_breeder(candidate: _Runtime, _args: Dictionary, now_s: int) -> Dictionary:
+	var message: String = candidate.farm.buy_breeder(now_s)
+	return {"ok": message == "", "reason": message, "result": message}
+
+
+func _cmd_upgrade_breeder(candidate: _Runtime, _args: Dictionary, _now_s: int) -> Dictionary:
+	var message: String = candidate.farm.upgrade_breeder()
+	return {"ok": message == "", "reason": message, "result": message}
+
+
+func _cmd_set_breeder_template(candidate: _Runtime, args: Dictionary, now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.farm.set_breeder_template(_arg_int(args, "seed_id"), now_s)
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("message", "")), "result": result}
+
+
+func _cmd_clear_breeder_template(candidate: _Runtime, _args: Dictionary, now_s: int) -> Dictionary:
+	var message: String = candidate.farm.clear_breeder_template(now_s)
+	return {"ok": message == "", "reason": message, "result": message}
+
+
+func _cmd_collect_breeder(candidate: _Runtime, _args: Dictionary, now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.farm.collect_breeder(now_s)
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("message", "")), "result": result}
+
+
+# —— M2：市场出售/锁定 ————————————————————————————————————————————
+
+func _cmd_sell_batch(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.farm.sell_batch(_arg_int(args, "batch_id"))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("message", "")), "result": result}
+
+
+func _cmd_sell_all_batches(candidate: _Runtime, _args: Dictionary, _now_s: int) -> Dictionary:
+	## 规则返回裸整数（总收益）；JSON 往返会变浮点，客户端 _finish 处取整。
+	var earned: int = candidate.farm.sell_all_batches()
+	return {"ok": true, "reason": "", "result": earned}
+
+
+func _cmd_sell_pending_crop(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.farm.sell_pending_crop(_arg_int(args, "batch_id"))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("message", "")), "result": result}
+
+
+func _cmd_lock_guest(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	## guest_id=0 即解锁客人位（镜像 farm_world._on_unlock_guest_requested）。
+	var message: String = candidate.farm.request_lock_guest(_arg_int(args, "guest_id"))
+	return {"ok": message == "", "reason": message, "result": message}
+
+
+func _cmd_lock_formula(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var message: String = candidate.farm.request_lock_formula(str(args.get("kind", "")))
+	return {"ok": message == "", "reason": message, "result": message}
+
+
+func _cmd_unlock_formula(candidate: _Runtime, _args: Dictionary, _now_s: int) -> Dictionary:
+	var message: String = candidate.farm.request_unlock_formula()
+	return {"ok": message == "", "reason": message, "result": message}
+
+
+func _cmd_sell_batch_to(candidate: _Runtime, args: Dictionary, now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.farm.sell_batch_to(
+		_arg_int(args, "batch_id"), _arg_int(args, "count", 1), _arg_int(args, "guest_id"), now_s
+	)
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("message", "")), "result": result}
+
+
+# —— M2：制作/设施/目标 ————————————————————————————————————————————
+
+func _cmd_craft(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.crafting.craft(str(args.get("recipe_id", "")))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_craft_claim_pending(candidate: _Runtime, _args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.crafting.claim_pending()
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_craft_buy_upgrade(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.crafting.buy_upgrade(str(args.get("upgrade_id", "")))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_craft_claim_goal(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.crafting.claim_goal(str(args.get("goal_id", "")))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_craft_sell_instance(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.crafting.sell_instance(str(args.get("def_id", "")))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+# —— M2：装备仓库与战备 ————————————————————————————————————————————
+
+func _cmd_inv_move_to_loadout(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.inventory.move_to_loadout(_arg_int(args, "instance_id"), str(args.get("container", "")))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_inv_move_to_warehouse(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.inventory.move_to_warehouse(_arg_int(args, "instance_id"))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_inv_place_at(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var cell: Dictionary = args.get("cell", {}) if args.get("cell") is Dictionary else {}
+	var result: Dictionary = candidate.inventory.place_at(
+		_arg_int(args, "instance_id"), str(args.get("container", "")),
+		Vector2i(_arg_int(cell, "x"), _arg_int(cell, "y")), bool(args.get("rotated", false))
+	)
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_inv_rotate(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.inventory.rotate_instance(_arg_int(args, "instance_id"))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_inv_auto_tidy(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.inventory.auto_tidy(str(args.get("container", "")))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_inv_clear_loadout(candidate: _Runtime, _args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.inventory.clear_loadout()
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_inv_grant_basic_kit(candidate: _Runtime, _args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.inventory.grant_basic_kit()
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_inv_apply_preset(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	## 配装预设应用＝多件精确放置的复合操作，客户端逐件发命令不原子；
+	## 预设本体是本机 QoL（PresetStore 不上传），应用走服务器单命令原子复原。
+	var preset: Variant = args.get("preset", {})
+	var result: Dictionary = LoadoutPresets.apply(candidate.inventory, preset if preset is Dictionary else {})
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
 ## 命令成功后的服务器侧联动（镜像 farm_world：教程推进 + 收获进成长统计）。
 ## M2 扩 sell/craft/inventory 步；M1 只覆盖 farm_basic。
 func _post_hooks(op: String, result: Variant, candidate: _Runtime) -> void:
@@ -248,6 +484,10 @@ func _post_hooks(op: String, result: Variant, candidate: _Runtime) -> void:
 					_record_harvest(entry, candidate.crafting)
 			if step == 2:
 				candidate.farm.state["tutorial_step"] = 3
+		"farm.sell_batch", "farm.sell_all_batches", "farm.sell_batch_to":
+			## 镜像 farm_world：出售成功且正处第 3 步时推进（3→4；第 4 步再播种即完成引导）。
+			if step == 3:
+				candidate.farm.state["tutorial_step"] = 4
 	return
 
 
@@ -259,7 +499,7 @@ func _record_harvest(harvest_result: Dictionary, crafting: CraftingGame) -> void
 
 
 ## JSON 数字解析为 float，统一安全取整；非法值回退 0（域层再拒绝）。
-static func _arg_int(args: Dictionary, key: String) -> int:
+static func _arg_int(args: Dictionary, key: String, fallback := 0) -> int:
 	var value: Variant = args.get(key, null)
 	if value is float:
 		return int(value)
@@ -267,4 +507,4 @@ static func _arg_int(args: Dictionary, key: String) -> int:
 		return value
 	if value is String and value.is_valid_int():
 		return int(value)
-	return 0
+	return fallback

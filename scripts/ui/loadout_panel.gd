@@ -50,6 +50,8 @@ const CATEGORY_COLOR := {
 
 var game: FarmGame
 var inventory: InventoryGame
+## M2：线上命令口（farm_hud.open_loadout 注入；空 Callable = 单机直改本地档）。
+var online_request: Callable = Callable()
 var selected_instance_id := -1
 var filter := "all"
 var dirty := false
@@ -254,7 +256,14 @@ func _build_container_box(container: String) -> VBoxContainer:
 
 
 func _on_drop_into_container(data: Dictionary, container: String) -> void:
-	var result := inventory.move_to_loadout(int(data["instance_id"]), container)
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("inv.move_to_loadout", {"instance_id": int(data["instance_id"]), "container": container})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+	else:
+		result = inventory.move_to_loadout(int(data["instance_id"]), container)
 	if result["ok"]:
 		dirty = true
 		_flash("已放入%s（拖放）。" % ExpeditionBaseline.CONTAINER_DISPLAY[container])
@@ -264,7 +273,14 @@ func _on_drop_into_container(data: Dictionary, container: String) -> void:
 
 
 func _on_auto_tidy(container: String) -> void:
-	var result := inventory.auto_tidy(container)
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("inv.auto_tidy", {"container": container})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+	else:
+		result = inventory.auto_tidy(container)
 	if result["ok"]:
 		dirty = true
 		_flash("已整理%s（容器归属不变）。" % ExpeditionBaseline.CONTAINER_DISPLAY[container])
@@ -288,7 +304,14 @@ func _section(parent: VBoxContainer, title: String) -> VBoxContainer:
 
 
 func _on_grant_kit() -> void:
-	var result := inventory.grant_basic_kit()
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("inv.grant_basic_kit", {})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+	else:
+		result = inventory.grant_basic_kit()
 	dirty = true
 	if result["granted"].is_empty():
 		_flash("基础装备已齐，无需补领。")
@@ -301,13 +324,21 @@ func _on_grant_kit() -> void:
 
 
 func _on_inject_demo() -> void:
+	if _is_online():
+		_flash("演示内容不在线上模式开放。")
+		return
 	var result := inventory.inject_demo_items()
 	_flash("演示物品已放入仓库（带“演示”标记，关闭面板即弃，不会存档）。")
 	_refresh()
 
 
 func _on_clear_loadout() -> void:
-	inventory.clear_loadout()
+	if _is_online():
+		var reply: Dictionary = await online_request.call("inv.clear_loadout", {})
+		if _online_result(reply).is_empty():
+			return
+	else:
+		inventory.clear_loadout()
 	dirty = true
 	selected_instance_id = -1
 	_flash("已把全部物品放回仓库。")
@@ -317,7 +348,14 @@ func _on_clear_loadout() -> void:
 func _on_rotate() -> void:
 	if selected_instance_id < 0:
 		return
-	var result := inventory.rotate_instance(selected_instance_id)
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("inv.rotate", {"instance_id": selected_instance_id})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+	else:
+		result = inventory.rotate_instance(selected_instance_id)
 	if result["ok"]:
 		dirty = true
 		_flash("已旋转（占格与牌数不变）。")
@@ -329,7 +367,14 @@ func _on_rotate() -> void:
 func _on_put_back() -> void:
 	if selected_instance_id < 0:
 		return
-	var result := inventory.move_to_warehouse(selected_instance_id)
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("inv.move_to_warehouse", {"instance_id": selected_instance_id})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+	else:
+		result = inventory.move_to_warehouse(selected_instance_id)
 	if result["ok"]:
 		dirty = true
 		_flash("已放回仓库。")
@@ -348,7 +393,14 @@ func _on_container_clicked(container: String) -> void:
 	if selected_instance_id < 0:
 		_flash("先在左侧仓库选中一件物品。")
 		return
-	var result := inventory.move_to_loadout(selected_instance_id, container)
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("inv.move_to_loadout", {"instance_id": selected_instance_id, "container": container})
+		result = _online_result(reply)
+		if result.is_empty():
+			return
+	else:
+		result = inventory.move_to_loadout(selected_instance_id, container)
 	if result["ok"]:
 		dirty = true
 		_flash("已放入%s。" % ExpeditionBaseline.CONTAINER_DISPLAY[container])
@@ -369,6 +421,22 @@ func _unhandled_key_input(event: InputEvent) -> void:
 
 func _on_close() -> void:
 	close_requested.emit()
+
+
+func _is_online() -> bool:
+	return online_request.is_valid()
+
+
+## 线上应答 → 规则返回值；失败已提示并返回 {}（调用方直接 return）。
+func _online_result(reply: Dictionary) -> Dictionary:
+	if reply.is_empty():
+		_flash("操作未完成：连接中断或超时，稍后重试。")
+		return {}
+	if str(reply.get("t", "")) == "req_err":
+		_flash(str(reply.get("msg", "操作失败")))
+		return {}
+	var result: Variant = reply.get("result", null)
+	return result if result is Dictionary else {}
 
 
 func _flash(message: String) -> void:
@@ -420,7 +488,14 @@ func apply_selected() -> Dictionary:
 		_flash("先在预设列表选中一套。")
 		return {"ok": false, "reason": "未选中预设"}
 	var preset: Dictionary = presets[index]
-	var result := LoadoutPresets.apply(inventory, preset)
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("inv.apply_preset", {"preset": preset})
+		result = _online_result(reply)
+		if result.is_empty():
+			return result
+	else:
+		result = LoadoutPresets.apply(inventory, preset)
 	if result["ok"]:
 		dirty = true
 		selected_instance_id = -1
@@ -469,6 +544,8 @@ func _refresh_presets(select_name: String = "") -> void:
 
 
 func _refresh() -> void:
+	## 快照会整体替换 game.state，长持有的 expedition 绑定会变悬空：每次刷新先重绑。
+	inventory.bind(game.state["expedition"])
 	_refresh_stats()
 	_refresh_warehouse()
 	for container in ExpeditionBaseline.CONTAINERS:
