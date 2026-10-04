@@ -26,6 +26,7 @@ var features: Array = [
 	OnlineProtocol.FEATURE_FARM_CRAFT,
 	OnlineProtocol.FEATURE_FARM_INVENTORY,
 	OnlineProtocol.FEATURE_EXPEDITION,
+	OnlineProtocol.FEATURE_VISIT,
 ]
 var dev_mode := false
 ## M4 运维（O02/O03/O04）：维护文件、错误计数、启动时刻。
@@ -38,6 +39,7 @@ var store: ServerDB
 var auth: AuthService
 var farms: FarmService
 var rooms: RoomService
+var visits: VisitService
 var peer := WebSocketMultiplayerPeer.new()
 var listening := false
 ## 4.6 的 WebSocketMultiplayerPeer 无 get_peer_list，用信号自维护在线表。
@@ -89,6 +91,11 @@ func _ready() -> void:
 	rooms.features = features
 	rooms.send = _reply
 	rooms.restore()
+	visits = VisitService.new()
+	visits.store = store
+	visits.auth = auth
+	visits.features = features
+	visits.visits_open = not _visits_closed
 	if not _listen_tls():
 		quit_now(4)
 		return
@@ -147,6 +154,7 @@ var _invite_mode := false
 var _invite_count := 0
 var _status_mode := false
 var _backup_dir := ""
+var _visits_closed := false
 var _invite_note := ""
 var _dev_time_shift := 0
 var _cert_paths: Array = []
@@ -184,6 +192,7 @@ func _read_args() -> void:
 	maintenance_path = _arg_value(args, "--maintenance-file")
 	_backup_dir = _arg_value(args, "--backup")
 	_status_mode = "--status" in args
+	_visits_closed = "--visits-closed" in args
 	_invite_mode = invite_s != ""
 	_invite_count = int(invite_s) if invite_s != "" else 0
 	dev_mode = "--dev" in args
@@ -338,6 +347,9 @@ func _cmd_req(pid: int, msg: Dictionary) -> void:
 	if rooms.is_expedition_op(op):
 		## M3：房间/洞窟命令走房间服务（含收据去重与推送）。
 		reply = rooms.handle(account_id, auth.nick_of(account_id), str(msg.get("req_id", "")), op, args)
+	elif visits.is_visit_op(op):
+		## R7：拜访命令走只读邻里服务（无收据、零副作用）。
+		reply = visits.handle(account_id, str(msg.get("req_id", "")), op, args)
 	else:
 		reply = farms.execute(account_id, str(msg.get("req_id", "")), op, args)
 	_reply(pid, reply)

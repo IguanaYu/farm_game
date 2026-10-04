@@ -124,6 +124,9 @@ var online_bridge: OnlineFarmBridge = null
 var location_router: Callable = Callable()
 var online_room_panel: OnlineRoomPanel = null
 var online_run_panel: OnlineRunPanel = null
+var online_visit_panel: OnlineVisitPanel = null
+## R7：拜访模式——只读参观，拦截一切自身操作（资产隔离红线）。
+var visiting := false
 ## ESC 暂停菜单：所有面板收起时才允许弹出；卡片内分主视图与设置子视图两页。
 var pause_overlay: Control
 var pause_back_button: Button
@@ -259,13 +262,41 @@ func set_online_status(text: String, is_online: bool) -> void:
 	online_badge.add_theme_color_override("font_color", Color("#2e7d4f") if is_online else Color("#b0623a"))
 
 
+## R7：拜访入口选中（地址簿回调）。
+signal visit_enter_requested(owner: Dictionary, farm: Dictionary)
+
+
 func _online_blocked(hint: String) -> bool:
-	## M1：依赖本地权威档/本地局的入口在线上模式一律拦截（F09）。
+	## M1：依赖本地权威档/本地局的入口在线上模式一律拦截（F09）；
+	## R7：拜访模式同样拦截（只读参观，资产隔离红线）。
+	if visiting:
+		if status_label != null:
+			show_status("拜访中不能操作，先回自己的农场。")
+		return true
 	if not online_mode:
 		return false
 	if status_label != null:
 		show_status(hint)
 	return true
+
+
+## R7：拜访门控开关。
+func set_visiting(on: bool) -> void:
+	visiting = on
+
+
+## R7：地址簿入口（信箱/小桥/邻里房屋）。
+func open_visit_directory() -> void:
+	if online_bridge == null:
+		show_status("线上功能不可用，请重新登录。")
+		return
+	_close_modal()
+	online_visit_panel.open(online_bridge)
+
+
+func _on_visit_requested(owner: Dictionary, farm: Dictionary) -> void:
+	online_visit_panel.close()
+	visit_enter_requested.emit(owner, farm)
 
 
 func open_shop() -> void:
@@ -1570,6 +1601,11 @@ func _build_expedition_panels() -> void:
 	online_run_panel.name = "OnlineRunPanel"
 	online_run_panel.close_requested.connect(_on_online_run_panel_closed)
 	add_child(online_run_panel)
+	online_visit_panel = OnlineVisitPanel.new()
+	online_visit_panel.name = "OnlineVisitPanel"
+	online_visit_panel.close_requested.connect(func() -> void: online_visit_panel.close())
+	online_visit_panel.visit_requested.connect(_on_visit_requested)
+	add_child(online_visit_panel)
 
 
 func open_crafting() -> void:

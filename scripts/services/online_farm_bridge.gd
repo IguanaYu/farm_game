@@ -24,6 +24,8 @@ var _bootstrapped := false
 var mirror_run := {}
 var mirror_run_version := 0
 var mirror_room := {}
+## R7：当前拜访的家园（空=未拜访；{owner, farm}）。
+var visiting := {}
 
 
 func begin(url: String, token: String) -> void:
@@ -188,6 +190,24 @@ func depart_solo() -> Dictionary:
 	var reply: Dictionary = await request("run.depart_solo", {})
 	_absorb_run(reply)
 	return reply
+
+
+# —— R7 拜访命令面（只读） ——————————————————————————————————————
+
+
+func visit_list() -> Dictionary:
+	return await request("visit.list", {})
+
+
+func visit_snapshot(account_id: int) -> Dictionary:
+	var reply: Dictionary = await request("visit.snapshot", {"account_id": account_id})
+	if str(reply.get("t", "")) == "req_ok" and reply.get("result", {}) is Dictionary:
+		visiting = reply["result"]
+	return reply
+
+
+func leave_visit() -> void:
+	visiting = {}
 
 
 ## 局内动作（供 map/battle/loot 的 sink 调用）：返回规则结果字典；

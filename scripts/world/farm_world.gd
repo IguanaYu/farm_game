@@ -61,6 +61,9 @@ var context: GameContext = null
 ## R2：地点路由与地点根——农场 3D 全部挂 FarmLocation 下，切换=该节点可见性（不重建）。
 var router: SceneRouter = null
 var farm_location: Node3D = null
+## R7：拜访地点（运行时按目标家园重建内容；null=未拜访）。
+var visit_yard: Node3D = null
+var visit_house: Node3D = null
 
 
 func _ready() -> void:
@@ -82,6 +85,7 @@ func _on_context_ready() -> void:
 	_setup_router()
 	_build_hud()
 	hud.location_router = Callable(router, "switch_to")
+	hud.visit_enter_requested.connect(enter_visit)
 	if online != null:
 		hud.set_online_mode(true)
 		hud.online_request = Callable(online, "request")
@@ -885,7 +889,293 @@ func _build_neighbor_entry() -> void:
 func _on_neighbor_entry_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		AudioKit.play(self, "ui_click")
-		hud.show_status("好友拜访将在后续版本开放（设计稿 §7）。")
+		if online == null:
+			hud.show_status("好友拜访是联机玩法，请从主菜单进入线上农场。")
+			return
+		hud.open_visit_directory()
+
+
+## —— R7 拜访（稿 §7）—————————————————————————————————————————————
+
+## 拜访入口：地址簿选中后建院子并切换。owner/farm 来自 visit.snapshot（只读）。
+func enter_visit(owner: Dictionary, farm_state: Dictionary) -> void:
+	_clear_visit_locations()
+	visit_yard = _build_visit_yard(owner, farm_state)
+	visit_house = _build_visit_house(owner)
+	add_child(visit_yard)
+	add_child(visit_house)
+	_set_location_physics(visit_yard, false)
+	_set_location_physics(visit_house, false)
+	router.register("visit_yard", visit_yard)
+	router.register("visit_house", visit_house)
+	hud.set_visiting(true)
+	router.switch_to("visit_yard", false)
+	hud.show_status("正在拜访 %s 的家园（只读参观）。" % str(owner.get("nick", "邻居")))
+
+
+func _clear_visit_locations() -> void:
+	if visit_yard != null:
+		router._locations.erase("visit_yard")
+		router._locations.erase("visit_house")
+		if str(router.current) in ["visit_yard", "visit_house"]:
+			router.current = "farm"
+		visit_yard.queue_free()
+		visit_house.queue_free()
+		visit_yard = null
+		visit_house = null
+
+
+## 院子（稿 §7）：复用农场视觉模板的只读变体——地块按主人状态渲染（不可交互）、
+## 房子（点击进小屋）、屋顶色与房名牌即主人身份、花藤院门（回自己农场）。
+func _build_visit_yard(owner: Dictionary, farm_state: Dictionary) -> Node3D:
+	var yard := Node3D.new()
+	yard.name = "VisitYard"
+	yard.visible = false
+	var cam := Camera3D.new()
+	cam.name = "VisitYardCamera"
+	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	cam.size = 14.6
+	cam.position = Vector3(9.4, 12.0, 15.2)
+	yard.add_child(cam)
+	cam.look_at_from_position(cam.position, Vector3(0, 0, 0), Vector3.UP)
+	var ground := MeshInstance3D.new()
+	ground.name = "YardGround"
+	var ground_box := BoxMesh.new()
+	ground_box.size = Vector3(20.0, 0.18, 14.0)
+	ground.mesh = ground_box
+	var ground_mat := StandardMaterial3D.new()
+	ground_mat.albedo_color = Color("#77a75a")
+	ground_mat.roughness = 1.0
+	ground.material_override = ground_mat
+	ground.position = Vector3(0, -0.08, 0)
+	yard.add_child(ground)
+	var plots: Array = farm_state.get("plots", [])
+	var owned: Array = farm_state.get("owned_plot_ids", [1, 2, 3])
+	for plot_id in range(1, mini(plots.size(), FarmGame.MAX_PLOTS) + 1):
+		var column := (plot_id - 1) % 5
+		var row := (plot_id - 1) / 5
+		var slot := Node3D.new()
+		slot.name = "VisitPlot_%02d" % plot_id
+		slot.position = Vector3((column - 2) * 2.85, 0.08, (row - 0.5) * 2.85)
+		yard.add_child(slot)
+		if not owned.has(plot_id):
+			continue
+		var plot: Dictionary = plots[plot_id - 1]
+		var model: PackedScene = PLOT_EMPTY
+		if int(plot.get("seed_id", 0)) != 0:
+			var kind := str(plot.get("kind", "cabbage"))
+			var stage := "growing"
+			if _now() >= int(plot.get("ready_at", 0)):
+				stage = "mature"
+			var stages: Dictionary = STAGE_MODELS.get(kind, {})
+			if stages.has(stage):
+				model = stages[stage]
+		var appearance := model.instantiate()
+		appearance.name = "VisitCrop"
+		slot.add_child(appearance)
+	var house := StaticBody3D.new()
+	house.name = "VisitHouse"
+	house.position = Vector3(0.0, 0.6, -4.2)
+	house.input_ray_pickable = true
+	var house_hit := CollisionShape3D.new()
+	var house_shape := BoxShape3D.new()
+	house_shape.size = Vector3(2.6, 2.4, 2.2)
+	house_hit.shape = house_shape
+	house.add_child(house_hit)
+	var body_mesh := MeshInstance3D.new()
+	var body_box := BoxMesh.new()
+	body_box.size = Vector3(2.6, 2.0, 2.2)
+	body_mesh.mesh = body_box
+	var body_mat := StandardMaterial3D.new()
+	body_mat.albedo_color = Color("#e7d7b8")
+	body_mesh.material_override = body_mat
+	body_mesh.position.y = -0.5
+	house.add_child(body_mesh)
+	var roof := MeshInstance3D.new()
+	roof.name = "VisitRoof"
+	var roof_mesh := PrismMesh.new()
+	roof_mesh.size = Vector3(3.0, 1.2, 2.6)
+	roof.mesh = roof_mesh
+	var roof_mat := StandardMaterial3D.new()
+	roof_mat.albedo_color = Color("#a4543f")
+	roof.material_override = roof_mat
+	roof.position.y = 1.6
+	house.add_child(roof)
+	house.set_meta("owner_nick", str(owner.get("nick", "邻居")))
+	house.input_event.connect(_on_visit_house_input)
+	yard.add_child(house)
+	var gate := StaticBody3D.new()
+	gate.name = "VisitGate"
+	gate.position = Vector3(-8.2, 0.9, 3.4)
+	gate.input_ray_pickable = true
+	var gate_hit := CollisionShape3D.new()
+	var gate_shape := BoxShape3D.new()
+	gate_shape.size = Vector3(1.4, 2.0, 0.3)
+	gate_hit.shape = gate_shape
+	gate.add_child(gate_hit)
+	var gate_mesh := MeshInstance3D.new()
+	var gate_box := BoxMesh.new()
+	gate_box.size = Vector3(1.4, 2.0, 0.24)
+	gate_mesh.mesh = gate_box
+	var gate_mat := StandardMaterial3D.new()
+	gate_mat.albedo_color = Color("#7d5a3a")
+	gate_mesh.material_override = gate_mat
+	gate.add_child(gate_mesh)
+	for vine in [-0.5, 0.0, 0.5]:
+		var flower := MeshInstance3D.new()
+		var flower_mesh := SphereMesh.new()
+		flower_mesh.radius = 0.14
+		flower_mesh.height = 0.2
+		flower.mesh = flower_mesh
+		var flower_mat := StandardMaterial3D.new()
+		flower_mat.albedo_color = Color("#c77fa8")
+		flower_mat.emission_enabled = true
+		flower_mat.emission = Color("#c77fa8")
+		flower_mat.emission_energy_multiplier = 0.35
+		flower.material_override = flower_mat
+		flower.position = Vector3(vine, 0.7 + 0.3 * absf(sin(vine * 6.0)), 0.16)
+		gate.add_child(flower)
+	gate.input_event.connect(_on_visit_gate_input)
+	yard.add_child(gate)
+	return yard
+
+
+## 小屋（稿 §7）：切墙内景——主人形象、茶桌、留言板（固定欢迎语模板）、门与窗（回院子）。
+func _build_visit_house(owner: Dictionary) -> Node3D:
+	var house := Node3D.new()
+	house.name = "VisitHouseInterior"
+	house.visible = false
+	var cam := Camera3D.new()
+	cam.name = "VisitHouseCamera"
+	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	cam.size = 7.4
+	cam.position = Vector3(0, 6.2, 7.4)
+	house.add_child(cam)
+	cam.look_at_from_position(cam.position, Vector3(0, 0.8, -0.5), Vector3.UP)
+	var floor_mesh := MeshInstance3D.new()
+	floor_mesh.name = "HouseFloor"
+	var floor_box := BoxMesh.new()
+	floor_box.size = Vector3(9.0, 0.2, 7.0)
+	floor_mesh.mesh = floor_box
+	var floor_mat := StandardMaterial3D.new()
+	floor_mat.albedo_color = Color("#9a7a52")
+	floor_mesh.material_override = floor_mat
+	floor_mesh.position = Vector3(0, -0.1, 0)
+	house.add_child(floor_mesh)
+	house.add_child(_visit_box("HouseBackWall", Vector3(9.0, 3.0, 0.3), Vector3(0, 1.5, -3.5), Color("#b08968")))
+	house.add_child(_visit_box("HouseLeftWall", Vector3(0.3, 3.0, 7.0), Vector3(-4.5, 1.5, 0), Color("#a37c5d")))
+	house.add_child(_visit_box("HouseRightWall", Vector3(0.3, 3.0, 7.0), Vector3(4.5, 1.5, 0), Color("#a37c5d")))
+	var host := MeshInstance3D.new()
+	host.name = "HostFigure"
+	var host_mesh := CapsuleMesh.new()
+	host_mesh.radius = 0.32
+	host_mesh.height = 1.15
+	host.mesh = host_mesh
+	var host_mat := StandardMaterial3D.new()
+	host_mat.albedo_color = Color("#5f7d9c")
+	host.material_override = host_mat
+	host.position = Vector3(-2.4, 0.68, -1.6)
+	house.add_child(host)
+	house.add_child(_visit_box("TeaTable", Vector3(1.4, 0.1, 0.9), Vector3(0.4, 0.62, -1.4), Color("#8a5a33")))
+	house.add_child(_visit_box("TeaTableLeg", Vector3(0.16, 0.6, 0.16), Vector3(0.4, 0.3, -1.4), Color("#6b4f35")))
+	var board := StaticBody3D.new()
+	board.name = "MessageBoard"
+	board.position = Vector3(3.4, 1.5, -3.2)
+	board.input_ray_pickable = true
+	var board_hit := CollisionShape3D.new()
+	var board_shape := BoxShape3D.new()
+	board_shape.size = Vector3(1.2, 0.9, 0.14)
+	board_hit.shape = board_shape
+	board.add_child(board_hit)
+	board.add_child(_visit_box("BoardMesh", Vector3(1.2, 0.9, 0.12), Vector3(0, 0, 0), Color("#b98d4f")))
+	board.set_meta("owner_nick", str(owner.get("nick", "邻居")))
+	board.input_event.connect(_on_visit_board_input)
+	house.add_child(board)
+	for pair in [["HouseDoor", Vector3(0, 1.1, 3.4), true], ["HouseWindow", Vector3(-3.0, 1.6, 3.32), false]]:
+		var opener := StaticBody3D.new()
+		opener.name = str(pair[0])
+		opener.position = pair[1]
+		opener.input_ray_pickable = true
+		var hit := CollisionShape3D.new()
+		var shape := BoxShape3D.new()
+		shape.size = Vector3(1.2 if pair[2] else 1.0, 2.0 if pair[2] else 1.0, 0.2)
+		hit.shape = shape
+		opener.add_child(hit)
+		var mesh := MeshInstance3D.new()
+		var box := BoxMesh.new()
+		box.size = shape.size * 0.95
+		mesh.mesh = box
+		var material := StandardMaterial3D.new()
+		material.albedo_color = Color("#77a75a") if pair[2] else Color("#bfe0ea")
+		material.emission_enabled = not pair[2]
+		material.emission = Color("#9fd0d8")
+		material.emission_energy_multiplier = 0.3
+		mesh.material_override = material
+		opener.add_child(mesh)
+		opener.input_event.connect(_on_visit_back_to_yard_input)
+		house.add_child(opener)
+	return house
+
+
+func _visit_box(node_name: String, dimensions: Vector3, location: Vector3, color: Color) -> MeshInstance3D:
+	var mesh := MeshInstance3D.new()
+	mesh.name = node_name
+	var box := BoxMesh.new()
+	box.size = dimensions
+	mesh.mesh = box
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = 1.0
+	mesh.material_override = material
+	mesh.position = location
+	return mesh
+
+
+func _on_visit_house_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
+		if router != null:
+			router.switch_to("visit_house")
+
+
+func _on_visit_back_to_yard_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
+		if router != null:
+			router.switch_to("visit_yard", false)
+
+
+func _on_visit_gate_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
+		leave_visit()
+
+
+## 花藤院门回程：清拜访态、恢复操作门控、回自己农场（换朋友需重开地址簿，稿 §7 首版规则）。
+func leave_visit() -> void:
+	if online != null:
+		online.leave_visit()
+	hud.set_visiting(false)
+	_clear_visit_locations()
+	router.switch_to("farm", false)
+	hud.show_status("回到了自己的农场。")
+
+
+func _on_visit_board_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
+		hud.show_status("【%s 的留言】欢迎来坐坐，院子里看看就好，帮我浇水的心意领啦。" % _visit_owner_nick())
+
+
+func _visit_owner_nick() -> String:
+	for node in [visit_house, visit_yard]:
+		if node == null:
+			continue
+		for name in ["MessageBoard", "VisitHouse"]:
+			var target: Node = node.get_node_or_null(name)
+			if target != null and target.has_meta("owner_nick"):
+				return str(target.get_meta("owner_nick"))
+	return "邻居"
 
 
 func _add_ground(node_name: String, dimensions: Vector3, location: Vector3, color: Color) -> void:
