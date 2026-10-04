@@ -28,6 +28,11 @@ var features: Array = [
 	OnlineProtocol.FEATURE_EXPEDITION,
 ]
 var dev_mode := false
+## M4 运维（O02/O03/O04）：维护文件、错误计数、启动时刻。
+var maintenance_path := ""
+var maintenance_on := false
+var error_count := 0
+var boot_ms := Time.get_ticks_msec()
 
 var store: ServerDB
 var auth: AuthService
@@ -65,6 +70,12 @@ func _ready() -> void:
 	auth.store = store
 	if _invite_mode:
 		_run_invite_mode()
+		return
+	if _status_mode:
+		_run_status_mode()
+		return
+	if _backup_dir != "":
+		_run_backup_mode()
 		return
 	farms = FarmService.new()
 	farms.store = store
@@ -110,6 +121,7 @@ func _on_peer_disconnected(id: int) -> void:
 func _process(_delta: float) -> void:
 	if not listening:
 		return
+	_poll_maintenance()
 	_flush_pending_kicks()
 	peer.poll()
 	_flush_pending_drops()
@@ -133,6 +145,8 @@ func _notification(what: int) -> void:
 
 var _invite_mode := false
 var _invite_count := 0
+var _status_mode := false
+var _backup_dir := ""
 var _invite_note := ""
 var _dev_time_shift := 0
 var _cert_paths: Array = []
@@ -167,6 +181,9 @@ func _read_args() -> void:
 		features = []
 		for item in features_s.split(",", false):
 			features.append(item.strip_edges())
+	maintenance_path = _arg_value(args, "--maintenance-file")
+	_backup_dir = _arg_value(args, "--backup")
+	_status_mode = "--status" in args
 	_invite_mode = invite_s != ""
 	_invite_count = int(invite_s) if invite_s != "" else 0
 	dev_mode = "--dev" in args
@@ -227,7 +244,14 @@ func _handle_packet(pid: int, raw: PackedByteArray) -> void:
 	var t := str(msg.get("t", ""))
 	match t:
 		"ping":
-			_reply(pid, {"t": "pong", "proto": PROTO_VERSION})
+			## O02 健康检查：未认证可用；携带在线/房间/局/错误/运行时长。
+			var health: Dictionary = rooms.stats() if rooms != null else {}
+			_reply(pid, {
+				"t": "pong", "proto": PROTO_VERSION,
+				"online": peers.size(), "rooms": int(health.get("rooms", 0)),
+				"active_runs": int(health.get("active_runs", 0)),
+				"errors": error_count, "uptime_s": int((Time.get_ticks_msec() - boot_ms) / 1000.0),
+			})
 		"hello":
 			_cmd_hello(pid, msg)
 		"activate":
@@ -241,6 +265,10 @@ func _handle_packet(pid: int, raw: PackedByteArray) -> void:
 
 
 func _cmd_hello(pid: int, msg: Dictionary) -> void:
+	if maintenance_on:
+		_reply(pid, OnlineProtocol.error_payload(OnlineProtocol.ERR_MAINTENANCE, "服务器维护中，请稍后再来"))
+		_drop_peer(pid)
+		return
 	var version_error: Variant = _version_check(msg)
 	if version_error != null:
 		_reply(pid, version_error)
@@ -297,6 +325,9 @@ func _establish_session(pid: int, account_id: int, nick: String, new_token := ""
 
 
 func _cmd_req(pid: int, msg: Dictionary) -> void:
+	if maintenance_on:
+		_reply(pid, OnlineProtocol.error_payload(OnlineProtocol.ERR_MAINTENANCE, "服务器维护中，请稍后再来"))
+		return
 	var account_id := auth.account_of_peer(pid)
 	if account_id == 0:
 		_reply(pid, OnlineProtocol.error_payload(OnlineProtocol.ERR_NOT_AUTHENTICATED))
@@ -393,8 +424,61 @@ func _reply(pid: int, payload: Dictionary) -> void:
 		_log("reply 丢弃：peer %d 无 WebSocketPeer" % pid)
 		return
 	var err := target.put_packet(JSON.stringify(payload).to_utf8_buffer())
+	if str(payload.get("code", "")) == OnlineProtocol.ERR_INTERNAL or str(payload.get("code", "")) == "tx_failed":
+		error_count += 1
 	if err != OK:
 		_log("reply 失败 peer=%d err=%d" % [pid, err])
+
+
+## O04 维护门控：文件出现→广播 bye(maintenance) 并优雅断开（跑中局不中断裁定，仅拒绝新动作）；
+## 文件移除→恢复。每 0.5s 检查一次（stat 代价可忽略）。
+var _maintenance_next_check_ms := 0
+
+func _poll_maintenance() -> void:
+	if maintenance_path == "":
+		return
+	var now_ms := Time.get_ticks_msec()
+	if now_ms < _maintenance_next_check_ms:
+		return
+	_maintenance_next_check_ms = now_ms + 500
+	var on := FileAccess.file_exists(maintenance_path)
+	if on == maintenance_on:
+		return
+	maintenance_on = on
+	_log("maintenance %s（%s）" % ["开启" if on else "关闭", maintenance_path])
+	if on:
+		for pid in peers.keys():
+			_reply(int(pid), {"t": "bye", "code": OnlineProtocol.ERR_MAINTENANCE})
+			_drop_peer(int(pid))
+
+
+## O03 备份：VACUUM INTO 生成一致快照（WAL 安全；M0 验证过的路径语义）。
+func _run_backup_mode() -> void:
+	DirAccess.make_dir_recursive_absolute(_backup_dir)
+	var stamp := Time.get_datetime_string_from_system(true).replace(":", "").replace("-", "").replace("T", "_").replace("Z", "")
+	var target := _backup_dir.path_join("farm_backup_%s.db" % stamp)
+	if not store.db.query_with_bindings("VACUUM INTO ?", [target]):
+		push_error("备份失败：%s" % store.db.error_message)
+		quit_now(7)
+		return
+	print("BACKUP_OK %s" % target)
+	_log("backup -> %s" % target)
+	quit_now(0)
+
+
+## O02 离线诊断：输出库内摘要 JSON 后退出（守护外/巡检用）。
+func _run_status_mode() -> void:
+	var accounts: int = int(store.query_one("SELECT COUNT(*) AS n FROM accounts")["n"])
+	var invites_left: int = int(store.query_one("SELECT COUNT(*) AS n FROM invites WHERE used_at IS NULL")["n"])
+	var runs_active: int = int(store.query_one("SELECT COUNT(*) AS n FROM runs")["n"])
+	var rooms_open: int = int(store.query_one("SELECT COUNT(*) AS n FROM rooms")["n"])
+	var settlements: int = int(store.query_one("SELECT COUNT(*) AS n FROM settlements")["n"])
+	print("STATUS_OK %s" % JSON.stringify({
+		"accounts": int(accounts), "invites_left": int(invites_left),
+		"runs_total": int(runs_active), "rooms_open": int(rooms_open),
+		"settlements": int(settlements),
+	}))
+	quit_now(0)
 
 
 func _log(line: String) -> void:

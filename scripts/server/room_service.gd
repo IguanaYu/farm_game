@@ -39,6 +39,14 @@ func now() -> int:
 	return farm_service.now()
 
 
+## M4 健康检查（O02）：房间数与去重后的活动局数。
+func stats() -> Dictionary:
+	var run_ids := {}
+	for account_id in _runs_by_account:
+		run_ids[_runs_by_account[account_id].run_id] = true
+	return {"rooms": _rooms_by_code.size(), "active_runs": run_ids.size()}
+
+
 func _file_backend(kind: String, id: String, data: Dictionary) -> bool:
 	## run 落库走本服务显式 SQL（事务内统一版本管理），这里只接结算单。
 	if kind == "save_settlement":

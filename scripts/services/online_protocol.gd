@@ -52,6 +52,8 @@ const ERR_REQ_ID_CONFLICT := "req_id_conflict"
 const ERR_REQ_ID_REQUIRED := "req_id_required"
 const ERR_INTERNAL := "internal_error"
 const ERR_BUSY := "busy"
+## M4 维护门控（O04）：维护文件存在时新会话/新命令拒绝，在线连接收 bye(maintenance)。
+const ERR_MAINTENANCE := "maintenance"
 
 ## 单包上限（N05：超大包直接断开）。
 const MAX_PACKET_BYTES := 65536

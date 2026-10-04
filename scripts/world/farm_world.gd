@@ -33,15 +33,15 @@ const STAGE_MODELS := {
 	},
 	# 岩芽菜先用胡萝卜模型占位（2.8 换正式素材）。
 	"rock_sprout": {
-		"sprout": preload("res://assets/models/plot_carrot_sprout.glb"),
-		"growing": preload("res://assets/models/plot_carrot_growing.glb"),
-		"mature": preload("res://assets/models/plot_carrot_mature.glb"),
+		"sprout": preload("res://assets/models/plot_rock_sprout_sprout.tscn"),
+		"growing": preload("res://assets/models/plot_rock_sprout_growing.tscn"),
+		"mature": preload("res://assets/models/plot_rock_sprout_mature.tscn"),
 	},
 	# 萤果同样先用胡萝卜模型占位（F-05：缺键让地块刷新脚本报错、永远显示空地）。
 	"glow_berry": {
-		"sprout": preload("res://assets/models/plot_carrot_sprout.glb"),
-		"growing": preload("res://assets/models/plot_carrot_growing.glb"),
-		"mature": preload("res://assets/models/plot_carrot_mature.glb"),
+		"sprout": preload("res://assets/models/plot_glow_berry_sprout.tscn"),
+		"growing": preload("res://assets/models/plot_glow_berry_growing.tscn"),
+		"mature": preload("res://assets/models/plot_glow_berry_mature.tscn"),
 	},
 }
 
@@ -102,6 +102,15 @@ func _on_context_ready() -> void:
 func _process(delta: float) -> void:
 	# 成熟标记上下浮动 + 缓慢旋转，让"可收获"一目了然。
 	var time := float(Time.get_ticks_msec()) / 1000.0
+	# R5 打磨（稿 §9 低频动效）：店内客人轻微起伏、篝火火焰闪烁。
+	if not guest_slots.is_empty():
+		for slot_index in range(guest_slots.size()):
+			var appearance: Node = guest_slots[slot_index].get_node_or_null("GuestAppearance")
+			if appearance is Node3D:
+				(appearance as Node3D).position.y = 0.04 * sin(time * 1.6 + slot_index * 2.1)
+	var flame: MeshInstance3D = get_node_or_null("CaveCamp/Campfire/FireFlame") if has_node("CaveCamp") else null
+	if flame != null:
+		flame.scale = Vector3.ONE * (1.0 + 0.08 * sin(time * 9.0) + 0.05 * sin(time * 23.0))
 	for plot_id in plot_holders.keys():
 		var holder: Node3D = plot_holders[plot_id]
 		if holder == null:
@@ -219,6 +228,8 @@ func _setup_router() -> void:
 			cam.current = true
 		_set_location_physics(camp, false)
 	router.register("cave_camp", camp, enter_camp, leave_camp)
+	## R5 地点音乐（稿 §9 声画辨识度）：随地点切换换轨；无对应资产回退农场昼曲。
+	router.location_changed.connect(_on_location_music)
 
 
 ## 商店内景（稿 §5，R3 正式版）：暖木地板+三面墙的浅俯视切墙间；后墙柜台、左右货架、
@@ -338,6 +349,19 @@ func _shop_shelf(node_name: String, location: Vector3) -> StaticBody3D:
 
 
 ## —— R4 洞口营地（稿 §6）—————————————————————————————————————————
+
+## R5 地点音乐映射：farm→昼曲；shop→暖铺曲；cave_camp→夜营曲（缺资产回退昼曲）。
+func _on_location_music(location_id: String) -> void:
+	var track := "farm_day"
+	match location_id:
+		"shop":
+			track = "shop_cozy"
+		"cave_camp":
+			track = "camp_fire"
+	if track != "farm_day" and AudioKit.stream(track) == null:
+		track = "farm_day"
+	AudioKit.play_music(self, track)
+
 
 ## 上山石阶：去洞窟营地（稿 §6"避免把上山误当成立即开战"——石阶只换地点，洞口才出发）。
 func _on_stairs_to_camp(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:

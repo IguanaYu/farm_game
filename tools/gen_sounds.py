@@ -175,7 +175,95 @@ def build_farm_day():
     write_wav("farm_day", out)
 
 
+def build_shop_cozy():
+    """R5 地点音乐（商店）：76 BPM 六小节，F-Dm-Bb-C，垫弦更柔、拨弦稀疏。约 19.0 秒。"""
+    bpm = 76.0
+    beat = 60.0 / bpm
+    bar = beat * 4
+    total = int(SR * bar * 6)
+    out = [0.0] * total
+    chords = [
+        ("F", [174.61, 220.00, 261.63], 87.31),
+        ("Dm", [146.83, 174.61, 220.00], 73.42),
+        ("Bb", [116.54, 146.83, 174.61], 58.27),
+        ("C", [130.81, 164.81, 196.00], 65.41),
+    ]
+    pluck_scale = [349.23, 392.00, 440.00, 523.25, 587.33]
+    for ci, (_, notes, bass) in enumerate(chords):
+        seg_start = ci * int(bar * 1.5)
+        seg_n = int(SR * bar * 1.5)
+        for f in notes:
+            env = _bar_env(seg_n, 0.35)
+            for i in range(seg_n):
+                t = i / SR
+                out[seg_start + i] += 0.16 * env[i] * (
+                    math.sin(2 * math.pi * f * t)
+                    + 0.3 * math.sin(2 * math.pi * f * 1.003 * t))
+        for bi in range(3):
+            bs = seg_start + int(SR * bi * beat * 2)
+            n = int(SR * 1.2)
+            for i in range(n):
+                t = i / SR
+                e = math.exp(-3.0 * t)
+                out[bs + i] += 0.22 * e * math.sin(2 * math.pi * bass * t)
+        for pi_ in range(2):
+            ps = seg_start + int(SR * (beat * (1.0 + pi_ * 2.5)))
+            f = pluck_scale[(ci + pi_ * 2) % len(pluck_scale)]
+            n = int(SR * 0.9)
+            for i in range(n):
+                t = i / SR
+                e = math.exp(-2.5 * t)
+                out[ps + i] += 0.18 * e * math.sin(2 * math.pi * f * t)
+    write_wav("shop_cozy", out)
+
+
+def build_camp_fire():
+    """R5 地点音乐（洞口营地）：60 BPM 四小节，Am-Em-F-Em，低音长音＋稀疏拨弦（夜营氛围）。约 16.0 秒。"""
+    bpm = 60.0
+    beat = 60.0 / bpm
+    bar = beat * 4
+    total = int(SR * bar * 4)
+    out = [0.0] * total
+    chords = [
+        ("Am", [220.00, 261.63, 329.63], 110.00),
+        ("Em", [164.81, 196.00, 246.94], 82.41),
+        ("F", [174.61, 220.00, 261.63], 87.31),
+        ("Em", [164.81, 196.00, 246.94], 82.41),
+    ]
+    for ci, (_, notes, bass) in enumerate(chords):
+        seg_start = ci * int(bar)
+        seg_n = int(SR * bar)
+        for f in notes:
+            env = _bar_env(seg_n, 0.5)
+            for i in range(seg_n):
+                t = i / SR
+                out[seg_start + i] += 0.13 * env[i] * math.sin(2 * math.pi * f * t)
+        n = seg_n
+        for i in range(n):
+            t = i / SR
+            out[seg_start + i] += 0.24 * math.exp(-0.35 * t) * math.sin(2 * math.pi * bass * t)
+        ps = seg_start + int(SR * beat * 2.5)
+        pluck = [329.63, 392.00, 440.00][ci % 3]
+        pn = int(SR * 1.1)
+        for i in range(pn):
+            t = i / SR
+            out[ps + i] += 0.15 * math.exp(-2.2 * t) * math.sin(2 * math.pi * pluck * t)
+    write_wav("camp_fire", out)
+
+
+def _bar_env(n, depth):
+    """小节窗包络（首尾归零）；depth 控制中段电平。"""
+    env = []
+    for i in range(n):
+        x = i / max(1, n - 1)
+        window = math.sin(math.pi * x)
+        env.append(depth * window)
+    return env
+
+
 if __name__ == "__main__":
     print("生成占位音频 → %s" % os.path.normpath(OUT_DIR))
     build()
+    build_shop_cozy()
+    build_camp_fire()
     print("完成。")

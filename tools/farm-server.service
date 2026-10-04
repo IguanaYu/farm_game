@@ -1,0 +1,19 @@
+[Unit]
+Description=Little Farm online server (WSS + SQLite)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+## M4 (O02) guard template: fill in the actual paths/ports before use.
+## Deployment record see docs/testing/; locally verify with:
+##   Godot ... res://scenes/server_main.tscn -- --port 31971 --db <db> --cert <crt> --key <key> --tag farm
+Type=simple
+WorkingDirectory=/opt/farm-m1
+ExecStart=/opt/farm-m1/farm_server.x86_64 --headless --path /opt/farm-m1 res://scenes/server_main.tscn -- --port 31971 --db /opt/farm-m1/data/farm.db --cert /opt/farm-m1/secrets/farm_server.crt --key /opt/farm-m1/secrets/farm_server.key --maintenance-file /opt/farm-m1/data/maintenance.flag
+Restart=on-failure
+RestartSec=3
+## O04 Maintenance switch: systemctl stop and then touch the maintenance.flag file
+## (rejects new sessions; local sessions receive bye and disconnect; remove the file to restore).
+
+[Install]
+WantedBy=multi-user.target
