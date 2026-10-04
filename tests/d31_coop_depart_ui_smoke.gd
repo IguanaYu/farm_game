@@ -11,9 +11,13 @@ var failed := false
 class ProbeRoomPanel extends RoomPanel:
 	var save_calls := 0
 	var fail_save := false
+	## 仅第 N 次保存失败（F-03 复核场景三：第一次成功、第二次失败）。
+	var fail_save_on_nth := 0
 
 	func _save_farm() -> bool:
 		save_calls += 1
+		if fail_save_on_nth > 0 and save_calls == fail_save_on_nth:
+			return false
 		return not fail_save
 
 
@@ -79,6 +83,33 @@ func _run() -> void:
 	_click(host2, "出发（主机，需全员准备）")
 	await _pump(40)
 	_check(host2.host != null and host2.host.expedition != null, "F-03：拒绝后主机可再次发起并开局")
+
+	# —— 场景三（复核 §3.1 关闭标准）：第一次保存成功、第二次失败 →
+	# 不开局、占用回滚、主机收到明确拒绝，且修复后可重试 ——
+	var host3 := _pair_host(31983)
+	var guest3 := _pair_guest(31983)
+	await _pump(20)
+	_click(host3, "准备／取消准备")
+	await _pump(6)
+	_click(guest3, "准备／取消准备")
+	await _pump(6)
+	guest3.fail_save_on_nth = 2
+	_click(host3, "出发（主机，需全员准备）")
+	await _pump(40)
+	_check(host3.host != null and host3.host.expedition == null, "F-03：占用落盘失败时主机不开局（回执未发出）")
+	var expedition3: Dictionary = guest3.game.state["expedition"]
+	_check(str((expedition3["inventory"] as Dictionary).get("occupied_by_run", "")) == "", "F-03：失败的出发回滚客机占用")
+	_check(str(expedition3.get("active_run_ref", "")) == "", "F-03：失败的出发回滚活动局引用")
+	_check(str(host3.status_label.text).find("拒绝") != -1, "F-03：主机收到明确拒绝（占用落盘失败）")
+	_check(str(guest3.status_label.text).find("主机拒绝") != -1, "F-03：客机收到主机回告（出发作废）")
+
+	# 落盘恢复后同房间再次出发：开局成功且写入新局 ID
+	guest3.fail_save_on_nth = 0
+	_click(host3, "出发（主机，需全员准备）")
+	await _pump(40)
+	_check(host3.host != null and host3.host.expedition != null, "F-03：占用落盘失败修复后可再次发起并开局")
+	_check(str((expedition3["inventory"] as Dictionary).get("occupied_by_run", "")) == str(host3.host.expedition.run["run_id"]), "F-03：重试成功后客机写入本机占用")
+	_check(guest3.save_calls >= 4, "F-03：两次完整出发共落盘至少四次")
 	_finish()
 
 

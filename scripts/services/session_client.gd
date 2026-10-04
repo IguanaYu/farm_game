@@ -130,8 +130,9 @@ func set_ready(ready: bool) -> void:
 	})
 
 
-## 收到出发指令后：本机先写占用与活动局引用再回执（出发事务的客机半边）。
-func confirm_depart() -> Dictionary:
+## 出发事务第一步：只写内存占用与活动局引用，不发任何消息。
+## 回执必须等占用状态落盘成功后再发（F-03 复核关闭标准）。
+func prepare_depart() -> Dictionary:
 	if pending_run_id == "":
 		return {"ok": false, "reason": "还没有收到出发指令"}
 	var run_id := pending_run_id
@@ -142,12 +143,45 @@ func confirm_depart() -> Dictionary:
 		var occupy := inventory.set_run_occupied(run_id)
 		if not occupy["ok"]:
 			return {"ok": false, "reason": occupy["reason"]}
+	elif str((expedition.get("inventory", {}) as Dictionary).get("occupied_by_run", "")) != run_id:
+		return {"ok": false, "reason": "已有其他活动局占用中"}
 	expedition["active_run_ref"] = run_id
-	_send({"t": "depart_saved", "run_id": run_id})
 	return {"ok": true, "reason": ""}
 
 
-## 明确拒绝本次出发（如存档写入失败）：主机收到后放弃开局，可再次发起（F-03）。
+## 占用已落盘后：发送成功回执（主机收到 depart_saved 才开局）。
+func commit_depart() -> void:
+	if pending_run_id == "":
+		return
+	_send({"t": "depart_saved", "run_id": pending_run_id})
+
+
+## 准备后落盘失败等：回滚内存占用与引用并明确拒绝，主机可再次发起（F-03）。
+func abort_depart(reason: String) -> void:
+	if pending_run_id == "":
+		return
+	var run_id := pending_run_id
+	pending_run_id = ""
+	var expedition: Dictionary = farm_game.state["expedition"]
+	var inventory := InventoryGame.new()
+	inventory.bind(expedition)
+	if str((expedition.get("inventory", {}) as Dictionary).get("occupied_by_run", "")) == run_id:
+		inventory.clear_run_occupied(run_id)
+	if str(expedition.get("active_run_ref", "")) == run_id:
+		expedition["active_run_ref"] = ""
+	_send({"t": "depart_declined", "run_id": "", "reason": reason})
+
+
+## 兼容层：准备＋回执连做（d26/d27/d34 直接调用；UI 面板走拆分后的三步）。
+func confirm_depart() -> Dictionary:
+	var prepared := prepare_depart()
+	if not prepared["ok"]:
+		return prepared
+	commit_depart()
+	return {"ok": true, "reason": ""}
+
+
+## 明确拒绝本次出发（如第一次存档写入失败）：主机收到后放弃开局，可再次发起（F-03）。
 func decline_depart(reason: String) -> void:
 	if pending_run_id == "":
 		return

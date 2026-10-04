@@ -397,21 +397,23 @@ func _on_depart() -> void:
 		coop_run_started_host.emit(host.expedition)
 
 
-## 收到主机出发指令（F-03）：先落盘本机存档 → 写占用并回执 → 再落盘一次占用状态；
-## 任一步失败都不回执/明确拒绝，主机收不到确认就不会开局。
+## 收到主机出发指令（F-03）：先落盘整档 → 写占用（仅内存）→ 落盘占用态 → 才发回执；
+## 任一步失败都不发成功回执并明确拒绝/回滚，主机收不到确认就不会开局。
 func _on_depart_begin() -> void:
 	if not _save_farm():
 		status_label.text = "出发暂停：本机存档写入失败（检查磁盘空间与权限）。"
 		client.decline_depart("存档写入失败")
 		return
-	var confirmed := client.confirm_depart()
-	if not confirmed["ok"]:
-		status_label.text = "出发暂停：%s" % str(confirmed["reason"])
-		client.decline_depart(str(confirmed["reason"]))
+	var prepared := client.prepare_depart()
+	if not prepared["ok"]:
+		status_label.text = "出发暂停：%s" % str(prepared["reason"])
+		client.decline_depart(str(prepared["reason"]))
 		return
 	if not _save_farm():
-		status_label.text = "警告：占用已写入但落盘失败；重启后可能需要重新占用，请联系主机。"
+		status_label.text = "出发暂停：占用写入失败，已回滚并告知主机，可重试出发。"
+		client.abort_depart("占用落盘失败")
 		return
+	client.commit_depart()
 	status_label.text = "已确认出发，等待主机开局……"
 
 
