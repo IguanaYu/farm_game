@@ -54,8 +54,8 @@ func _run() -> void:
 		_finish(backup)
 		return
 	var farm_loc: Node3D = world.farm_location
-	var shop_loc: Node3D = world.get_node("FarmWorld/ShopStubLocation") if world.has_node("FarmWorld/ShopStubLocation") else world.get_node("ShopStubLocation")
-	if not _check(shop_loc != null and not shop_loc.visible, "商店占位间存在且默认隐藏"):
+	var shop_loc: Node3D = world.get_node_or_null("ShopInterior")
+	if not _check(shop_loc != null and not shop_loc.visible, "商店内景存在且默认隐藏"):
 		_finish(backup)
 		return
 

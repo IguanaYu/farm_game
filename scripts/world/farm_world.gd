@@ -5,6 +5,9 @@ const PLOT_EMPTY := preload("res://assets/models/plot_empty.glb")
 const SHOP_MODEL := preload("res://assets/models/facility_shop.glb")
 const WAREHOUSE_MODEL := preload("res://assets/models/facility_warehouse.glb")
 const TREE_MODEL := preload("res://assets/models/deco_tree.glb")
+## R3 门廊雨棚配色（稿 §4 入口表：绿白条纹）。
+const AWNING_GREEN := Color("#3f7d4e")
+const AWNING_WHITE := Color("#f2ead8")
 const FENCE_MODEL := preload("res://assets/models/deco_fence.glb")
 const FLOWER_MODEL := preload("res://assets/models/deco_flower.glb")
 const BREEDER_MODEL := preload("res://assets/models/facility_breeder.glb")
@@ -146,8 +149,11 @@ func _build_farm() -> void:
 	camera.current = true
 	add_child(camera)
 	camera.look_at(Vector3(0, 0, 0))
-	_add_ground("EarthBase", Vector3(17.6, 0.45, 11.8), Vector3(0, -0.38, 0), Color("#a7794f"))
-	_add_ground("GrassTop", Vector3(17.4, 0.18, 11.6), Vector3(0, -0.08, 0), Color("#77a75a"))
+	## R3 连续地形（稿 §4）：地面延伸出镜头外，消灭"矩形盒子悬空"观感；
+	## 尺寸覆盖三档分辨率下正交相机（size 14.6，横幅最大 ~23.4）的落点范围。
+	_add_ground("EarthBase", Vector3(48.5, 0.45, 39.0), Vector3(0, -0.38, 0), Color("#a7794f"))
+	_add_ground("GrassTop", Vector3(48.0, 0.18, 38.5), Vector3(0, -0.08, 0), Color("#77a75a"))
+	_build_treeline_and_hills()
 	_add_ground("FarmPath", Vector3(11.0, 0.035, 0.45), Vector3(0, 0.035, 0), Color("#c8a772"))
 	# 十块地：5 列 × 2 行；未拥有的地块隐藏，购地后出现。
 	for column in range(5):
@@ -164,8 +170,10 @@ func _build_farm() -> void:
 	_add_prop("CaveEntrance", Vector3(6.3, 0.08, 4.1), Vector3(2.0, 2.6, 1.8), Color("#4a4358"), Color("#b79ae8"), "cave")
 	_add_prop("LoadoutBench", Vector3(4.6, 0.08, 4.2), Vector3(1.2, 0.9, 0.9), Color("#8a5a33"), Color("#ffd257"), "loadout")
 	_add_prop("CraftTable", Vector3(4.6, 0.08, 3.1), Vector3(1.2, 0.9, 0.9), Color("#7d8a8f"), Color("#9fd0d8"), "craft")
-	for position in [Vector3(-3.0, 0.08, 4.1), Vector3(0.0, 0.08, 4.1), Vector3(3.0, 0.08, 4.1)]:
-		_add_guest_slot(position)
+	## R3：三位客人移入商店内景（稿 §2/§5）；农场门口不再站人。
+	_build_shop_porch()
+	_build_hill_stairs()
+	_build_neighbor_entry()
 	for position in [Vector3(-6.9, 0.08, 3.6), Vector3(6.9, 0.08, 3.6)]:
 		_add_decoration(TREE_MODEL, position)
 	for position in [Vector3(-6.6, 0.08, 1.9), Vector3(6.6, 0.08, 1.9), Vector3(-6.6, 0.08, -0.9), Vector3(6.6, 0.08, -0.9)]:
@@ -178,64 +186,58 @@ func _build_farm() -> void:
 		_add_decoration(FENCE_MODEL, Vector3(7.5, 0.08, z), 90.0)
 
 
-## R2：地点路由装配——farm（自身 3D 组）+ shop 占位间；切换不触碰 GameContext。
+## R2/R3：地点路由装配——farm（自身 3D 组）+ shop 正式内景；切换不触碰 GameContext。
 func _setup_router() -> void:
 	router = SceneRouter.new()
 	router.name = "SceneRouter"
 	add_child(router)
 	router.register("farm", farm_location)
-	var shop := _build_shop_stub()
-	router.register("shop", shop, Callable(), Callable())
+	var shop := _build_shop_interior()
+	## 隐藏地点的碰撞体不参与射线（物理查询不理会可见性——world_picking 实测坑）：
+	## 切入开层 1，切离清层；构建后立即关闭商店侧。
+	_set_location_physics(shop, false)
+	var enter_shop := func() -> void:
+		var cam: Camera3D = shop.get_node_or_null("ShopCamera")
+		if cam != null:
+			cam.current = true
+		_set_location_physics(shop, true)
+	var leave_shop := func() -> void:
+		var cam: Camera3D = get_node_or_null("FarmCamera")
+		if cam != null:
+			cam.current = true
+		_set_location_physics(shop, false)
+	router.register("shop", shop, enter_shop, leave_shop)
 
 
-## 商店占位内景（R2 骨架，R3 换正式切墙内景）：小间 + 柜台（保留原商店面板）+ 回程门。
-func _build_shop_stub() -> Node3D:
+## 商店内景（稿 §5，R3 正式版）：暖木地板+三面墙的浅俯视切墙间；后墙柜台、左右货架、
+## 委托台角落、前景三客人（点击=今日集市面板）、门=回程。交易规则全部沿用现有面板（39 命令不动）。
+func _build_shop_interior() -> Node3D:
 	var shop := Node3D.new()
-	shop.name = "ShopStubLocation"
+	shop.name = "ShopInterior"
 	shop.visible = false
 	add_child(shop)
-	var floor_mesh := MeshInstance3D.new()
-	floor_mesh.name = "ShopFloor"
-	var floor_box := BoxMesh.new()
-	floor_box.size = Vector3(10.0, 0.2, 8.0)
-	floor_mesh.mesh = floor_box
-	floor_mesh.position = Vector3(0, -0.1, 0)
-	var floor_mat := StandardMaterial3D.new()
-	floor_mat.albedo_color = Color("#8a6a45")
-	floor_mesh.material_override = floor_mat
+	var interior_cam := Camera3D.new()
+	interior_cam.name = "ShopCamera"
+	interior_cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	interior_cam.size = 7.2
+	interior_cam.position = Vector3(0, 6.4, 7.6)
+	shop.add_child(interior_cam)
+	interior_cam.look_at_from_position(interior_cam.position, Vector3(0, 0.8, -0.5), Vector3.UP)
+	var floor_mesh := _interior_box("ShopFloor", Vector3(10.0, 0.2, 8.0), Vector3(0, -0.1, 0), Color("#8a6a45"))
 	shop.add_child(floor_mesh)
-	var wall := MeshInstance3D.new()
-	wall.name = "ShopBackWall"
-	var wall_box := BoxMesh.new()
-	wall_box.size = Vector3(10.0, 3.2, 0.3)
-	wall.mesh = wall_box
-	wall.position = Vector3(0, 1.6, -4.0)
-	var wall_mat := StandardMaterial3D.new()
-	wall_mat.albedo_color = Color("#a4543f")
-	wall.material_override = wall_mat
-	shop.add_child(wall)
-	var counter := StaticBody3D.new()
-	counter.name = "ShopCounter"
-	counter.position = Vector3(0, 0.5, -2.2)
-	counter.input_ray_pickable = true
-	var counter_hit := CollisionShape3D.new()
-	var counter_shape := BoxShape3D.new()
-	counter_shape.size = Vector3(4.0, 1.0, 0.8)
-	counter_hit.shape = counter_shape
-	counter.add_child(counter_hit)
-	var counter_mesh := MeshInstance3D.new()
-	var counter_box := BoxMesh.new()
-	counter_box.size = Vector3(4.0, 1.0, 0.8)
-	counter_mesh.mesh = counter_box
-	var counter_mat := StandardMaterial3D.new()
-	counter_mat.albedo_color = Color("#c8a772")
-	counter_mesh.material_override = counter_mat
-	counter.add_child(counter_mesh)
-	counter.input_event.connect(_on_shop_counter_input)
-	shop.add_child(counter)
+	shop.add_child(_interior_box("ShopBackWall", Vector3(10.0, 3.2, 0.3), Vector3(0, 1.6, -4.0), Color("#a4543f")))
+	shop.add_child(_interior_box("ShopLeftWall", Vector3(0.3, 3.2, 8.0), Vector3(-5.0, 1.6, 0), Color("#96503d")))
+	shop.add_child(_interior_box("ShopRightWall", Vector3(0.3, 3.2, 8.0), Vector3(5.0, 1.6, 0), Color("#96503d")))
+	shop.add_child(_shop_counter())
+	shop.add_child(_shop_shelf("ShopShelfLeft", Vector3(-3.7, 0.55, -1.2)))
+	shop.add_child(_shop_shelf("ShopShelfRight", Vector3(3.7, 0.55, -1.2)))
+	shop.add_child(_shop_shelf("DelegationDesk", Vector3(4.2, 0.5, 2.4)))
+	## 前景三位客人（稿 §5：并排站立，点击打开今日集市——沿用 M2 交易面板）。
+	for offset in [-2.6, 0.0, 2.6]:
+		_add_guest_slot(Vector3(offset, 0.0, 2.6), shop)
 	var door := StaticBody3D.new()
 	door.name = "ShopDoor"
-	door.position = Vector3(0, 1.1, 3.7)
+	door.position = Vector3(0, 1.1, 3.85)
 	door.input_ray_pickable = true
 	var door_hit := CollisionShape3D.new()
 	var door_shape := BoxShape3D.new()
@@ -258,6 +260,71 @@ func _build_shop_stub() -> Node3D:
 	return shop
 
 
+## 地点碰撞层开关：非当前地点的 StaticBody 不参与射线/点击（含物理直查）。
+func _set_location_physics(root: Node, enabled: bool) -> void:
+	for child in root.get_children():
+		if child is CollisionObject3D:
+			if enabled:
+				child.collision_layer = 1 if not child.has_meta("orig_layer") else int(child.get_meta("orig_layer"))
+			else:
+				if not child.has_meta("orig_layer"):
+					child.set_meta("orig_layer", child.collision_layer)
+				child.collision_layer = 0
+		_set_location_physics(child, enabled)
+
+
+func _interior_box(node_name: String, dimensions: Vector3, location: Vector3, color: Color) -> MeshInstance3D:
+	var mesh := MeshInstance3D.new()
+	mesh.name = node_name
+	var box := BoxMesh.new()
+	box.size = dimensions
+	mesh.mesh = box
+	var material := StandardMaterial3D.new()
+	material.albedo_color = color
+	material.roughness = 1.0
+	mesh.material_override = material
+	mesh.position = location
+	return mesh
+
+
+## 柜台（稿 §5：买种子/肥料与委托台的承载入口，本轮同开商店面板）。
+func _shop_counter() -> StaticBody3D:
+	var counter := StaticBody3D.new()
+	counter.name = "ShopCounter"
+	counter.position = Vector3(0, 0.5, -2.9)
+	counter.input_ray_pickable = true
+	var hit := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(5.2, 1.0, 0.8)
+	hit.shape = shape
+	counter.add_child(hit)
+	counter.add_child(_interior_box("CounterTop", Vector3(5.2, 1.0, 0.8), Vector3(0, 0, 0), Color("#c8a772")))
+	counter.add_child(_interior_box("CounterTrim", Vector3(5.3, 0.14, 0.9), Vector3(0, 0.55, 0), Color("#ffd257")))
+	counter.input_event.connect(_on_shop_counter_input)
+	return counter
+
+
+## 货架/委托台（稿 §5：分层陈列，本轮承载商店面板入口）。
+func _shop_shelf(node_name: String, location: Vector3) -> StaticBody3D:
+	var shelf := StaticBody3D.new()
+	shelf.name = node_name
+	shelf.position = location
+	shelf.input_ray_pickable = true
+	var hit := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(1.6, 1.1, 0.7)
+	hit.shape = shape
+	shelf.add_child(hit)
+	shelf.add_child(_interior_box("ShelfBack", Vector3(1.6, 1.1, 0.12), Vector3(0, 0, -0.28), Color("#7d5a3a")))
+	for level in range(2):
+		shelf.add_child(_interior_box("ShelfBoard_%d" % level, Vector3(1.6, 0.08, 0.6), Vector3(0, 0.25 + level * 0.45, 0), Color("#a97d4e")))
+	for goods in range(3):
+		shelf.add_child(_interior_box("ShelfGoods_%d" % goods, Vector3(0.34, 0.3, 0.3),
+			Vector3(-0.5 + goods * 0.5, 0.44, 0), Color("#d8b56a") if goods % 2 == 0 else Color("#9fd0d8")))
+	shelf.input_event.connect(_on_shop_counter_input)
+	return shelf
+
+
 func _on_shop_counter_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		AudioKit.play(self, "ui_click")
@@ -269,6 +336,241 @@ func _on_shop_door_input(_camera: Node, event: InputEvent, _position: Vector3, _
 		AudioKit.play(self, "ui_click")
 		if router != null:
 			router.go_back()
+
+
+
+## —— R3 农场环境（稿 §4/§9）———————————————————————————————————————
+
+## 环境层：林带围合 + 远山轮廓（不参与点击；复用树模型与低细节几何）。
+func _build_treeline_and_hills() -> void:
+	var tree_ring: Array = []
+	for x in range(-20, 21, 4):
+		tree_ring.append(Vector3(x, 0.08, 14.5))
+		tree_ring.append(Vector3(x, 0.08, -14.5))
+	for z in range(-12, 13, 4):
+		tree_ring.append(Vector3(-21.5, 0.08, z))
+		tree_ring.append(Vector3(21.5, 0.08, z))
+	for position in tree_ring:
+		var tree: Node3D = TREE_MODEL.instantiate()
+		tree.position = position
+		tree.rotation_degrees.y = float((int(position.x * 7 + position.z * 13)) % 360)
+		tree.set_meta("env_layer", true)
+		_loc().add_child(tree)
+	var hills := [
+		[Vector3(-26.0, 0.0, -18.0), 7.5, Color("#5e7d63")],
+		[Vector3(26.5, 0.0, -16.0), 9.0, Color("#66856a")],
+		[Vector3(-30.0, 0.0, 6.0), 8.5, Color("#628266")],
+		[Vector3(30.5, 0.0, 8.0), 10.0, Color("#5b7a60")],
+		[Vector3(0.0, 0.0, -26.0), 12.0, Color("#6d8b70")],
+	]
+	for hill in hills:
+		var mesh := MeshInstance3D.new()
+		mesh.name = "DistantHill"
+		var cone := CylinderMesh.new()
+		cone.top_radius = 0.4
+		cone.bottom_radius = float(hill[1])
+		cone.height = float(hill[1]) * 0.62
+		mesh.mesh = cone
+		var material := StandardMaterial3D.new()
+		material.albedo_color = hill[2]
+		material.roughness = 1.0
+		mesh.material_override = material
+		mesh.position = hill[0] + Vector3(0, cone.height / 2.0 - 0.6, 0)
+		mesh.set_meta("env_layer", true)
+		_loc().add_child(mesh)
+
+
+## 商店门廊（稿 §4/入口表）：绿白条纹雨棚 + 门口菜筐 + 门廊踏步（点击=进店，同 shop 建筑）。
+func _build_shop_porch() -> void:
+	var porch_root := Node3D.new()
+	porch_root.name = "ShopPorch"
+	_loc().add_child(porch_root)
+	var base := Vector3(-4.6, 0.08, -3.05)
+	for strip in range(8):
+		var panel := MeshInstance3D.new()
+		panel.name = "AwningStrip_%d" % strip
+		var box := BoxMesh.new()
+		box.size = Vector3(0.42, 0.06, 1.5)
+		panel.mesh = box
+		var material := StandardMaterial3D.new()
+		material.albedo_color = AWNING_GREEN if strip % 2 == 0 else AWNING_WHITE
+		material.roughness = 0.85
+		panel.material_override = material
+		panel.position = base + Vector3(-1.47 + strip * 0.42, 2.25, 0.75)
+		panel.rotation_degrees.x = -12.0
+		porch_root.add_child(panel)
+	for crate_offset in [Vector3(-1.9, 0.0, 0.35), Vector3(-1.35, 0.0, 0.55)]:
+		var crate := MeshInstance3D.new()
+		crate.name = "PorchCrate"
+		var crate_box := BoxMesh.new()
+		crate_box.size = Vector3(0.55, 0.4, 0.45)
+		crate.mesh = crate_box
+		var crate_mat := StandardMaterial3D.new()
+		crate_mat.albedo_color = Color("#b98d4f")
+		crate.material_override = crate_mat
+		crate.position = base + crate_offset + Vector3(0, 0.2, 0)
+		porch_root.add_child(crate)
+	var porch_body := StaticBody3D.new()
+	porch_body.name = "ShopPorchEntry"
+	porch_body.position = base + Vector3(0, 0, 0.9)
+	porch_body.input_ray_pickable = true
+	var hit := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(3.2, 2.6, 0.9)
+	hit.shape = shape
+	hit.position.y = 1.3
+	porch_body.add_child(hit)
+	porch_body.input_event.connect(_on_building_input.bind("shop"))
+	porch_root.add_child(porch_body)
+
+
+## 上山石阶（稿 §4/入口表）：东南灰石阶 + 提灯，点击=洞窟营地面板（R4 前仍 hub 面板）。
+func _build_hill_stairs() -> void:
+	var stairs_root := Node3D.new()
+	stairs_root.name = "HillStairs"
+	_loc().add_child(stairs_root)
+	var base := Vector3(7.6, 0.08, 3.2)
+	for step in range(4):
+		var block := MeshInstance3D.new()
+		block.name = "StairStep_%d" % step
+		var box := BoxMesh.new()
+		box.size = Vector3(1.5, 0.28 + step * 0.22, 0.55)
+		block.mesh = box
+		var material := StandardMaterial3D.new()
+		material.albedo_color = Color("#8d8d95") if step % 2 == 0 else Color("#7c7c85")
+		material.roughness = 1.0
+		block.material_override = material
+		block.position = base + Vector3(step * 0.32, (0.28 + step * 0.22) / 2.0, -step * 0.62)
+		stairs_root.add_child(block)
+	var lamp := MeshInstance3D.new()
+	lamp.name = "StairLamp"
+	var lamp_pole := CylinderMesh.new()
+	lamp_pole.top_radius = 0.05
+	lamp_pole.bottom_radius = 0.07
+	lamp_pole.height = 1.15
+	lamp.mesh = lamp_pole
+	var lamp_mat := StandardMaterial3D.new()
+	lamp_mat.albedo_color = Color("#4b4034")
+	lamp.material_override = lamp_mat
+	lamp.position = base + Vector3(-1.05, 0.58, -0.2)
+	stairs_root.add_child(lamp)
+	var lamp_head := MeshInstance3D.new()
+	lamp_head.name = "StairLampHead"
+	var head_box := BoxMesh.new()
+	head_box.size = Vector3(0.22, 0.26, 0.22)
+	lamp_head.mesh = head_box
+	var head_mat := StandardMaterial3D.new()
+	head_mat.albedo_color = Color("#ffd257")
+	head_mat.emission_enabled = true
+	head_mat.emission = Color("#ffc93c")
+	head_mat.emission_energy_multiplier = 1.1
+	lamp_head.material_override = head_mat
+	lamp_head.position = base + Vector3(-1.05, 1.2, -0.2)
+	stairs_root.add_child(lamp_head)
+	var stair_body := StaticBody3D.new()
+	stair_body.name = "StairsEntry"
+	stair_body.position = base + Vector3(0.5, 0.6, -0.9)
+	stair_body.input_ray_pickable = true
+	var hit := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(2.4, 1.6, 2.2)
+	hit.shape = shape
+	stair_body.add_child(hit)
+	stair_body.input_event.connect(_on_building_input.bind("cave"))
+	stairs_root.add_child(stair_body)
+
+
+## 邻里入口（稿 §4/入口表）：西侧溪流 + 石桥 + 信箱（R7 前点击提示占位）。
+func _build_neighbor_entry() -> void:
+	var entry_root := Node3D.new()
+	entry_root.name = "NeighborEntry"
+	_loc().add_child(entry_root)
+	var stream := MeshInstance3D.new()
+	stream.name = "WestStream"
+	var stream_box := BoxMesh.new()
+	stream_box.size = Vector3(1.5, 0.1, 30.0)
+	stream.mesh = stream_box
+	var stream_mat := StandardMaterial3D.new()
+	stream_mat.albedo_color = Color("#5f93b8")
+	stream_mat.roughness = 0.25
+	stream_mat.metallic = 0.1
+	stream.material_override = stream_mat
+	stream.position = Vector3(-9.6, -0.02, 0)
+	entry_root.add_child(stream)
+	var bridge := MeshInstance3D.new()
+	bridge.name = "StoneBridge"
+	var bridge_box := BoxMesh.new()
+	bridge_box.size = Vector3(3.0, 0.16, 1.5)
+	bridge.mesh = bridge_box
+	var bridge_mat := StandardMaterial3D.new()
+	bridge_mat.albedo_color = Color("#9a9aa2")
+	bridge_mat.roughness = 1.0
+	bridge.material_override = bridge_mat
+	bridge.position = Vector3(-9.6, 0.14, 3.4)
+	entry_root.add_child(bridge)
+	for rail in [-1, 1]:
+		var post := MeshInstance3D.new()
+		post.name = "BridgeRail_%d" % rail
+		var post_box := BoxMesh.new()
+		post_box.size = Vector3(3.0, 0.34, 0.12)
+		post.mesh = post_box
+		var post_mat := StandardMaterial3D.new()
+		post_mat.albedo_color = Color("#84848d")
+		post.material_override = post_mat
+		post.position = Vector3(-9.6, 0.38, 3.4 + rail * 0.72)
+		entry_root.add_child(post)
+	var mailbox := StaticBody3D.new()
+	mailbox.name = "NeighborMailbox"
+	mailbox.position = Vector3(-7.9, 0.08, 4.6)
+	mailbox.input_ray_pickable = true
+	var hit := CollisionShape3D.new()
+	var shape := BoxShape3D.new()
+	shape.size = Vector3(0.6, 1.5, 0.6)
+	hit.shape = shape
+	hit.position.y = 0.75
+	mailbox.add_child(hit)
+	var pole := MeshInstance3D.new()
+	var pole_mesh := CylinderMesh.new()
+	pole_mesh.top_radius = 0.05
+	pole_mesh.bottom_radius = 0.06
+	pole_mesh.height = 1.0
+	pole.mesh = pole_mesh
+	var pole_mat := StandardMaterial3D.new()
+	pole_mat.albedo_color = Color("#6b4f35")
+	pole.material_override = pole_mat
+	pole.position.y = 0.5
+	mailbox.add_child(pole)
+	var mbox := MeshInstance3D.new()
+	mbox.name = "MailboxBody"
+	var mbox_mesh := BoxMesh.new()
+	mbox_mesh.size = Vector3(0.34, 0.3, 0.5)
+	mbox.mesh = mbox_mesh
+	var mbox_mat := StandardMaterial3D.new()
+	mbox_mat.albedo_color = Color("#c05a4a")
+	mbox.material_override = mbox_mat
+	mbox.position.y = 1.14
+	mailbox.add_child(mbox)
+	var flag := MeshInstance3D.new()
+	flag.name = "MailboxFlag"
+	var flag_mesh := BoxMesh.new()
+	flag_mesh.size = Vector3(0.05, 0.16, 0.2)
+	flag.mesh = flag_mesh
+	var flag_mat := StandardMaterial3D.new()
+	flag_mat.albedo_color = Color("#ffd257")
+	flag_mat.emission_enabled = true
+	flag_mat.emission = Color("#ffc93c")
+	flag_mat.emission_energy_multiplier = 0.8
+	flag.material_override = flag_mat
+	flag.position = Vector3(0.2, 1.22, 0)
+	mailbox.add_child(flag)
+	mailbox.input_event.connect(_on_neighbor_entry_input)
+	entry_root.add_child(mailbox)
+
+
+func _on_neighbor_entry_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
+		hud.show_status("好友拜访将在后续版本开放（设计稿 §7）。")
 
 
 func _add_ground(node_name: String, dimensions: Vector3, location: Vector3, color: Color) -> void:
@@ -334,6 +636,19 @@ func _add_plot(plot_id: int, location: Vector3) -> void:
 	mature_marker.position.y = 1.55
 	mature_marker.visible = false
 	body.add_child(mature_marker)
+	## R3（稿 §4）：未购地块不再隐藏——待开垦草桩表达连续扩地位置。
+	var stub := MeshInstance3D.new()
+	stub.name = "PlotStub"
+	var stub_mesh := BoxMesh.new()
+	stub_mesh.size = Vector3(2.1, 0.1, 2.1)
+	stub.mesh = stub_mesh
+	var stub_material := StandardMaterial3D.new()
+	stub_material.albedo_color = Color("#6f9d52")
+	stub_material.roughness = 1.0
+	stub.material_override = stub_material
+	stub.position.y = 0.03
+	stub.visible = false
+	body.add_child(stub)
 	body.input_event.connect(_on_plot_input.bind(plot_id))
 	body.mouse_entered.connect(_on_plot_hover.bind(plot_id))
 	body.mouse_exited.connect(_on_plot_exit.bind(plot_id))
@@ -401,8 +716,8 @@ func _add_prop(node_name: String, location: Vector3, dimensions: Vector3, fill: 
 	_loc().add_child(body)
 
 
-func _add_guest_slot(location: Vector3) -> void:
-	## 门口的三个客人站位：模型按当日出现的客人切换，点击打开今日集市。
+func _add_guest_slot(location: Vector3, root: Node3D = null) -> void:
+	## 客人站位（R3 起位于商店内景前景）：模型按当日出现的客人切换，点击打开今日集市。
 	var slot_index := guest_slots.size()
 	var body := StaticBody3D.new()
 	body.name = "GuestSlot_%d" % (slot_index + 1)
@@ -416,7 +731,7 @@ func _add_guest_slot(location: Vector3) -> void:
 	hitbox.position.y = 0.85
 	body.add_child(hitbox)
 	body.input_event.connect(_on_guest_input.bind(slot_index))
-	_loc().add_child(body)
+	(root if root != null else _loc()).add_child(body)
 	guest_slots.append(body)
 
 
@@ -507,8 +822,14 @@ func _refresh_plot_visibility(plot_id: int) -> void:
 		return
 	var body: StaticBody3D = holder.get_parent()
 	var owned: bool = plot_id in game.owned_plot_ids()
-	body.visible = owned
+	body.visible = true
 	body.input_ray_pickable = owned
+	var stub: MeshInstance3D = body.get_node_or_null("PlotStub")
+	if stub != null:
+		stub.visible = not owned
+	var ring: MeshInstance3D = body.get_node_or_null("PlotHoverRing")
+	if ring != null and not owned:
+		ring.visible = false
 
 
 func _refresh_plot_model(plot_id: int) -> void:
