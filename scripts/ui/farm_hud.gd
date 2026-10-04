@@ -120,6 +120,8 @@ var active_expedition: ExpeditionGame
 ## 合作局主机侧会话（F-04）：地图/战斗面板的裁定入口与快照刷新从这里注入。
 var coop_host: SessionHost = null
 var online_bridge: OnlineFarmBridge = null
+## R4：地点路由回调（farm_world 注入；结算回营地用）。
+var location_router: Callable = Callable()
 var online_room_panel: OnlineRoomPanel = null
 var online_run_panel: OnlineRunPanel = null
 ## ESC 暂停菜单：所有面板收起时才允许弹出；卡片内分主视图与设置子视图两页。
@@ -1566,7 +1568,7 @@ func _build_expedition_panels() -> void:
 	add_child(online_room_panel)
 	online_run_panel = OnlineRunPanel.new()
 	online_run_panel.name = "OnlineRunPanel"
-	online_run_panel.close_requested.connect(func() -> void: online_run_panel.close())
+	online_run_panel.close_requested.connect(_on_online_run_panel_closed)
 	add_child(online_run_panel)
 
 
@@ -1731,6 +1733,22 @@ func _on_run_finished() -> void:
 	active_expedition = null
 	coop_host = null
 	_clear_coop_sinks()
+	_return_to_camp_if_idle()
+
+
+## R4（稿 §6）：结算完成 → 回洞口营地（"入口营地接住一次完整结算"）；失败静默（无路由时维持现状）。
+func _return_to_camp_if_idle() -> void:
+	if location_router == null or not location_router.is_valid():
+		return
+	location_router.call("switch_to", "cave_camp")
+
+
+## 线上局面板关闭：局终（outcome 非空）→ 回营地；局中关闭＝"返回农场并暂停"（保持现状）。
+func _on_online_run_panel_closed() -> void:
+	var run_over := online_bridge != null and str(online_bridge.mirror_run.get("outcome", "")) != ""
+	online_run_panel.close()
+	if run_over:
+		_return_to_camp_if_idle()
 
 
 ## —— M3：线上局编排（出发/继续/进局面板） ——

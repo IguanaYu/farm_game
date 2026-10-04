@@ -81,6 +81,7 @@ func _on_context_ready() -> void:
 	_build_farm()
 	_setup_router()
 	_build_hud()
+	hud.location_router = Callable(router, "switch_to")
 	if online != null:
 		hud.set_online_mode(true)
 		hud.online_request = Callable(online, "request")
@@ -165,9 +166,7 @@ func _build_farm() -> void:
 	_add_building("ShopBuilding", SHOP_MODEL, Vector3(-4.6, 0.08, -4.35), "shop")
 	_add_building("BreederBuilding", BREEDER_MODEL, Vector3(0.0, 0.08, -4.35), "breeder")
 	_add_building("WarehouseBuilding", WAREHOUSE_MODEL, Vector3(4.6, 0.08, -4.35), "warehouse")
-	# 第二大阶段占位入口（2.1 计划 W5）：纯色方盒＋发光顶边，正式素材 2.8 替换。
-	# 位置在东南侧草坪，避开地块、建筑、客人站位与栅栏的点击区。
-	_add_prop("CaveEntrance", Vector3(6.3, 0.08, 4.1), Vector3(2.0, 2.6, 1.8), Color("#4a4358"), Color("#b79ae8"), "cave")
+	## R4：紫盒洞口占位退役——上山石阶直达洞口营地（稿 §6：到营地后才点洞口出发）。
 	_add_prop("LoadoutBench", Vector3(4.6, 0.08, 4.2), Vector3(1.2, 0.9, 0.9), Color("#8a5a33"), Color("#ffd257"), "loadout")
 	_add_prop("CraftTable", Vector3(4.6, 0.08, 3.1), Vector3(1.2, 0.9, 0.9), Color("#7d8a8f"), Color("#9fd0d8"), "craft")
 	## R3：三位客人移入商店内景（稿 §2/§5）；农场门口不再站人。
@@ -207,6 +206,19 @@ func _setup_router() -> void:
 			cam.current = true
 		_set_location_physics(shop, false)
 	router.register("shop", shop, enter_shop, leave_shop)
+	var camp := _build_cave_camp()
+	_set_location_physics(camp, false)
+	var enter_camp := func() -> void:
+		var cam: Camera3D = camp.get_node_or_null("CampCamera")
+		if cam != null:
+			cam.current = true
+		_set_location_physics(camp, true)
+	var leave_camp := func() -> void:
+		var cam: Camera3D = get_node_or_null("FarmCamera")
+		if cam != null:
+			cam.current = true
+		_set_location_physics(camp, false)
+	router.register("cave_camp", camp, enter_camp, leave_camp)
 
 
 ## 商店内景（稿 §5，R3 正式版）：暖木地板+三面墙的浅俯视切墙间；后墙柜台、左右货架、
@@ -323,6 +335,285 @@ func _shop_shelf(node_name: String, location: Vector3) -> StaticBody3D:
 			Vector3(-0.5 + goods * 0.5, 0.44, 0), Color("#d8b56a") if goods % 2 == 0 else Color("#9fd0d8")))
 	shelf.input_event.connect(_on_shop_counter_input)
 	return shelf
+
+
+## —— R4 洞口营地（稿 §6）—————————————————————————————————————————
+
+## 上山石阶：去洞窟营地（稿 §6"避免把上山误当成立即开战"——石阶只换地点，洞口才出发）。
+func _on_stairs_to_camp(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
+		if router != null:
+			router.switch_to("cave_camp")
+
+
+## 营地：山体暗洞口（点击=出发界面）、篝火（组队）、战备台（配装）、帐篷装饰、下山路口。
+func _build_cave_camp() -> Node3D:
+	var camp := Node3D.new()
+	camp.name = "CaveCamp"
+	camp.visible = false
+	add_child(camp)
+	var camp_cam := Camera3D.new()
+	camp_cam.name = "CampCamera"
+	camp_cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camp_cam.size = 9.0
+	camp_cam.position = Vector3(0, 7.0, 9.0)
+	camp.add_child(camp_cam)
+	camp_cam.look_at_from_position(camp_cam.position, Vector3(0, 1.0, -1.0), Vector3.UP)
+	var ground := MeshInstance3D.new()
+	ground.name = "CampGround"
+	var ground_box := BoxMesh.new()
+	ground_box.size = Vector3(13.0, 0.2, 10.0)
+	ground.mesh = ground_box
+	var ground_mat := StandardMaterial3D.new()
+	ground_mat.albedo_color = Color("#5f6b57")
+	ground_mat.roughness = 1.0
+	ground.material_override = ground_mat
+	ground.position = Vector3(0, -0.1, 0)
+	camp.add_child(ground)
+	# 山壁与暗洞腔（稿 §6：岩壁里嵌入暗洞，洞内有深度与冷色反光）。
+	var cliff := MeshInstance3D.new()
+	cliff.name = "CliffWall"
+	var cliff_box := BoxMesh.new()
+	cliff_box.size = Vector3(13.0, 5.6, 1.6)
+	cliff.mesh = cliff_box
+	var cliff_mat := StandardMaterial3D.new()
+	cliff_mat.albedo_color = Color("#6d6d78")
+	cliff_mat.roughness = 1.0
+	cliff.material_override = cliff_mat
+	cliff.position = Vector3(0, 2.8, -4.2)
+	camp.add_child(cliff)
+	for ledge in [-3.2, 0.6, 3.6]:
+		var rock := MeshInstance3D.new()
+		rock.name = "CliffRock"
+		var rock_mesh := BoxMesh.new()
+		rock_mesh.size = Vector3(2.2, 1.1, 1.2)
+		rock.mesh = rock_mesh
+		var rock_mat := StandardMaterial3D.new()
+		rock_mat.albedo_color = Color("#7a7a85")
+		rock.material_override = rock_mat
+		rock.position = Vector3(ledge, 4.6 + float((int(ledge) % 2)) * 0.6, -3.6)
+		rock.rotation_degrees.y = 12.0 if ledge < 0 else -9.0
+		camp.add_child(rock)
+	var cave_mouth := StaticBody3D.new()
+	cave_mouth.name = "CaveMouth"
+	cave_mouth.position = Vector3(0, 1.3, -3.5)
+	cave_mouth.input_ray_pickable = true
+	var mouth_hit := CollisionShape3D.new()
+	var mouth_shape := BoxShape3D.new()
+	mouth_shape.size = Vector3(2.6, 2.6, 1.2)
+	mouth_hit.shape = mouth_shape
+	cave_mouth.add_child(mouth_hit)
+	var mouth_dark := MeshInstance3D.new()
+	mouth_dark.name = "MouthDark"
+	var dark_box := BoxMesh.new()
+	dark_box.size = Vector3(2.2, 2.2, 1.4)
+	mouth_dark.mesh = dark_box
+	var dark_mat := StandardMaterial3D.new()
+	dark_mat.albedo_color = Color("#191a26")
+	dark_mat.emission_enabled = true
+	dark_mat.emission = Color("#3d4a6b")
+	dark_mat.emission_energy_multiplier = 0.25
+	mouth_dark.material_override = dark_mat
+	mouth_dark.position = Vector3(0, 0, -0.3)
+	cave_mouth.add_child(mouth_dark)
+	var mouth_trim := MeshInstance3D.new()
+	mouth_trim.name = "MouthTrim"
+	var trim_box := BoxMesh.new()
+	trim_box.size = Vector3(2.5, 0.12, 0.2)
+	mouth_trim.mesh = trim_box
+	var trim_mat := StandardMaterial3D.new()
+	trim_mat.albedo_color = Color("#7ac7b3")
+	trim_mat.emission_enabled = true
+	trim_mat.emission = Color("#7ac7b3")
+	trim_mat.emission_energy_multiplier = 0.8
+	mouth_trim.material_override = trim_mat
+	mouth_trim.position = Vector3(0, 1.2, 0.35)
+	cave_mouth.add_child(mouth_trim)
+	cave_mouth.set_meta("entry", "depart")
+	cave_mouth.input_event.connect(_on_cave_mouth_input)
+	camp.add_child(cave_mouth)
+	# 篝火（组队）：石圈 + 柴堆 + 火焰。
+	var campfire := StaticBody3D.new()
+	campfire.name = "Campfire"
+	campfire.position = Vector3(-3.0, 0.1, 0.2)
+	campfire.input_ray_pickable = true
+	var fire_hit := CollisionShape3D.new()
+	var fire_shape := BoxShape3D.new()
+	fire_shape.size = Vector3(1.5, 1.0, 1.5)
+	fire_hit.shape = fire_shape
+	fire_hit.position.y = 0.5
+	campfire.add_child(fire_hit)
+	var ring := MeshInstance3D.new()
+	ring.name = "FireRing"
+	var ring_mesh := CylinderMesh.new()
+	ring_mesh.top_radius = 0.75
+	ring_mesh.bottom_radius = 0.8
+	ring_mesh.height = 0.14
+	ring.mesh = ring_mesh
+	var ring_mat := StandardMaterial3D.new()
+	ring_mat.albedo_color = Color("#84848d")
+	ring.material_override = ring_mat
+	ring.position.y = 0.07
+	campfire.add_child(ring)
+	var wood := MeshInstance3D.new()
+	wood.name = "FireWood"
+	var wood_mesh := CylinderMesh.new()
+	wood_mesh.top_radius = 0.09
+	wood_mesh.bottom_radius = 0.09
+	wood_mesh.height = 0.85
+	wood.mesh = wood_mesh
+	var wood_mat := StandardMaterial3D.new()
+	wood_mat.albedo_color = Color("#6b4f35")
+	wood.material_override = wood_mat
+	wood.rotation_degrees.z = 90.0
+	wood.position.y = 0.2
+	campfire.add_child(wood)
+	var flame := MeshInstance3D.new()
+	flame.name = "FireFlame"
+	var flame_mesh := CylinderMesh.new()
+	flame_mesh.top_radius = 0.03
+	flame_mesh.bottom_radius = 0.3
+	flame_mesh.height = 0.65
+	flame.mesh = flame_mesh
+	var flame_mat := StandardMaterial3D.new()
+	flame_mat.albedo_color = Color("#ffb347")
+	flame_mat.emission_enabled = true
+	flame_mat.emission = Color("#ff9a3c")
+	flame_mat.emission_energy_multiplier = 1.4
+	flame.material_override = flame_mat
+	flame.position.y = 0.55
+	campfire.add_child(flame)
+	campfire.set_meta("entry", "team")
+	campfire.input_event.connect(_on_campfire_input)
+	camp.add_child(campfire)
+	# 战备台（配装）。
+	var bench := StaticBody3D.new()
+	bench.name = "WarBench"
+	bench.position = Vector3(3.1, 0.4, 0.4)
+	bench.input_ray_pickable = true
+	var bench_hit := CollisionShape3D.new()
+	var bench_shape := BoxShape3D.new()
+	bench_shape.size = Vector3(1.8, 0.9, 0.9)
+	bench_hit.shape = bench_shape
+	bench.add_child(bench_hit)
+	var bench_top := MeshInstance3D.new()
+	bench_top.name = "BenchTop"
+	var bench_box := BoxMesh.new()
+	bench_box.size = Vector3(1.8, 0.14, 0.9)
+	bench_top.mesh = bench_box
+	var bench_mat := StandardMaterial3D.new()
+	bench_mat.albedo_color = Color("#8a5a33")
+	bench_top.material_override = bench_mat
+	bench.add_child(bench_top)
+	var bench_trim := MeshInstance3D.new()
+	bench_trim.name = "BenchTrim"
+	var btrim_box := BoxMesh.new()
+	btrim_box.size = Vector3(1.9, 0.1, 1.0)
+	bench_trim.mesh = btrim_box
+	var btrim_mat := StandardMaterial3D.new()
+	btrim_mat.albedo_color = Color("#ffd257")
+	btrim_mat.emission_enabled = true
+	btrim_mat.emission = Color("#ffc93c")
+	btrim_mat.emission_energy_multiplier = 0.7
+	bench_trim.material_override = btrim_mat
+	bench_trim.position = Vector3(0, 0.5, 0)
+	bench.add_child(bench_trim)
+	bench.set_meta("entry", "loadout")
+	bench.input_event.connect(_on_war_bench_input)
+	camp.add_child(bench)
+	# 帐篷装饰 + 门口提灯。
+	var tent := MeshInstance3D.new()
+	tent.name = "CampTent"
+	var tent_mesh := PrismMesh.new()
+	tent_mesh.size = Vector3(2.0, 1.5, 2.4)
+	tent.mesh = tent_mesh
+	var tent_mat := StandardMaterial3D.new()
+	tent_mat.albedo_color = Color("#b0894f")
+	tent.material_override = tent_mat
+	tent.position = Vector3(4.6, 0.75, -2.6)
+	tent.rotation_degrees.y = -18.0
+	camp.add_child(tent)
+	var tent_lamp := MeshInstance3D.new()
+	tent_lamp.name = "TentLamp"
+	var tl_box := BoxMesh.new()
+	tl_box.size = Vector3(0.2, 0.24, 0.2)
+	tent_lamp.mesh = tl_box
+	var tl_mat := StandardMaterial3D.new()
+	tl_mat.albedo_color = Color("#ffd257")
+	tl_mat.emission_enabled = true
+	tl_mat.emission = Color("#ffc93c")
+	tl_mat.emission_energy_multiplier = 1.0
+	tent_lamp.material_override = tl_mat
+	tent_lamp.position = Vector3(4.6, 1.0, -1.2)
+	camp.add_child(tent_lamp)
+	# 下山路口（回农场）：路径石板 + 路灯。
+	var downhill := StaticBody3D.new()
+	downhill.name = "DownhillPath"
+	downhill.position = Vector3(0, 0.05, 3.9)
+	downhill.input_ray_pickable = true
+	var path_hit := CollisionShape3D.new()
+	var path_shape := BoxShape3D.new()
+	path_shape.size = Vector3(1.8, 1.0, 0.8)
+	path_hit.shape = path_shape
+	path_hit.position.y = 0.5
+	downhill.add_child(path_hit)
+	for slab in range(3):
+		var plate := MeshInstance3D.new()
+		plate.name = "PathSlab_%d" % slab
+		var plate_box := BoxMesh.new()
+		plate_box.size = Vector3(1.4 - slab * 0.15, 0.08, 0.5)
+		plate.mesh = plate_box
+		var plate_mat := StandardMaterial3D.new()
+		plate_mat.albedo_color = Color("#9a9aa2")
+		plate.material_override = plate_mat
+		plate.position = Vector3(0, 0.04, -slab * 0.6)
+		downhill.add_child(plate)
+	var road_lamp := MeshInstance3D.new()
+	road_lamp.name = "RoadLamp"
+	var rl_pole := CylinderMesh.new()
+	rl_pole.top_radius = 0.05
+	rl_pole.bottom_radius = 0.06
+	rl_pole.height = 1.3
+	road_lamp.mesh = rl_pole
+	var rl_mat := StandardMaterial3D.new()
+	rl_mat.albedo_color = Color("#4b4034")
+	road_lamp.material_override = rl_mat
+	road_lamp.position = Vector3(1.2, 0.65, 3.6)
+	downhill.add_child(road_lamp)
+	downhill.set_meta("entry", "downhill")
+	downhill.input_event.connect(_on_downhill_input)
+	camp.add_child(downhill)
+	return camp
+
+
+## 洞口：打开发射界面（hub 面板；线上/单人分支在 farm_hud._on_depart/_on_resume 内）。
+func _on_cave_mouth_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
+		hud.open_expedition_hub()
+
+
+## 篝火：组队（farm_hud.open_room 自动分流离线房间面板/线上 OnlineRoomPanel）。
+func _on_campfire_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
+		hud.open_room()
+
+
+## 战备台：配装（M2 配装命令在线离线均可用）。
+func _on_war_bench_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
+		hud.open_loadout()
+
+
+## 下山路口：回农场。
+func _on_downhill_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		AudioKit.play(self, "ui_click")
+		if router != null:
+			router.go_back()
 
 
 func _on_shop_counter_input(_camera: Node, event: InputEvent, _position: Vector3, _normal: Vector3, _shape_index: int) -> void:
@@ -476,7 +767,7 @@ func _build_hill_stairs() -> void:
 	shape.size = Vector3(2.4, 1.6, 2.2)
 	hit.shape = shape
 	stair_body.add_child(hit)
-	stair_body.input_event.connect(_on_building_input.bind("cave"))
+	stair_body.input_event.connect(_on_stairs_to_camp)
 	stairs_root.add_child(stair_body)
 
 
