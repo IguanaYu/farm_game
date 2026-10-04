@@ -14,6 +14,8 @@ cd "$(dirname "$0")/.."
 declare -A WHITELIST=(
   ["stage6_regression_smoke.gd"]=3
   ["d41_audio_smoke.gd"]=1
+  # d53 装载真实 main_menu/world 场景做全链路冒烟，退出时引擎资源缓存报告 1 条（非功能错误）
+  ["d53_login_panel_lifecycle.gd"]=1
 )
 
 total=0

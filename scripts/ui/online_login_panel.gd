@@ -130,14 +130,16 @@ func _run_handshake(starter: Callable, busy_text: String) -> void:
 	_show_status(busy_text, false)
 	for button in [activate_button, login_button, revoke_button]:
 		button.disabled = true
-	if client != null:
-		client.queue_free()
+	_retire_client()
 	client = OnlineClient.new()
 	client.name = "OnlineHandshakeClient"
 	add_child(client)
 	var outcome := {"msg": null}
 	client.welcome_received.connect(func(welcome): outcome["msg"] = welcome, CONNECT_ONE_SHOT)
 	client.handshake_failed.connect(func(code, need): outcome["msg"] = {"code": code, "need": need}, CONNECT_ONE_SHOT)
+	## D-01：握手期内被顶替也按失败终结——此前 kicked 无人接，await 会挂到超时，
+	## 真实原因（会话被旧连接占用）被"连接超时"掩盖。
+	client.kicked.connect(func(reason): outcome["msg"] = {"code": reason, "need": {}}, CONNECT_ONE_SHOT)
 	starter.call(client)
 	var deadline := Time.get_ticks_msec() + 12000
 	while outcome["msg"] == null and Time.get_ticks_msec() < deadline:
@@ -146,6 +148,10 @@ func _run_handshake(starter: Callable, busy_text: String) -> void:
 		button.disabled = false
 	_busy = false
 	var msg: Variant = outcome["msg"]
+	## D-01 根治：面板握手是一次性的，所有出路（超时/被拒/被踢）都必须关停并释放
+	## 握手客户端——begin_with_token 的自动重连生命周期若被留在后台，会无限重连、
+	## 反复抢注账号会话，把后续每次登录拖进"顶替-被踢"循环（实测 6 试 1 成的根因）。
+	_retire_client()
 	if msg == null:
 		_show_status("连接超时：检查网络或服务器地址。", true)
 		return
@@ -153,13 +159,19 @@ func _run_handshake(starter: Callable, busy_text: String) -> void:
 		_show_status(_fail_text(str(msg["code"]), msg.get("need", {})), true)
 		return
 	var welcome: Dictionary = msg
-	# 面板的握手连接到此为止；farm_world 会用凭据重新登录（短暂双连由服务器单会话顶替）
-	client.shutdown()
-	client.queue_free()
-	client = null
 	GameFlow.online_token = str(welcome.get("token", OnlineClient.load_session().get("token", "")))
 	_refresh_session()
 	entered_online.emit(GameFlow.online_token)
+
+
+func _retire_client() -> void:
+	## 关停并释放握手客户端。queue_free 前必须先 shutdown：不再被 poll 的 peer
+	## 无法完成关闭握手，服务器要等 TCP 超时才释放会话（会拖累同账号的下次登录）。
+	if client == null:
+		return
+	client.shutdown()
+	client.queue_free()
+	client = null
 
 
 func _fail_text(code: String, need: Dictionary) -> String:
