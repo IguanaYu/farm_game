@@ -39,15 +39,14 @@ const COIN_ICON := preload("res://assets/sprites/item_coin.png")
 const SEED_ICONS := {
 	"cabbage": preload("res://assets/sprites/seed_cabbage.png"),
 	"carrot": preload("res://assets/sprites/seed_carrot.png"),
-	# 萤果／岩芽菜暂用胡萝卜贴图占位：缺键会让商店、播种、收获弹窗直接脚本报错、卡片消失。
-	"glow_berry": preload("res://assets/sprites/seed_carrot.png"),
-	"rock_sprout": preload("res://assets/sprites/seed_carrot.png"),
+	"glow_berry": preload("res://assets/sprites/seed_glow_berry.svg"),
+	"rock_sprout": preload("res://assets/sprites/seed_rock_sprout.svg"),
 }
 const CROP_ICONS := {
 	"cabbage": preload("res://assets/sprites/crop_cabbage.png"),
 	"carrot": preload("res://assets/sprites/crop_carrot.png"),
-	"glow_berry": preload("res://assets/sprites/crop_carrot.png"),
-	"rock_sprout": preload("res://assets/sprites/crop_carrot.png"),
+	"glow_berry": preload("res://assets/sprites/crop_glow_berry.svg"),
+	"rock_sprout": preload("res://assets/sprites/crop_rock_sprout.svg"),
 	"star_bloom": preload("res://assets/sprites/crop_carrot.png"),
 }
 const FERTILIZER_ICONS := {
@@ -117,6 +116,7 @@ var equipment_warehouse_panel: WarehousePanel
 var room_panel: RoomPanel
 var coop_client_panel: CoopClientPanel
 var active_expedition: ExpeditionGame
+var last_expedition_receipt: Dictionary = {}
 ## 合作局主机侧会话（F-04）：地图/战斗面板的裁定入口与快照刷新从这里注入。
 var coop_host: SessionHost = null
 var online_bridge: OnlineFarmBridge = null
@@ -127,6 +127,22 @@ var online_run_panel: OnlineRunPanel = null
 var online_visit_panel: OnlineVisitPanel = null
 ## R7：拜访模式——只读参观，拦截一切自身操作（资产隔离红线）。
 var visiting := false
+var location_id := "farm"
+var location_owner: Dictionary = {}
+var brand_title: Label
+var object_anchor := Vector2.ZERO
+var basket_batch_id := 0
+var selected_guest_id := 0
+var readonly_title := ""
+var readonly_body := ""
+var readonly_owner := ""
+var guest_quotes: Array[PanelContainer] = []
+var quote_labels: Array[Label] = []
+var quote_projection: Callable = Callable()
+var owner_projection: Callable = Callable()
+var owner_quote: PanelContainer
+var owner_quote_label: Label
+
 ## ESC 暂停菜单：所有面板收起时才允许弹出；卡片内分主视图与设置子视图两页。
 var pause_overlay: Control
 var pause_back_button: Button
@@ -139,12 +155,7 @@ var pause_settings_panel: SettingsView
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var hud_theme := Theme.new()
-	var chinese_font := SystemFont.new()
-	chinese_font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
-	hud_theme.default_font = chinese_font
-	hud_theme.default_font_size = 18
-	theme = hud_theme
+	theme = LifeUI.make_theme()
 	_build_brand()
 	_build_counters()
 	_build_context()
@@ -153,6 +164,7 @@ func _ready() -> void:
 	_build_modal()
 	_build_expedition_panels()
 	_build_pause_overlay()
+	_build_world_quotes()
 
 
 func refresh(state: Dictionary) -> void:
@@ -169,6 +181,7 @@ func refresh(state: Dictionary) -> void:
 	level_bar.value = 100.0 if progress["next_need"] < 0 else 100.0 * progress["into_level"] / maxf(1, progress["next_need"])
 	update_harvest_entry()
 	_update_tutorial_banner()
+	_refresh_world_quotes()
 	if modal_overlay.visible:
 		_render_modal()
 
@@ -190,13 +203,16 @@ func update_harvest_entry() -> void:
 	var mature_count: int = 0
 	if game != null:
 		mature_count = game.mature_plot_ids(view_now).size()
-	harvest_all_entry.visible = mature_count > 0
+	harvest_all_entry.visible = mature_count > 0 and location_id == "farm" and not visiting
 	harvest_all_entry.get_node("ActionStack/ActionCaption").text = "收获 · %d" % mature_count
 
 
 func show_plot_hint(plot_id: int, plot: Dictionary, now: int) -> void:
 	if plot_id == 0:
-		plot_hint_label.text = "选一块地，开始种植"
+		plot_hint_label.text = {"farm":"点击田地种植 · 建筑与路口可以进入", "shop":"篮子选数量，再找客人成交", "cave_camp":"洞口出发 · 战备台配装 · 篝火组队", "visit_yard":"只读参观 · 房子进屋 · 院门回家", "visit_house":"坐坐喝茶 · 门窗回到院子"}.get(location_id, "")
+		return
+	if plot.is_empty() or not bool(plot.get("owned",false)):
+		plot_hint_label.text = "待开垦地 · 点击查看开垦条件"
 		return
 	if plot["seed_id"] == 0:
 		plot_hint_label.text = "第 %d 块地  ·  空地，点击播种" % plot_id
@@ -217,6 +233,7 @@ func show_plot_hint(plot_id: int, plot: Dictionary, now: int) -> void:
 
 func show_status(message: String) -> void:
 	status_label.text = message
+	status_label.visible = not message.is_empty()
 	status_label.tooltip_text = message
 	toast_timer.start()
 
@@ -343,9 +360,21 @@ func open_plot_care(plot_id: int) -> void:
 	_render_modal()
 
 
-func _apply_modal_height(half_height: int) -> void:
-	modal_panel.offset_top = -half_height
-	modal_panel.offset_bottom = half_height
+func _apply_modal_height(_half_height: int) -> void:
+	# Light workspaces leave the world visible; only complex expedition work uses a full-screen mode.
+	var compact := active_modal in ["seed_picker","plot_care","harvest","harvest_all","expansion","readonly","guest"]
+	var width := 430.0 if compact else 530.0
+	var height := minf(490.0 if compact else 640.0,size.y-140.0)
+	var at := Vector2(size.x-width-24,112)
+	if compact and location_id == "farm" and object_anchor != Vector2.ZERO:
+		at = object_anchor + Vector2(48,-height*0.45)
+		if at.x+width > size.x-24:
+			at.x = object_anchor.x-width-48
+		at.x = clampf(at.x,24,size.x-width-24)
+		at.y = clampf(at.y,108,size.y-height-24)
+	modal_panel.set_anchors_and_offsets_preset(Control.PRESET_TOP_LEFT)
+	modal_panel.position = at
+	modal_panel.size = Vector2(width,height)
 	modal_scroll.scroll_vertical = 0
 
 
@@ -354,7 +383,7 @@ func _build_brand() -> void:
 	brand.name = "FarmBrand"
 	brand.offset_left = 24
 	brand.offset_top = 22
-	brand.offset_right = 278
+	brand.offset_right = 345
 	brand.offset_bottom = 88
 	add_child(brand)
 	var margin := _margin(14, 10)
@@ -366,7 +395,8 @@ func _build_brand() -> void:
 	var titles := VBoxContainer.new()
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(titles)
-	titles.add_child(_label("小小农场", 22, TEXT_DARK))
+	brand_title = _label("我的农场",22,TEXT_DARK)
+	titles.add_child(brand_title)
 	level_bar = _progress(LEAF)
 	level_bar.custom_minimum_size = Vector2(100, 4)
 	titles.add_child(level_bar)
@@ -418,6 +448,9 @@ func _build_tutorial_banner() -> void:
 func _update_tutorial_banner() -> void:
 	if tutorial_panel == null:
 		return
+	if location_id != "farm" or visiting:
+		tutorial_panel.hide()
+		return
 	var step := int(current_state.get("tutorial_step", 99))
 	if step < 0 or step >= TUTORIAL_STEPS.size():
 		tutorial_panel.visible = false
@@ -465,8 +498,8 @@ func _build_context() -> void:
 	context.anchor_top = 1.0
 	context.anchor_bottom = 1.0
 	context.offset_left = 24
-	context.offset_right = 690
-	context.offset_top = -92
+	context.offset_right = 570
+	context.offset_top = -74
 	context.offset_bottom = -24
 	context.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(context)
@@ -480,45 +513,30 @@ func _build_context() -> void:
 	plot_hint_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	stack.add_child(plot_hint_label)
 	status_label = _label("", 14, TEXT_MUTED)
+	status_label.visible = false
 	status_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	stack.add_child(status_label)
 	toast_timer = Timer.new()
 	toast_timer.one_shot = true
 	toast_timer.wait_time = 6.0
-	toast_timer.timeout.connect(func(): status_label.text = "")
+	toast_timer.timeout.connect(func(): status_label.text = ""; status_label.hide())
 	add_child(toast_timer)
 
 
 func _build_actions() -> void:
 	var actions := HBoxContainer.new()
 	actions.name = "FarmActions"
-	actions.anchor_left = 1.0
-	actions.anchor_right = 1.0
-	actions.anchor_top = 1.0
-	actions.anchor_bottom = 1.0
-	actions.offset_left = -554
-	actions.offset_right = -20
-	actions.offset_top = -100
-	actions.offset_bottom = -24
-	actions.add_theme_constant_override("separation", 10)
+	actions.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	actions.offset_left = -156
+	actions.offset_right = -24
+	actions.offset_top = -90
+	actions.offset_bottom = -20
 	add_child(actions)
-	harvest_all_entry = _icon_action("一键收获", CRATE_ICON, Color("#eaf4df"), Color("#87b06f"))
+	harvest_all_entry = _icon_action("一键收获", CRATE_ICON, CREAM, Color("#a8bf8a"))
 	harvest_all_entry.name = "HarvestAllButton"
 	harvest_all_entry.visible = false
 	harvest_all_entry.pressed.connect(func(): harvest_all_requested.emit())
 	actions.add_child(harvest_all_entry)
-	var market_button := _icon_action("集市", COIN_ICON, CREAM, Color("#dce5d9"))
-	market_button.name = "OpenMarketButton"
-	market_button.pressed.connect(func(): view_now = 0; open_market())
-	actions.add_child(market_button)
-	var shop_button := _icon_action("商店", SHOP_ICON, CREAM, Color("#dce5d9"))
-	shop_button.name = "OpenShopButton"
-	shop_button.pressed.connect(open_shop)
-	actions.add_child(shop_button)
-	var warehouse_button := _icon_action("仓库", WAREHOUSE_ICON, CREAM, Color("#dce5d9"))
-	warehouse_button.name = "OpenWarehouseButton"
-	warehouse_button.pressed.connect(func(): open_warehouse())
-	actions.add_child(warehouse_button)
 
 
 func _icon_action(caption: String, texture: Texture2D, fill: Color, border: Color) -> Button:
@@ -551,12 +569,13 @@ func _build_modal() -> void:
 	modal_overlay = Control.new()
 	modal_overlay.name = "ModalOverlay"
 	modal_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	modal_overlay.mouse_filter = Control.MOUSE_FILTER_STOP
+	modal_overlay.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	modal_overlay.visible = false
 	add_child(modal_overlay)
 	var shade := ColorRect.new()
 	shade.name = "ModalShade"
-	shade.color = Color(0.08, 0.16, 0.12, 0.42)
+	shade.color = Color.TRANSPARENT
+	shade.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	modal_overlay.add_child(shade)
 	modal_panel = _panel(CREAM, Color("#e1e8df"), 20)
@@ -650,6 +669,30 @@ func _render_modal() -> void:
 		"market":
 			sell_all_button.visible = false
 			_render_market()
+		"basket":
+			sell_all_button.visible = false
+			_render_basket()
+		"guest":
+			sell_all_button.visible = false
+			_render_guest()
+		"expansion":
+			sell_all_button.visible = false
+			_render_expansion()
+		"readonly":
+			sell_all_button.visible = false
+			modal_title.text = readonly_title
+			modal_content.add_child(_wrapped(readonly_owner,LEAF))
+			modal_content.add_child(_wrapped(readonly_body))
+	call_deferred("_fit_workspace")
+
+
+func _fit_workspace() -> void:
+	if not modal_overlay.visible:
+		return
+	var cap := minf(490.0 if active_modal in ["seed_picker","plot_care","harvest","expansion","readonly","guest"] else 640.0,size.y-140.0)
+	modal_panel.size.y = minf(cap,maxf(210,modal_content.get_combined_minimum_size().y+146))
+	modal_panel.position.x = maxf(24,minf(modal_panel.position.x,size.x-modal_panel.size.x-24))
+
 
 
 func _render_harvest() -> void:
@@ -1028,15 +1071,15 @@ func _warehouse_tabs(active: String) -> HBoxContainer:
 	tabs.name = "WarehouseTabs"
 	tabs.add_theme_constant_override("separation", 8)
 	var crops_tab := _solid_button("作物 %d/%d" % [game.crop_slots_used(), game.warehouse_capacity()], LEAF if active == "crops" else Color("#edf2e9"))
-	crops_tab.custom_minimum_size.x = 200
+	crops_tab.custom_minimum_size.x = 100
 	crops_tab.pressed.connect(func(): open_warehouse("crops"))
 	tabs.add_child(crops_tab)
 	var seeds_tab := _solid_button("种子 %d/%d" % [game.seed_slots_used(), game.warehouse_capacity()], LEAF if active == "seeds" else Color("#edf2e9"))
-	seeds_tab.custom_minimum_size.x = 200
+	seeds_tab.custom_minimum_size.x = 100
 	seeds_tab.pressed.connect(func(): open_warehouse("seeds"))
 	tabs.add_child(seeds_tab)
 	var breeder_tab := _solid_button("育种机", LEAF if active == "breeder" else Color("#edf2e9"))
-	breeder_tab.custom_minimum_size.x = 120
+	breeder_tab.custom_minimum_size.x = 90
 	breeder_tab.pressed.connect(func(): open_breeder())
 	tabs.add_child(breeder_tab)
 	return tabs
@@ -1266,7 +1309,7 @@ func _render_market() -> void:
 	for batch in current_state["crop_batches"]:
 		modal_content.add_child(_market_batch_card(batch, market))
 	var config := _disclosure(modal_content, "今日客人 · 收购公式 · 锁定", "market_config")
-	var guest_row := HBoxContainer.new()
+	var guest_row := VBoxContainer.new()
 	guest_row.name = "MarketGuestRow"
 	guest_row.add_theme_constant_override("separation", 8)
 	config.add_child(guest_row)
@@ -1296,7 +1339,7 @@ func _render_market() -> void:
 		config.add_child(_wrapped("锁定变更已记录，明天零点生效。", LEAF))
 	config.add_child(_wrapped("客人收购偏好植物时，公式倍率额外 ×1.2。锁客人与锁公式的变更均于明天生效；锁公式保留类型，系数仍每日重抽。"))
 	var locked_formula: Dictionary = market.get("locked_formula", {})
-	for kind in ["cabbage", "carrot"]:
+	for kind in PlantDefs.plant_kinds():
 		var formula: Dictionary = market["formulas"].get(kind, {})
 		var card := _panel(Color("#f0f3eb"), Color("#e1e8df"), 12)
 		card.name = "FormulaCard_%s" % kind
@@ -1331,7 +1374,7 @@ func _market_batch_card(batch: Dictionary, market: Dictionary) -> PanelContainer
 	var stack := _card_stack(card)
 	_item_heading(stack, CROP_ICONS[batch["kind"]], "%s ×%d" % [PlantDefs.get_plant(batch["kind"])["display_name"], batch["count"]], "%d 分 / 个 · 地块 %02d" % [int(batch.get("per_crop_score", batch["base_score"])), batch["plot_id"]])
 	stack.add_child(_attribute_chips(batch.get("attributes", {})))
-	var controls := HBoxContainer.new()
+	var controls := VBoxContainer.new()
 	controls.add_theme_constant_override("separation", 10)
 	stack.add_child(controls)
 	controls.add_child(_label("卖出", 15, TEXT_MUTED))
@@ -1352,7 +1395,7 @@ func _market_batch_card(batch: Dictionary, market: Dictionary) -> PanelContainer
 	var best_price := -1
 	for guest_id in market.get("guest_ids", []):
 		best_price = maxi(best_price, int(game.quote(batch, selected_count, int(guest_id))["coins"]))
-	var quotes := HBoxContainer.new()
+	var quotes := VBoxContainer.new()
 	quotes.add_theme_constant_override("separation", 10)
 	stack.add_child(quotes)
 	var info := _disclosure(stack, "报价计算", "quote_%d" % batch["id"])
@@ -1412,21 +1455,30 @@ func close_modal_after_action() -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed and not event.echo and event.is_action_pressed("pause"):
-		if pause_settings_view != null and pause_settings_view.visible:
-			_show_pause_main()
-		elif pause_overlay != null and pause_overlay.visible:
-			_close_pause()
-		elif not _any_panel_open():
-			_open_pause()
+	if not event is InputEventKey or not event.pressed or event.echo or not event.is_action_pressed("pause"):
+		return
+	if pause_settings_view != null and pause_settings_view.visible:
+		_show_pause_main()
+	elif pause_overlay != null and pause_overlay.visible:
+		_close_pause()
+	elif modal_overlay.visible:
+		_close_modal()
+	else:
+		for panel in [online_visit_panel,online_room_panel,online_run_panel,loadout_panel,crafting_panel,equipment_warehouse_panel,room_panel,coop_client_panel,expedition_hub_panel]:
+			if panel != null and panel.visible:
+				panel.close_requested.emit()
+				get_viewport().set_input_as_handled()
+				return
+		if _any_panel_open():
+			return  # Battle and route panels own their selection/menu rules.
+		_open_pause()
+	get_viewport().set_input_as_handled()
 
 
-## 战斗/组队等面板自己也监听 ESC 但不消费事件：面板打开时 HUD 必须完全让位，
-## 否则同一次 ESC 会既关面板又弹暂停。
 func _any_panel_open() -> bool:
 	if active_modal != "" or modal_overlay.visible:
 		return true
-	for ui_panel in [expedition_hub_panel, loadout_panel, battle_screen, map_panel, crafting_panel, equipment_warehouse_panel, room_panel, coop_client_panel]:
+	for ui_panel in [expedition_hub_panel, loadout_panel, battle_screen, map_panel, crafting_panel, equipment_warehouse_panel, room_panel, coop_client_panel, online_room_panel, online_run_panel, online_visit_panel]:
 		if ui_panel != null and ui_panel.visible:
 			return true
 	return false
@@ -1498,7 +1550,12 @@ func _build_pause_settings_view() -> VBoxContainer:
 	pause_settings_view.add_child(title)
 	pause_settings_panel = SettingsView.new()
 	pause_settings_panel.name = "PauseSettingsPanel"
-	pause_settings_view.add_child(pause_settings_panel)
+	var settings_scroll := ScrollContainer.new()
+	settings_scroll.custom_minimum_size = Vector2(0,480)
+	settings_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	pause_settings_view.add_child(settings_scroll)
+	pause_settings_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_scroll.add_child(pause_settings_panel)
 	var back_button := _solid_button("返回", ACCENT_GOLD)
 	back_button.name = "PauseSettingsBackButton"
 	back_button.pressed.connect(_show_pause_main)
@@ -1571,6 +1628,7 @@ func _build_expedition_panels() -> void:
 	map_panel.battle_start_requested.connect(_on_run_battle_start)
 	map_panel.farm_save_requested.connect(_on_expedition_farm_save)
 	map_panel.run_finished.connect(_on_run_finished)
+	map_panel.settlement_presented.connect(func(receipt: Dictionary): last_expedition_receipt = receipt)
 	add_child(map_panel)
 	crafting_panel = CraftingPanel.new()
 	crafting_panel.name = "CraftingPanel"
@@ -1591,7 +1649,10 @@ func _build_expedition_panels() -> void:
 	add_child(room_panel)
 	coop_client_panel = CoopClientPanel.new()
 	coop_client_panel.name = "CoopClientPanel"
-	coop_client_panel.close_requested.connect(func() -> void: coop_client_panel.close())
+	coop_client_panel.close_requested.connect(func() -> void:
+		coop_client_panel.close()
+		last_expedition_receipt = coop_client_panel.settlement_receipt.duplicate(true)
+		_return_to_camp_if_idle())
 	add_child(coop_client_panel)
 	online_room_panel = OnlineRoomPanel.new()
 	online_room_panel.name = "OnlineRoomPanel"
@@ -1629,6 +1690,8 @@ func set_online_expedition(bridge: OnlineFarmBridge) -> void:
 
 func open_room() -> void:
 	## 2.6：好友组队房间页（局域网／本机直连）；M3 线上模式走服务器房间。
+	if location_router.is_valid() and location_id != "cave_camp":
+		location_router.call("cave_camp",false)
 	if online_mode:
 		if online_bridge == null:
 			show_status("线上房间不可用，请重新登录。")
@@ -1746,6 +1809,8 @@ func _on_resume_requested() -> void:
 
 func _on_run_battle_start(combat: CombatGame) -> void:
 	map_panel.visible = false
+	if active_expedition != null:
+		battle_screen.layer_id = str(active_expedition.run.get("layer_id","moss_stone_shallow"))
 	battle_screen.open_run(combat)
 
 
@@ -1776,15 +1841,18 @@ func _on_run_finished() -> void:
 func _return_to_camp_if_idle() -> void:
 	if location_router == null or not location_router.is_valid():
 		return
-	location_router.call("switch_to", "cave_camp")
+	location_router.call("cave_camp", false)
+	if not last_expedition_receipt.is_empty():
+		show_status("本次带回 %d 件 · 新收获 %d 件 · 保护 %d 件。点营地行囊整理。" % [last_expedition_receipt.get("returned",[]).size(),last_expedition_receipt.get("gained",[]).size(),last_expedition_receipt.get("protected",[]).size()])
 
 
 ## 线上局面板关闭：局终（outcome 非空）→ 回营地；局中关闭＝"返回农场并暂停"（保持现状）。
 func _on_online_run_panel_closed() -> void:
 	var run_over := online_bridge != null and str(online_bridge.mirror_run.get("outcome", "")) != ""
-	online_run_panel.close()
 	if run_over:
-		_return_to_camp_if_idle()
+		last_expedition_receipt = online_bridge.mirror_settlement.duplicate(true)
+	online_run_panel.close()
+	_return_to_camp_if_idle()
 
 
 ## —— M3：线上局编排（出发/继续/进局面板） ——
@@ -1856,6 +1924,7 @@ func close_expedition_panels() -> void:
 func _on_loadout_close() -> void:
 	## 关闭战备：剔除演示物品；真实改动通过信号交给组合根保存；重置演示连战的生命延续。
 	loadout_panel.close()
+	_return_to_camp_if_idle()
 	var dirty: bool = loadout_panel.dirty
 	loadout_panel.mark_saved()
 	if battle_screen != null:
@@ -1905,7 +1974,7 @@ func _margin(horizontal: int, vertical: int) -> MarginContainer:
 func _label(content: String, size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = content
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", maxi(18,size))
 	label.add_theme_color_override("font_color", color)
 	return label
 
@@ -1916,7 +1985,7 @@ func _solid_button(content: String, fill: Color) -> Button:
 	button.custom_minimum_size.y = 40
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
-	button.add_theme_font_size_override("font_size", 16)
+	button.add_theme_font_size_override("font_size", 18)
 	var ink := TEXT_DARK if fill.get_luminance() > 0.5 else Color.WHITE
 	button.add_theme_color_override("font_color", ink)
 	button.add_theme_color_override("font_hover_color", ink)
@@ -1990,7 +2059,7 @@ func _card_stack(card: PanelContainer) -> VBoxContainer:
 
 func _grid(parent: Control) -> GridContainer:
 	var grid := GridContainer.new()
-	grid.columns = 2
+	grid.columns = 1
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.add_theme_constant_override("h_separation", 12)
 	grid.add_theme_constant_override("v_separation", 12)
@@ -2119,3 +2188,235 @@ func _seed_inventory_card(group: Dictionary, planting := false) -> PanelContaine
 		recycle.pressed.connect(_emit_recycle.bind(seed_id))
 		actions.add_child(recycle)
 	return card
+
+func set_object_anchor(at: Vector2) -> void:
+	object_anchor = at
+
+
+func set_location(id: String, owner: Dictionary = {}) -> void:
+	location_id = id
+	location_owner = owner
+	_close_modal()
+	brand_title.text = {"farm":"我的农场","shop":"田边杂货铺","cave_camp":"洞口营地","visit_yard":str(owner.get("nick","邻居"))+" · 院子","visit_house":str(owner.get("nick","邻居"))+" · 小屋"}.get(id,"小小农场")
+	brand_title.tooltip_text = "右上角是我的资产" if id.begins_with("visit") else ""
+	get_node("FarmBrand").custom_minimum_size.x = 0
+	get_node("FarmBrand").offset_right = 390 if id.begins_with("visit") else 345
+	level_bar.visible = id == "farm"
+	level_value.visible = id == "farm"
+	tutorial_panel.visible = id == "farm" and int(current_state.get("tutorial_step",5)) < 5
+	show_plot_hint(0,{},view_now)
+	update_harvest_entry()
+	_refresh_world_quotes()
+	if owner_quote_label != null:
+		var welcome := str(owner.get("welcome_message",""))
+		owner_quote_label.text = str(owner.get("nick","邻居"))+" · "+("在线" if bool(owner.get("online",false)) else "离线")+"\n静态形象 · 默认家居\n"+(welcome if not welcome.is_empty() else "主人尚未设置欢迎留言。")
+
+
+func show_object_hint(caption: String) -> void:
+	if caption == "":
+		show_plot_hint(0,{},view_now)
+	else:
+		plot_hint_label.text = caption
+
+
+func open_expansion() -> void:
+	active_modal = "expansion"
+	_apply_modal_height(220)
+	modal_overlay.visible = true
+	_render_modal()
+
+
+func _render_expansion() -> void:
+	modal_title.text = "开垦新田"
+	modal_icon.texture = WAREHOUSE_ICON
+	var owned := game.owned_plot_ids().size()
+	modal_content.add_child(_wrapped("已开垦 %d / %d 块地" % [owned,FarmGame.MAX_PLOTS],LEAF))
+	modal_content.add_child(_wrapped("扩地按原来的开垦顺序进行。购买后，这片草地就能播种。"))
+	# The existing facilities card is the single source of cost, unlock conditions and purchase action.
+	var price := int(MarketDefs.PLOT_PRICES.get(owned+1,0))
+	modal_content.add_child(_wrapped("开垦下一块地：%d 金" % price,LEAF))
+	var buy := _solid_button("开垦 · %d 金" % price,LEAF)
+	buy.disabled = owned >= FarmGame.MAX_PLOTS or int(current_state.get("coins",0))<price
+	buy.pressed.connect(func(): buy_plot_requested.emit())
+	modal_content.add_child(buy)
+
+
+func open_readonly(title: String, content: String, owner: String) -> void:
+	readonly_title = title
+	readonly_body = content
+	readonly_owner = owner
+	active_modal = "readonly"
+	_apply_modal_height(200)
+	modal_overlay.visible = true
+	_render_modal()
+
+
+func selected_basket() -> Dictionary:
+	var batches: Array = current_state.get("crop_batches",[])
+	for batch in batches:
+		if int(batch["id"]) == basket_batch_id:
+			return batch
+	if not batches.is_empty():
+		basket_batch_id = int(batches[0]["id"])
+		return batches[0]
+	basket_batch_id = 0
+	return {}
+
+
+func open_basket() -> void:
+	selected_guest_id = 0
+	active_modal = "basket"
+	_apply_modal_height(270)
+	modal_overlay.visible = true
+	_render_modal()
+
+
+func _render_basket() -> void:
+	modal_title.text = "作物篮"
+	modal_icon.texture = CRATE_ICON
+	var chosen := selected_basket()
+	modal_content.add_child(_wrapped("选一批作物和数量，三位客人的报价会同步更新。",LEAF))
+	if chosen.is_empty():
+		modal_content.add_child(_wrapped("篮子空了，回农场收获后再来。"))
+	for batch in current_state.get("crop_batches",[]):
+		var card := _panel(Color.WHITE,Color("#9eb887") if int(batch["id"]) == basket_batch_id else Color("#dce4d3"),12)
+		modal_content.add_child(card)
+		var col := _card_stack(card)
+		var select := _solid_button("%s ×%d%s" % [PlantDefs.get_plant(batch["kind"])["display_name"],batch["count"]," · 已选" if int(batch["id"]) == basket_batch_id else ""],Color("#e4ecd9"))
+		select.pressed.connect(func(): basket_batch_id = int(batch["id"]); _render_modal(); _refresh_world_quotes())
+		col.add_child(select)
+		if int(batch["id"]) == basket_batch_id:
+			var quantity := OptionButton.new()
+			quantity.name = "BasketQuantity"
+			for n in range(1,int(batch["count"])+1):
+				quantity.add_item("卖出 %d 个" % n)
+			quantity.selected = clampi(int(market_sell_counts.get(basket_batch_id,batch["count"])),1,int(batch["count"]))-1
+			quantity.item_selected.connect(func(n): market_sell_counts[basket_batch_id] = n+1; _refresh_world_quotes())
+			col.add_child(quantity)
+	var done := _solid_button("提好篮子 · 找客人",LEAF)
+	done.pressed.connect(_close_modal)
+	modal_content.add_child(done)
+
+
+func open_guest(guest_id: int) -> void:
+	selected_guest_id = guest_id
+	active_modal = "guest"
+	_apply_modal_height(230)
+	modal_overlay.visible = true
+	_render_modal()
+
+
+func _render_guest() -> void:
+	var guest: Dictionary = MarketDefs.GUESTS.get(selected_guest_id,{})
+	modal_title.text = str(guest.get("display_name","客人"))+" · 收购"
+	modal_icon.texture = COIN_ICON
+	var batch := selected_basket()
+	if batch.is_empty():
+		modal_content.add_child(_wrapped("今天还没有带作物来。"))
+		return
+	var count := clampi(int(market_sell_counts.get(int(batch["id"]),batch["count"])),1,int(batch["count"]))
+	var price := game.quote(batch,count,selected_guest_id)
+	_item_heading(modal_content,CROP_ICONS[batch["kind"]],"%s ×%d" % [PlantDefs.get_plant(batch["kind"])["display_name"],count],"篮子里的所选数量")
+	modal_content.add_child(_label("报价 %d 金" % price["coins"],32,LEAF))
+	modal_content.add_child(_wrapped("倍率 ×%.2f%s；成交时会重新核对库存和今天的报价。" % [price["multiplier"]," · 偏好加成 ×1.2" if price["preferred"] else ""]))
+	var sell := _solid_button("成交 · %d 金" % price["coins"],LEAF)
+	sell.name = "GuestConfirmSale"
+	sell.pressed.connect(func(): sell_batch_to_requested.emit(int(batch["id"]),count,selected_guest_id))
+	modal_content.add_child(sell)
+	var change := _plain_button("重新选批次与数量",TEXT_DARK)
+	change.pressed.connect(open_basket)
+	modal_content.add_child(change)
+	var board := _plain_button("查看全部报价与锁定",TEXT_DARK)
+	board.pressed.connect(open_market)
+	modal_content.add_child(board)
+
+
+func _build_world_quotes() -> void:
+	owner_quote = _panel(CREAM,Color("#c9ceb4"),10)
+	owner_quote.name = "OwnerWelcome"
+	owner_quote.custom_minimum_size = Vector2(300,0)
+	owner_quote.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	owner_quote.visible = false
+	add_child(owner_quote)
+	owner_quote_label = _wrapped("",TEXT_DARK)
+	owner_quote_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	owner_quote.add_child(owner_quote_label)
+	for i in range(3):
+		var panel := _panel(Color("#fff9e8"),Color("#b9c79d"),12)
+		panel.name = "GuestDialogue_%d" % (i+1)
+		panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.size = Vector2(220,120)
+		panel.visible = false
+		add_child(panel)
+		var label := _label("",18,TEXT_DARK)
+		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		panel.add_child(label)
+		guest_quotes.append(panel)
+		quote_labels.append(label)
+	move_child(modal_overlay,-1)
+	move_child(pause_overlay,-1)
+
+
+func _refresh_world_quotes() -> void:
+	if quote_labels.is_empty() or game == null:
+		return
+	var ids: Array = game.state.get("market",{}).get("guest_ids",[])
+	var batch := selected_basket()
+	var count := 0 if batch.is_empty() else clampi(int(market_sell_counts.get(int(batch["id"]),batch["count"])),1,int(batch["count"]))
+	var best := -1
+	for id in ids:
+		if count>0:
+			best = maxi(best,int(game.quote(batch,count,int(id))["coins"]))
+	for i in range(guest_quotes.size()):
+		guest_quotes[i].visible = location_id == "shop" and i<ids.size()
+		if i>=ids.size():
+			continue
+		var guest: Dictionary = MarketDefs.GUESTS[int(ids[i])]
+		var pref: String = PlantDefs.get_plant(guest["preferred_kind"])["display_name"]
+		var text: String = str(guest["display_name"])+"\n今天想买"+pref+"。"
+		if count>0:
+			var price := game.quote(batch,count,int(ids[i]))
+			text += "\n%d 个 · %d 金%s" % [count,price["coins"]," · 最高" if int(price["coins"])==best else ""]
+		else:
+			text += "\n先到作物篮选一批菜吧。"
+		quote_labels[i].text = text
+
+
+func _process(_delta: float) -> void:
+	if owner_quote != null:
+		owner_quote.visible = location_id=="visit_house" and not _any_panel_open()
+		if owner_quote.visible and owner_projection.is_valid():
+			var head: Vector2 = owner_projection.call()
+			owner_quote.size = Vector2(300,0)
+			owner_quote.position = Vector2(clampf(head.x-150,16,size.x-316),clampf(head.y-owner_quote.size.y-32,104,size.y-200))
+	for notice in get_children():
+		if str(notice.name).begins_with("SaleAcknowledged"):
+			notice.visible = location_id == "shop"
+	if location_id != "shop" or not quote_projection.is_valid():
+		return
+	for i in range(guest_quotes.size()):
+		guest_quotes[i].visible = not _any_panel_open() and i<game.state.get("market",{}).get("guest_ids",[]).size()
+		var at: Vector2 = quote_projection.call(i)
+		guest_quotes[i].position = Vector2(clampf(at.x-110,16,size.x-236),clampf(at.y-135,98,size.y-220))
+
+
+func show_sale_feedback(guest_id: int, coins: int) -> void:
+	# Called only after a successful rule result or authoritative reply.
+	if location_id != "shop" or not quote_projection.is_valid():
+		return
+	var ids: Array = game.state["market"]["guest_ids"]
+	var index := ids.find(guest_id)
+	if index < 0:
+		return
+	var notice := _label("谢谢，菜很新鲜！\n+%d 金币" % coins,22,LEAF)
+	notice.name = "SaleAcknowledged"
+	notice.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	notice.position = quote_projection.call(index)+Vector2(-80,-90)
+	notice.z_index = 60
+	add_child(notice)
+	var tween := notice.create_tween().set_parallel(true)
+	if not SettingsStore.get_reduce_motion():
+		tween.tween_property(notice,"position:y",notice.position.y-32,1.4)
+	tween.tween_property(notice,"modulate:a",0.0,0.6).set_delay(0.8)
+	tween.chain().tween_callback(notice.queue_free)

@@ -12,6 +12,7 @@ var _locations := {}  # id -> {root: Node, on_enter: Callable, on_leave: Callabl
 var _stack: Array = []
 var _fade_layer: CanvasLayer = null
 var _fade_rect: ColorRect = null
+var _fade_tween: Tween = null
 
 
 func register(id: String, root: Node, on_enter := Callable(), on_leave := Callable()) -> void:
@@ -21,6 +22,13 @@ func register(id: String, root: Node, on_enter := Callable(), on_leave := Callab
 		root.visible = true
 
 
+func unregister(id: String) -> void:
+	# Active locations must leave through switch_to so visibility, picking and cameras agree.
+	assert(id != current, "Leave a location before unregistering it")
+	_locations.erase(id)
+	_stack = _stack.filter(func(entry): return str(entry) != id)
+
+
 ## 切换地点：push=true 记录返回栈（普通入口）；同地点直通不动作。
 func switch_to(id: String, push := true) -> void:
 	if not _locations.has(id):
@@ -28,7 +36,7 @@ func switch_to(id: String, push := true) -> void:
 		return
 	if id == current:
 		return
-	_fade_out()
+	_transition()
 	var from := str(current)
 	if _locations.has(from):
 		var leaving: Dictionary = _locations[from]
@@ -42,7 +50,6 @@ func switch_to(id: String, push := true) -> void:
 	(entering["root"] as Node).visible = true
 	if entering["on_enter"].is_valid():
 		entering["on_enter"].call()
-	_fade_in()
 	location_changed.emit(id)
 
 
@@ -74,18 +81,16 @@ func _ensure_fade() -> void:
 	_fade_layer.add_child(_fade_rect)
 
 
-func _fade_out() -> void:
+func _transition() -> void:
 	_ensure_fade()
 	if _fade_rect == null:
 		return
-	var tween := create_tween()
-	tween.tween_property(_fade_rect, "color:a", 1.0, 0.12)
-
-
-func _fade_in() -> void:
-	_ensure_fade()
-	if _fade_rect == null:
+	if _fade_tween != null and _fade_tween.is_valid():
+		_fade_tween.kill()
+	if SettingsStore.get_reduce_motion():
+		_fade_rect.color.a = 0.0
 		return
-	var tween := create_tween()
-	tween.tween_interval(0.06)
-	tween.tween_property(_fade_rect, "color:a", 0.0, 0.12)
+	# Location changes remain synchronous; one short veil fades away without competing tweens.
+	_fade_rect.color.a = 0.28
+	_fade_tween = create_tween()
+	_fade_tween.tween_property(_fade_rect, "color:a", 0.0, 0.24)

@@ -6,6 +6,7 @@ extends Control
 signal battle_start_requested(combat: CombatGame)
 signal farm_save_requested
 signal run_finished
+signal settlement_presented(receipt: Dictionary)
 
 ## 合作局会话裁定入口（F-04）：设置后所有推进/领取/撤离动作改走主机裁定，
 ## 双人同票才推进；单人局此入口为空，直接调本地 ExpeditionGame。
@@ -240,6 +241,7 @@ func _vote_note(run: Dictionary) -> String:
 
 
 func _refresh_map() -> void:
+	ExpeditionUI.set_layer(self,str(expedition.run.get("layer_id","moss_stone_shallow")))
 	route_view.display(expedition.run)
 
 func _select_route(row: int, col: int) -> void:
@@ -265,7 +267,9 @@ func _refresh_node() -> void:
 	var art := ExpeditionArt.new()
 	art.subject = _node_art(str(node["type"]))
 	art.tint = ExpeditionUI.GOLD
-	art.custom_minimum_size.y = 100
+	art.custom_minimum_size.y = 200
+	art.stage_scene = true
+	art.layer_id = str(run.get("layer_id","moss_stone_shallow"))
 	node_column.add_child(art)
 	var title := _label("%s  /  %s" % [ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node["type"]), "?"), str(node.get("hint", ""))], 22, CREAM)
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
@@ -759,39 +763,15 @@ func _open_menu() -> void:
 
 
 func _show_settlement(settlement: Dictionary) -> void:
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 6)
-	var kind_text := {"extract": "成功撤离回家", "gate_clear": "击败最后的守门者，探险完成", "death": "战斗失败……", "abandon": "已放弃本次探险"}
-	column.add_child(_label(kind_text.get(str(settlement["kind"]), str(settlement["kind"])), 20, FOREST))
-	for group in [["returned", "返还带入物品"], ["gained", "新增获得"], ["protected", "保险箱保留"], ["lost", "损失"], ["consumed", "已消耗补给"]]:
-		var entries: Array = settlement.get(group[0], [])
-		if entries.is_empty():
-			continue
-		if group[0] == "consumed":
-			column.add_child(_label("%s：%d 件" % [group[1], entries.size()], 13, TEXT_MUTED))
-			continue
-		var names: Array = []
-		for entry in entries:
-			names.append(str(entry["name"]))
-		var group_line := _label("%s（%d）：%s" % [group[1], entries.size(), "、".join(names)], 14, TEXT_DARK if group[0] != "lost" else BAD_RED)
-		group_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		column.add_child(group_line)
-	var note := _label("货物仍是货物，回家后自行出售才变金币。", 12, TEXT_MUTED)
-	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	column.add_child(note)
-	var done := _button("确认回家", Color("#eaf4df"), Color("#87b06f"))
-	done.pressed.connect(func() -> void:
+	settlement_presented.emit(settlement.duplicate(true))
+	var applied: bool = bool(settlement.get("applied",false)) or expedition.game.state["expedition"].get("applied_settlements",[]).has(str(settlement.get("settlement_id","")))
+	var content := ExpeditionSettlement.build(settlement,applied,func():
 		_close_overlay()
 		close()
 		run_finished.emit()
-		farm_save_requested.emit()
-	)
-	column.add_child(done)
-	_show_overlay(column)
+		farm_save_requested.emit())
+	_show_overlay(content)
 	settlement_visible = true
-
-
-# —— 覆盖层 ————————————————————————————————————————————————
 
 
 func _show_overlay(content: Control) -> void:
@@ -883,35 +863,18 @@ func _refresh_route_preview() -> void:
 	if selected_route.x < 0:
 		var art := ExpeditionArt.new()
 		art.subject = "start"
-		art.custom_minimum_size.y = 160
+		art.stage_scene = true
+		art.layer_id = str(expedition.run.get("layer_id","moss_stone_shallow"))
+		art.custom_minimum_size.y = 220
 		node_column.add_child(art)
-		node_column.add_child(_label("下一步，走向哪里？", 26, CREAM))
-		var note := _label("点击路线图上下一排的节点，查看风险和遭遇，再确认前进。\n休整站可恢复生命，也能带着战利品安全撤离。", 16, LIGHT_MUTED)
+		node_column.add_child(_label("下一步，走向哪里？",26,CREAM))
+		var note := _label("点击下一排节点查看风险，再确认前进。休整站可以恢复生命，也能安全撤离。",18,LIGHT_MUTED)
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		node_column.add_child(note)
 		return
 	var node: Dictionary = expedition.run["map"]["rows"][selected_route.x][selected_route.y]
-	var art := ExpeditionArt.new()
-	art.subject = _node_art(str(node["type"]))
-	art.tint = ExpeditionUI.RED if str(node.get("risk", "")) == "high" else ExpeditionUI.GOLD
-	art.custom_minimum_size.y = 140
-	node_column.add_child(art)
-	node_column.add_child(_label("下一站 · %s" % ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node["type"]), "?"), 26, CREAM))
-	node_column.add_child(_label(ExpeditionRoute.risk_text(str(node.get("risk", "none"))), 15, art.tint))
-	var hint := _label(str(node.get("hint", "")), 16, LIGHT_TEXT)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	node_column.add_child(hint)
-	var encounter_id := str(node.get("encounter", ""))
-	if CombatGame.ENCOUNTERS.has(encounter_id):
-		var names: Array[String] = []
-		for id in CombatGame.ENCOUNTERS[encounter_id]["enemies"]:
-			names.append(str(CombatGame.ENEMIES[id]["name"]))
-		var enemies := _label("可能遭遇：" + "、".join(names), 14, LIGHT_MUTED)
-		enemies.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		node_column.add_child(enemies)
-	var go := ExpeditionUI.button("确认选路 / 投票前进" if bool(expedition.run.get("coop", false)) else "向这里前进   →", true)
-	go.pressed.connect(_on_move.bind(selected_route.x, selected_route.y))
-	node_column.add_child(go)
+	node_column.add_child(ExpeditionNodePreview.build(node,str(expedition.run.get("layer_id","moss_stone_shallow")),"确认选路 / 投票前进" if bool(expedition.run.get("coop",false)) else "向这里前进 →",_on_move.bind(selected_route.x,selected_route.y)))
+
 
 func _fit_overlay() -> void:
 	if overlay_panel.visible:

@@ -126,10 +126,10 @@ func _run() -> void:
 	var visit_plot: Node = yard.get_node_or_null("VisitPlot_01")
 	var plot_readonly := visit_plot != null
 	if plot_readonly:
-		for child in visit_plot.get_children():
-			if child is CollisionObject3D and (child as CollisionObject3D).input_ray_pickable:
+		for connection in visit_plot.input_event.get_connections():
+			if connection["callable"].get_method() != "_on_visit_crop_input":
 				plot_readonly = false
-	_check(plot_readonly, "院子地块只读展示（无可点击碰撞体）")
+	_check(plot_readonly, "院子地块仅绑定只读查看，不绑定收获等写操作")
 	_check(world.hud.visiting, "拜访门控开启（hud.visiting）")
 	world.router.switch_to("visit_house")
 	var house: Node3D = world.get_node_or_null("VisitHouseInterior")

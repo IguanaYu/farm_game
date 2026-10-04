@@ -1,0 +1,44 @@
+{
+  "date": "2026-10-04",
+  "baseline_commit": "2064954",
+  "branch": "codex/visual-scene-alignment",
+  "engine": "Godot 4.6.1 / Vulkan Mobile / RTX 4060 Ti",
+  "functional_regression": {
+    "total": 61,
+    "failed": 0,
+    "result": "REGRESSION_ALL_PASS",
+    "network": "isolated real WSS and ENet cooperation tests; public two-PC test not performed"
+  },
+  "world_and_real_viewport_input": {
+    "checks": 120,
+    "failures": []
+  },
+  "workspace_gui_fixture": {
+    "checks": 44,
+    "failures": []
+  },
+  "expedition_real_gui": {
+    "result": "PASS",
+    "screens": 16,
+    "paths": [
+      "card click/drag",
+      "legal targets and damage",
+      "shortcuts and modal blocking",
+      "route preview/confirmation",
+      "loot and extraction",
+      "settlement acknowledgement",
+      "1024px ten-card battle"
+    ]
+  },
+  "captures": {
+    "total": 54,
+    "physical_dimensions": {
+      "1280x800": 50,
+      "1024x640": 3,
+      "1440x900": 1
+    },
+    "world_fixture_suffix": "Constructed view snapshots, not public server results"
+  },
+  "save_isolation": "Distinct application name Farm_Visual_Audit_20261004_6bc4; production saves/database/certificates untouched",
+  "delivery": "source and screenshots; existing Farm.exe not re-exported"
+}

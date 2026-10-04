@@ -57,7 +57,7 @@ const PLANTS: Dictionary = {
 	},
 	# 正式名称未定：carrot 仅是临时美术 ID，不据此确定正式名称。
 	"carrot": {
-		"display_name": "胡萝卜（暂名）",
+		"display_name": "胡萝卜",
 		"grow_seconds": 7200,
 		"base_score": 1200,
 		"crop_count": 5,

@@ -1,5 +1,6 @@
 class_name BattleScreen
 extends Control
+var layer_id := "moss_stone_shallow"
 ## 战斗界面（2.2 设计 D2.2-01/02/06）。规则裁定全部走 CombatGame；本脚本只消费事件、
 ## 展示状态与轻量反馈（浮动数字），不做第二次结算。长动画不阻塞操作（本版无长动画）。
 
@@ -152,7 +153,7 @@ func _build() -> void:
 	chooser_column.add_child(quit_button)
 
 	battle_column = VBoxContainer.new()
-	battle_column.add_theme_constant_override("separation", 10)
+	battle_column.add_theme_constant_override("separation", 8)
 	battle_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(battle_column)
 	var top := HBoxContainer.new()
@@ -168,7 +169,7 @@ func _build() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	top.add_child(status_label)
 	var history := ExpeditionUI.button("战斗记录")
-	history.pressed.connect(func() -> void: log_box.visible = not log_box.visible)
+	history.pressed.connect(_open_history)
 	top.add_child(history)
 
 	var stage := HBoxContainer.new()
@@ -180,7 +181,7 @@ func _build() -> void:
 	player_card.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	stage.add_child(player_card)
 	player_panel = VBoxContainer.new()
-	player_panel.add_theme_constant_override("separation", 9)
+	player_panel.add_theme_constant_override("separation", 5)
 	player_card.add_child(player_panel)
 	var enemy_center := CenterContainer.new()
 	enemy_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -206,7 +207,7 @@ func _build() -> void:
 	var scroll := ScrollContainer.new()
 	scroll.name = "HandScroll"
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size.y = 226
+	scroll.custom_minimum_size.y = 208
 	dock_column.add_child(scroll)
 	hand_row = HBoxContainer.new()
 	hand_row.add_theme_constant_override("separation", 10)
@@ -443,6 +444,7 @@ func _on_end_turn() -> void:
 
 
 func _refresh() -> void:
+	ExpeditionUI.set_layer(self,layer_id)
 	if combat == null or combat.state.is_empty() or not combat.state["players"].has(player_key):
 		return
 	var player: Dictionary = combat.state["players"][player_key]
@@ -477,7 +479,7 @@ func _refresh_enemies() -> void:
 		var alive := bool(enemy["alive"])
 		var key := str(enemy["id"])
 		var card := VBoxContainer.new()
-		card.custom_minimum_size.x = 174
+		card.custom_minimum_size.x = 220
 		card.add_theme_constant_override("separation", 6)
 		card.set_meta("unit_key", key)
 		enemy_row.add_child(card)
@@ -488,10 +490,12 @@ func _refresh_enemies() -> void:
 			intent.text += " · " + ("你" if combat.intent_target(enemy) == player_key else "队友")
 		card.add_child(intent)
 		var target := _target_button(key)
-		target.custom_minimum_size = Vector2(174, 146)
+		target.custom_minimum_size = Vector2(220, 185)
 		target.disabled = not alive
 		card.add_child(target)
 		var art := ExpeditionArt.new()
+		art.stage_scene = true
+		art.layer_id = layer_id
 		art.subject = str(enemy.get("def_id", "slime"))
 		art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		target.add_child(art)
@@ -607,6 +611,26 @@ func _refresh_log() -> void:
 	log_label.text = "\n".join(recent)
 
 
+func _open_history() -> void:
+	ExpeditionUI.clear(inspector_column)
+	inspector_column.add_child(_label("战斗记录",25,CREAM))
+	var scroll := ScrollContainer.new()
+	scroll.custom_minimum_size = Vector2(460,300)
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	inspector_column.add_child(scroll)
+	var content := _label("\n".join(combat.combat_log()),18,ExpeditionUI.TEXT)
+	content.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(content)
+	var close_button := ExpeditionUI.button("返回战斗 · Esc")
+	close_button.pressed.connect(_close_inspector)
+	inspector_column.add_child(close_button)
+	inspector_center.mouse_filter = Control.MOUSE_FILTER_STOP
+	inspector_center.show()
+	inspector_panel.show()
+	modal_shade.show()
+
+
 func _refresh_detail() -> void:
 	var uid := selected_uid if selected_uid >= 0 else hovered_uid
 	var card := _hand_card(uid)
@@ -677,6 +701,11 @@ func _popup_on_unit(unit_key: String, text: String, color: Color) -> void:
 	if anchor == null:
 		return
 	_popup_at(anchor, text, color)
+	if SettingsStore.get_reduce_motion():
+		return
+	var pulse := anchor.create_tween()
+	pulse.tween_property(anchor,"modulate",color.lightened(0.35),0.07)
+	pulse.tween_property(anchor,"modulate",Color.WHITE,0.18)
 
 
 func _popup_center(text: String, color: Color) -> void:
@@ -690,7 +719,8 @@ func _popup_at(anchor: Control, text: String, color: Color) -> void:
 	add_child(label)
 	var tween := label.create_tween()
 	tween.set_parallel(true)
-	tween.tween_property(label, "position:y", label.position.y - 65, 0.9)
+	if not SettingsStore.get_reduce_motion():
+		tween.tween_property(label, "position:y", label.position.y - 65, 0.9)
 	tween.tween_property(label, "modulate:a", 0.0, 0.7).set_delay(0.2)
 	tween.chain().tween_callback(label.queue_free)
 
@@ -744,7 +774,7 @@ func _target_display(rule: String) -> String:
 func _label(content: String, size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = content
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", maxi(16,size))
 	label.add_theme_color_override("font_color", color)
 	return label
 
@@ -797,6 +827,10 @@ func _refresh_player() -> void:
 	ExpeditionUI.clear(player_panel)
 	var player: Dictionary = combat.state["players"][player_key]
 	player_panel.add_child(_label("探险者 / 你", 13, ExpeditionUI.GOLD))
+	var portrait := ExpeditionArt.new()
+	portrait.subject = "farmer"
+	portrait.custom_minimum_size.y = 80
+	player_panel.add_child(portrait)
 	var self_target := _target_button(player_key)
 	self_target.text = "以自己为目标"
 	self_target.custom_minimum_size.y = 48

@@ -17,9 +17,14 @@ static func make_theme() -> Theme:
 	var font := SystemFont.new()
 	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
 	result.default_font = font
-	result.default_font_size = 16
+	result.default_font_size = 18
 	result.set_color("font_color", "Label", TEXT)
 	result.set_color("font_color", "CheckButton", TEXT)
+	for type in ["LineEdit","OptionButton"]:
+		result.set_color("font_color",type,TEXT)
+		result.set_stylebox("normal",type,style(PANEL,LINE,9,10))
+		result.set_stylebox("focus",type,style(PANEL,GOLD,9,10))
+		result.set_stylebox("hover",type,style(PANEL.lightened(0.1),GOLD,9,10))
 	return result
 
 static func style(fill: Color, border := LINE, radius := 12, margin := 12) -> StyleBoxFlat:
@@ -57,7 +62,7 @@ static func button(content: String, primary := false) -> Button:
 static func decorate_button(result: Button, primary := false) -> void:
 	var fill := GOLD if primary else Color("#253c44")
 	var ink := INK if primary else TEXT
-	result.add_theme_font_size_override("font_size", 15)
+	result.add_theme_font_size_override("font_size", 18)
 	for key in ["font_color", "font_hover_color", "font_pressed_color", "font_focus_color"]:
 		result.add_theme_color_override(key, ink)
 	result.add_theme_color_override("font_disabled_color", Color("#a1b1b7"))
@@ -83,9 +88,17 @@ static func bar(value: int, maximum: int, tint := TEAL) -> ProgressBar:
 
 static func backdrop(parent: Control) -> void:
 	var art := ExpeditionArt.new()
+	art.name = "CaveBackdrop"
 	art.subject = "cave"
 	art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	parent.add_child(art)
+
+static func set_layer(parent: Node, id: String) -> void:
+	for child in parent.get_children():
+		if child is ExpeditionArt:
+			child.layer_id = id
+			child.queue_redraw()
+		set_layer(child,id)
 
 static func frame(parent: Control, padding := 24) -> MarginContainer:
 	var result := MarginContainer.new()

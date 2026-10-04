@@ -4,6 +4,8 @@ extends Control
 
 var subject := "crystal"
 var tint := Color("#7ac7b3")
+var layer_id := "moss_stone_shallow"
+var stage_scene := false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -21,12 +23,24 @@ func _draw() -> void:
 	if subject == "cave":
 		_draw_cave()
 		return
+	if stage_scene:
+		_draw_cave()
 	var unit := minf(size.x, size.y) / 200.0
 	draw_set_transform(Vector2(size.x / 2.0 - 100.0 * unit, size.y / 2.0 - 100.0 * unit), 0, Vector2.ONE * unit)
 	var shadow := Color("#101d25")
 	var light := tint.lightened(0.3)
 	draw_circle(Vector2(100, 100), 82, Color(tint, 0.055))
 	match subject:
+		"farmer":
+			_poly([[66,113],[132,113],[145,168],[116,171],[103,148],[85,171],[56,166]],Color("#899b75"))
+			_poly([[76,157],[95,157],[95,189],[79,189]],Color("#927453"))
+			_poly([[108,157],[127,157],[124,189],[108,189]],Color("#927453"))
+			draw_circle(Vector2(101,91),34,Color("#e5c8a2"))
+			draw_circle(Vector2(91,96),3,Color("#485a50"))
+			draw_circle(Vector2(113,96),3,Color("#485a50"))
+			draw_style_box(ExpeditionUI.style(Color("#ead7a4"),Color.TRANSPARENT,14,0),Rect2(52,60,97,21))
+			draw_style_box(ExpeditionUI.style(Color("#dfc795"),Color.TRANSPARENT,13,0),Rect2(72,34,58,40))
+			draw_line(Vector2(74,65),Vector2(128,65),Color("#ad8163"),6)
 		"ore":
 			_poly([[33, 144], [51, 82], [87, 63], [110, 81], [142, 69], [171, 119], [151, 158], [69, 169]], tint)
 			_poly([[51, 82], [87, 63], [110, 81], [101, 122], [64, 131]], light)
@@ -86,6 +100,9 @@ func _draw() -> void:
 		"exit", "rest", "start":
 			_poly([[100, 24], [128, 49], [157, 163], [43, 163], [72, 49]], Color("#32474c"))
 			_poly([[93, 70], [122, 90], [131, 156], [68, 156]], tint)
+			if subject == "exit":
+				_poly([[93, 70], [122, 90], [131, 156], [68, 156]], Color("#e1e4bc"))
+				_poly([[68,156],[131,156],[172,198],[24,198]],Color("#d9e1b6",0.22))
 			draw_line(Vector2(100, 89), Vector2(100, 144), light, 5)
 			draw_line(Vector2(100, 89), Vector2(83, 111), light, 5)
 			draw_line(Vector2(100, 89), Vector2(117, 111), light, 5)
@@ -141,16 +158,28 @@ func draw_ellipse_shadow() -> void:
 	draw_colored_polygon(points, Color("#0e1a20"))
 
 func _draw_cave() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color("#101d25"))
+	var iron := layer_id == "iron_root_deeps"
+	var crystal := layer_id == "crystal_vein_deeps"
+	var base := Color("#201e29") if crystal else (Color("#272922") if iron else Color("#162b2a"))
+	var rock := Color("#3c3850") if crystal else (Color("#454333") if iron else Color("#30443b"))
+	draw_rect(Rect2(Vector2.ZERO, size), base)
 	var w := size.x
 	var h := size.y
-	_poly([[0, 0], [w, 0], [w, h * 0.8], [w * 0.84, h * 0.59], [w * 0.75, h * 0.18], [w * 0.59, h * 0.1], [w * 0.45, h * 0.23], [w * 0.25, h * 0.18], [w * 0.12, h * 0.54], [0, h * 0.76]], Color("#162830"))
+	_poly([[0, 0], [w, 0], [w, h * 0.8], [w * 0.84, h * 0.59], [w * 0.75, h * 0.18], [w * 0.59, h * 0.1], [w * 0.45, h * 0.23], [w * 0.25, h * 0.18], [w * 0.12, h * 0.54], [0, h * 0.76]], rock.darkened(0.25))
 	_poly([[0, 0], [w * 0.22, 0], [w * 0.16, h * 0.16], [w * 0.18, h * 0.28], [w * 0.1, h * 0.64], [0, h * 0.8]], Color("#20363c"))
 	_poly([[w, 0], [w * 0.82, 0], [w * 0.87, h * 0.27], [w * 0.84, h * 0.51], [w * 0.92, h * 0.68], [w, h * 0.75]], Color("#21353a"))
 	for i in range(18):
 		var point := Vector2(w * (0.12 + fmod(i * 0.173, 0.79)), h * (0.2 + fmod(i * 0.137, 0.5)))
 		draw_circle(point, 2 if i % 3 == 0 else 1, Color("#789783", 0.38))
 	_poly([[0, h], [0, h * 0.87], [w * 0.27, h * 0.73], [w * 0.58, h * 0.79], [w, h * 0.69], [w, h]], Color("#17272d"))
+	for i in range(7):
+		var x := w*(0.08+i*0.14)
+		if crystal:
+			_poly([[x,h*0.79],[x+12,h*0.61],[x+24,h*0.72],[x+32,h*0.80]],Color("#9ba1c7",0.42))
+		elif iron:
+			draw_polyline(PackedVector2Array([Vector2(x,0),Vector2(x+18,h*0.18),Vector2(x+8,h*0.35)]),Color("#8b775b",0.25),maxf(3,w*0.006),true)
+		else:
+			_poly([[x,h*0.78],[x+20,h*0.72],[x+43,h*0.79],[x+23,h*0.82]],Color("#68895b",0.32))
 	for x in [w * 0.06, w * 0.94]:
 		for radius in [55, 35, 18]:
 			draw_circle(Vector2(x, h * 0.49), radius, Color("#e5bd78", 0.025))

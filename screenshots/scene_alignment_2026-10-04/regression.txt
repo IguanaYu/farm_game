@@ -1,0 +1,67 @@
+Godot 4.6.1 / isolated application and save directory / 2026-10-04
+Exit code 0; no unexpected ERROR; no SCRIPT ERROR. Existing content/count whitelist retained.
+
+d21_defs_smoke.gd                    exit=0   errors=0   ok
+d21_inventory_smoke.gd               exit=0   errors=0   ok
+d21_migration_smoke.gd               exit=0   errors=0   ok
+d21_net_probe.gd                     exit=0   errors=0   ok
+d22_rules_smoke.gd                   exit=0   errors=0   ok
+d22_serialize_smoke.gd               exit=0   errors=0   ok
+d22_worked_example.gd                exit=0   errors=0   ok
+d23_combat_worked.gd                 exit=0   errors=0   ok
+d23_defs_smoke.gd                    exit=0   errors=0   ok
+d23_inventory_worked.gd              exit=0   errors=0   ok
+d23_save_smoke.gd                    exit=0   errors=0   ok
+d24_recovery_sim.gd                  exit=0   errors=0   ok
+d24_run_smoke.gd                     exit=0   errors=0   ok
+d24_settle_smoke.gd                  exit=0   errors=0   ok
+d25_crafting_smoke.gd                exit=0   errors=0   ok
+d25_goals_smoke.gd                   exit=0   errors=0   ok
+d25_plant_smoke.gd                   exit=0   errors=0   ok
+d26_combat_coop_smoke.gd             exit=0   errors=0   ok
+d26_session_smoke.gd                 exit=0   errors=0   ok
+d27_recovery_matrix.gd               exit=0   errors=0   ok
+d28_content_smoke.gd                 exit=0   errors=0   ok
+d29_arbitrage_smoke.gd               exit=0   errors=0   ok
+d29_economy_sim.gd                   exit=0   errors=0   ok
+d29_regression_smoke.gd              exit=0   errors=0   ok
+d30_asset_smoke.gd                   exit=0   errors=0   ok
+d31_coop_depart_ui_smoke.gd          exit=0   errors=0   ok
+d32_coop_play_ui_smoke.gd            exit=0   errors=0   ok
+d33_scene_integration_smoke.gd       exit=0   errors=0   ok
+d34_relay_smoke.gd                   exit=0   errors=0   ok
+d35_main_menu_smoke.gd               exit=0   errors=0   ok
+d36_pause_menu_smoke.gd              exit=0   errors=0   ok
+d37_settings_store_smoke.gd          exit=0   errors=0   ok
+d38_main_menu_room_entry_smoke.gd    exit=0   errors=0   ok
+d39_loadout_preset_smoke.gd          exit=0   errors=0   ok
+d40_crystal_layer_smoke.gd           exit=0   errors=0   ok
+d41_audio_smoke.gd                   exit=0   errors=0   ok
+d42_online_auth_farm_smoke.gd        exit=0   errors=0   ok
+d43_online_client_bridge_smoke.gd    exit=0   errors=0   ok
+d44_loot_smoke.gd                    exit=0   errors=0   ok
+d44_online_farm_commands_matrix.gd   exit=0   errors=0   ok
+d45_online_room_run_smoke.gd         exit=0   errors=0   ok
+d46_online_client_expedition_smoke.gd exit=0   errors=0   ok
+d47_world_shell_switch_smoke.gd      exit=0   errors=0   ok
+d48_farm_shop_scene_smoke.gd         exit=0   errors=0   ok
+d49_cave_camp_scene_smoke.gd         exit=0   errors=0   ok
+d50_m4_resilience_matrix.gd          exit=0   errors=0   ok
+d51_polish_round_smoke.gd            exit=0   errors=0   ok
+d52_visit_smoke.gd                   exit=0   errors=0   ok
+d53_login_panel_lifecycle.gd         exit=0   errors=1   ok
+scene_workspace_smoke.gd             exit=0   errors=0   ok
+stage1_smoke.gd                      exit=0   errors=0   ok
+stage2_rules_smoke.gd                exit=0   errors=0   ok
+stage2_worked_example.gd             exit=0   errors=0   ok
+stage3_breeding_sim.gd               exit=0   errors=0   ok
+stage3_breeding_smoke.gd             exit=0   errors=0   ok
+stage3_warehouse_smoke.gd            exit=0   errors=0   ok
+stage4_market_smoke.gd               exit=0   errors=0   ok
+stage5_ux_smoke.gd                   exit=0   errors=0   ok
+stage6_economy_sim.gd                exit=0   errors=0   ok
+stage6_regression_smoke.gd           exit=0   errors=2   ok
+world_picking_smoke.gd               exit=0   errors=0   ok
+
+Total 61 tests, 0 failed.
+REGRESSION_ALL_PASS

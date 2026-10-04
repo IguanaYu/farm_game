@@ -58,7 +58,10 @@ func _op_snapshot(account_id: int, req_id: String, args: Dictionary) -> Dictiona
 	if not (parsed is Dictionary):
 		return _req_err(req_id, "visit.snapshot", OnlineProtocol.ERR_INTERNAL, "snapshot_broken")
 	return _req_ok(req_id, "visit.snapshot", {
-		"owner": {"account_id": target, "nick": str(row["nick"])},
+		"owner": {"account_id": target, "nick": str(row["nick"]),
+			"online": auth.has_session(target), "appearance": "default",
+			"roof_color": "#b9785c", "welcome_message": "",
+			"snapshot_read_at": int(Time.get_unix_time_from_system())},
 		"farm": parsed,
 	})
 

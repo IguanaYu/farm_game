@@ -23,7 +23,7 @@ var deck_label: Label
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	theme = ExpeditionUI.make_theme()
 	_build()
@@ -76,8 +76,15 @@ func close() -> void:
 
 
 func _build() -> void:
-	ExpeditionUI.backdrop(self)
-	var frame := ExpeditionUI.frame(self, 36)
+	var workspace := ExpeditionUI.panel(Color("#20362fee"),Color("#8b9c77"),20)
+	workspace.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	workspace.offset_left = -600
+	workspace.offset_right = -24
+	workspace.offset_top = 112
+	workspace.offset_bottom = 756
+	add_child(workspace)
+	var frame := MarginContainer.new()
+	workspace.add_child(frame)
 	var scroll := ScrollContainer.new()
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	frame.add_child(scroll)
@@ -90,13 +97,13 @@ func _build() -> void:
 	var overline := _label("THE CAVERN   /   探险营地", 14, ExpeditionUI.GOLD)
 	overline.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(overline)
-	var close_button := ExpeditionUI.button("返回农场   ×")
+	var close_button := ExpeditionUI.button("收起 · 留在营地  ×")
 	close_button.pressed.connect(func() -> void: close_requested.emit())
 	top.add_child(close_button)
-	column.add_child(_label("矿洞深处，藏着下一次收获。", 34, CREAM))
+	column.add_child(_label("出发前，再检查一下。", 28, CREAM))
 	column.add_child(_label("整备你的牌组，选择一条路，带着战利品回家。", 17, ExpeditionUI.MUTED))
 
-	var chapters := HBoxContainer.new()
+	var chapters := VBoxContainer.new()
 	chapters.add_theme_constant_override("separation", 16)
 	column.add_child(chapters)
 	var layer_number := 0
@@ -112,7 +119,7 @@ func _build() -> void:
 		var art := ExpeditionArt.new()
 		art.subject = ["start", "ore_golem", "crystal"][layer_number - 1]
 		art.tint = [ExpeditionUI.TEAL, Color("#a9b7a5"), Color("#b4a6d2")][layer_number - 1]
-		art.custom_minimum_size.y = 105
+		art.custom_minimum_size.y = 55
 		details.add_child(art)
 		var title := _label(str(ExpeditionDefs.layer(layer_id)["name"]).replace("（第三层）", ""), 21, CREAM)
 		details.add_child(title)

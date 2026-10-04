@@ -1,0 +1,29 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+Vulkan 1.4.325 - Forward Mobile - Using Device #0: NVIDIA - NVIDIA GeForce RTX 4060 Ti
+
+VISUAL_SHOT 01_main_menu
+VISUAL_SHOT 02_online_login
+VISUAL_SHOT 03_farm_tutorial
+VISUAL_SHOT 04_farm_clear
+VISUAL_SHOT 05_farm_mature
+VISUAL_SHOT 06_seed_picker
+VISUAL_SHOT 07_warehouse
+VISUAL_SHOT 08_breeder
+VISUAL_SHOT 09_crafting
+VISUAL_SHOT 10_shop_clear
+VISUAL_SHOT 11_shop_purchase
+VISUAL_SHOT 12_shop_market
+VISUAL_SHOT 13_cave_camp
+VISUAL_SHOT 14_cave_departure
+VISUAL_SHOT 15_loadout
+VISUAL_SHOT 16_offline_room
+VISUAL_SHOT 17_directory_demo
+VISUAL_SHOT 18_directory_after_escape
+VISUAL_SHOT 19_friend_yard
+VISUAL_SHOT 20_friend_house
+VISUAL_SHOT 21_friend_return
+VISUAL_SHOT 22_pause
+VISUAL_SHOT 23_settings
+VISUAL_SHOT 24_crafting_1024
+VISUAL_SHOT 25_directory_736
+VISUAL_AUDIT_DONE { "source_commit": "2064954", "isolated_user_data": true, "network_connected": false, "shots": ["01_main_menu", "02_online_login", "03_farm_tutorial", "04_farm_clear", "05_farm_mature", "06_seed_picker", "07_warehouse", "08_breeder", "09_crafting", "10_shop_clear", "11_shop_purchase", "12_shop_market", "13_cave_camp", "14_cave_departure", "15_loadout", "16_offline_room", "17_directory_demo", "18_directory_after_escape", "19_friend_yard", "20_friend_house", "21_friend_return", "22_pause", "23_settings", "24_crafting_1024", "25_directory_736"], "directory_escape": { "directory_visible": true, "pause_visible": true }, "friend_yard": { "location": "visit_yard", "camera": "/root/FarmWorld/FarmCamera", "farm_visible": false, "house_collision_layer": 0, "gate_collision_layer": 0, "owned_in_snapshot": [1, 2, 3, 4, 5, 6], "rendered_owned_plots": ["VisitPlot_01", "VisitPlot_02", "VisitPlot_03"] }, "friend_house": { "location": "visit_house", "camera": "/root/FarmWorld/FarmCamera", "farm_visible": false, "door_collision_layer": 0, "window_collision_layer": 0 }, "friend_return": { "location": "farm", "camera": "/root/FarmWorld/FarmCamera", "farm_visible": false, "visiting": false }, "crafting_1024": { "viewport": "[P: (0.0, 0.0), S: (1440.0, 900.0)]", "minimum_width": 1020, "minimum_height": 660 } }

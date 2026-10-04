@@ -126,6 +126,13 @@ func _run() -> void:
 	_check(int(combat.state["round"]) == 1, "pile modal blocks end-turn shortcut")
 	await _key(KEY_ESCAPE)
 	_check(not screen.inspector_panel.visible, "escape closes pile inspector")
+	screen._open_history()
+	await _shot("16_battle_history",screen)
+	_check(screen.inspector_panel.visible,"history opens readable modal")
+	await _key(KEY_E)
+	_check(int(combat.state["round"])==1,"history modal blocks end-turn shortcut")
+	await _key(KEY_ESCAPE)
+	_check(not screen.inspector_panel.visible,"escape closes history inspector")
 	await _key(KEY_E)
 	_check(int(combat.state["round"]) == 2, "E advances round")
 	await _shot("06_next_round", screen)
@@ -141,6 +148,7 @@ func _run() -> void:
 		var before := int(player["hand"].size())
 		var source: Button = screen.hand_row.get_child(self_index)
 		var start := source.get_global_rect().get_center()
+		root.warp_mouse(start)
 		var press := InputEventMouseButton.new()
 		press.position = start
 		press.global_position = start
@@ -158,6 +166,7 @@ func _run() -> void:
 		move = move.duplicate()
 		move.position = screen.target_controls["p1"].get_global_rect().get_center()
 		move.global_position = move.position
+		root.warp_mouse(move.position)
 		root.push_input(move, true)
 		await _settle()
 		press = press.duplicate()

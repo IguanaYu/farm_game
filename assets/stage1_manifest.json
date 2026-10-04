@@ -56,7 +56,7 @@
     ],
     "notes": "plot_wet / plot_fertilized / facility_breeder / guest_* 尚未接入，留给阶段 3~5。"
   },
-  "status": "stage 5: asset inventory annotated; core loop visuals complete with documented placeholders",
+  "status": "2026-10-04: scene alignment; native scenery modules, shared UI and specific rare-crop icons",
   "stage3_additions": {
     "models": [
       "facility_breeder"
@@ -75,18 +75,29 @@
   },
   "inventory": {
     "license": "项目自制（art/lowpoly 由本项目 Blender 资产库生成，无外部授权争议）",
-    "in_use": "models+panel_icons 全部已接入游戏",
+    "in_use": "作物阶段与 guest_01..06 GLB 继续使用；当前建筑、环境、室内、营地和主人家居由 scene_art.gd 构建。旧设施与装饰 GLB 保留供历史版本使用。",
     "needs_revision": [
-      "胡萝卜正式名称未定（文档约定 carrot 仅为临时美术 ID）",
-      "guest_01..06 为造型草案，正式身份未定"
+      "guest_01..06 为默认静态造型，拜访明确标注默认形象，不表示在线玩家实时位置。"
     ],
     "missing_but_placeholder_ok": [
-      "plot_wet / plot_fertilized（浇水、施肥的地面状态模型）暂用悬停环与文字反馈代替",
-      "遭遇无专属插画，使用文字文案"
+      "plot_wet / plot_fertilized 使用已有地块状态反馈，尚无独立 GLB。"
     ],
     "unused_yet": [
       "plot_seeded",
       "crop_cabbage/crop_carrot 独立作物模型（地块阶段模型已覆盖）"
     ]
+  },
+  "scene_alignment_20261004": {
+    "native_scenery": "scripts/world/scene_art.gd",
+    "rare_crop_models": "scripts/world/crop_model.gd: rock_sprout/glow_berry three stages",
+    "vector_icons": [
+      "seed_rock_sprout.svg",
+      "crop_rock_sprout.svg",
+      "seed_glow_berry.svg",
+      "crop_glow_berry.svg"
+    ],
+    "node_art": "scripts/ui/expedition_art.gd: enemy/item/node illustrations and three layer backdrops",
+    "house_view": "default guest GLB; household geometry; current yard rendered in window",
+    "historical_notes": "stage2/stage3 additions retain their original historical status; inventory and scene_alignment_20261004 describe current usage"
   }
 }

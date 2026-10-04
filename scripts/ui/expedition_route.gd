@@ -26,12 +26,18 @@ func display(snapshot: Dictionary) -> void:
 			button.name = "Route_%d_%d" % [row, col]
 			button.set_meta("row", row)
 			button.set_meta("col", col)
-			button.add_theme_font_size_override("font_size", 13)
+			button.add_theme_font_size_override("font_size", 16)
 			button.custom_minimum_size = Vector2(90, 38)
 			var here := row == current_row and col == int(current.get("col", 0))
 			var completed := bool(run.get("resolved", {}).get("r%dc%d" % [row, col], {}).get("completed", false))
 			button.disabled = row != current_row + 1 or str(run.get("phase", "")) != "map"
 			button.text = ("◆ " if here else ("✓ " if completed else "")) + button.text
+			var voters: Array[String] = []
+			for member in ["p1","p2"]:
+				if str(run.get("votes",{}).get(member,"")) == "%d,%d" % [row,col]:
+					voters.append("①" if member=="p1" else "②")
+			if not voters.is_empty():
+				button.text += " " + "".join(voters)
 			var border := ExpeditionUI.RED if str(node.get("risk", "")) == "high" else ExpeditionUI.LINE
 			button.add_theme_stylebox_override("normal", ExpeditionUI.style(Color("#29474d"), ExpeditionUI.GOLD, 18, 6))
 			button.add_theme_stylebox_override("disabled", ExpeditionUI.style(Color("#3c5351") if here else Color("#1c2c34"), ExpeditionUI.GOLD if here else border, 18, 6))

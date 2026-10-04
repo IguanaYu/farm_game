@@ -33,12 +33,7 @@ var _float_bases: Array = []
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	var theme_root := Theme.new()
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
-	theme_root.default_font = font
-	theme_root.default_font_size = 17
-	theme = theme_root
+	theme = LifeUI.make_theme()
 	SettingsStore.apply_window_settings()
 	SettingsStore.apply_volumes()
 	_build()
@@ -60,7 +55,7 @@ func _build() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	var card := _panel(CREAM, Color("#d5c9aa"), 20)
-	card.custom_minimum_size = Vector2(470, 0)
+	card.custom_minimum_size = Vector2(530, 0)
 	center.add_child(card)
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 34)
@@ -71,7 +66,7 @@ func _build() -> void:
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 10)
 	margin.add_child(stack)
-	stack.add_child(_label("🌻 小小农场", 40, FOREST))
+	stack.add_child(_label("小小农场", 40, FOREST))
 	stack.add_child(_label("点击种植、离线成长，还有洞穴探险与好友组队", 14, TEXT_MUTED))
 	separator_space(stack, 8)
 
@@ -87,19 +82,19 @@ func _build() -> void:
 	new_game_button.name = "NewGameButton"
 	new_game_button.pressed.connect(_on_new_game)
 	main_view.add_child(new_game_button)
-	var online_button := _menu_button("线上农场", Color("#eef4e7"), Color("#9fbf8a"), 40, 16)
+	var online_button := _menu_button("线上农场 · 服务器进度", Color("#eef4e7"), Color("#9fbf8a"), 44, 20)
 	online_button.name = "OnlineButton"
 	online_button.pressed.connect(_on_online)
 	main_view.add_child(online_button)
-	var coop_button := _menu_button("好友联机", Color("#e7eef6"), Color("#8fa8c8"), 40, 16)
+	var coop_button := _menu_button("本地组队 · 本机存档", Color("#e7eef6"), Color("#8fa8c8"), 44, 20)
 	coop_button.name = "CoopButton"
 	coop_button.pressed.connect(_on_coop)
 	main_view.add_child(coop_button)
-	var settings_button := _menu_button("设置", Color("#f2eede"), Color("#cfc4a6"), 40, 16)
+	var settings_button := _menu_button("设置", Color("#f2eede"), Color("#cfc4a6"), 44, 20)
 	settings_button.name = "SettingsButton"
 	settings_button.pressed.connect(_on_settings)
 	main_view.add_child(settings_button)
-	var quit_button := _menu_button("退出游戏", Color("#f7e9e2"), Color("#c98d77"), 40, 16)
+	var quit_button := _menu_button("退出游戏", Color("#f7e9e2"), Color("#c98d77"), 44, 20)
 	quit_button.name = "QuitButton"
 	quit_button.pressed.connect(_on_quit)
 	main_view.add_child(quit_button)
@@ -166,7 +161,12 @@ func _build_settings_view() -> VBoxContainer:
 	view.add_child(_label("设置", 22, FOREST))
 	settings_panel = SettingsView.new()
 	settings_panel.name = "SettingsPanel"
-	view.add_child(settings_panel)
+	var settings_scroll := ScrollContainer.new()
+	settings_scroll.custom_minimum_size = Vector2(0,480)
+	settings_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	view.add_child(settings_scroll)
+	settings_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_scroll.add_child(settings_panel)
 	var back_button := _menu_button("返回", Color("#f2eede"), Color("#cfc4a6"), 36, 15)
 	back_button.pressed.connect(func() -> void: _show_main_view())
 	view.add_child(back_button)
@@ -263,78 +263,60 @@ func _refresh_continue_summary() -> void:
 
 
 func _build_backdrop() -> void:
-	var sky := ColorRect.new()
-	sky.name = "MenuSky"
-	sky.color = Color(0.88, 0.92, 0.85)
-	sky.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	add_child(sky)
-
-	var sun := PanelContainer.new()
-	sun.name = "MenuSun"
-	var sun_style := StyleBoxFlat.new()
-	sun_style.bg_color = Color("#f6e7bd")
-	sun_style.set_corner_radius_all(52)
-	sun.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	sun.add_theme_stylebox_override("panel", sun_style)
-	sun.anchor_left = 0.78
-	sun.anchor_right = 0.78
-	sun.anchor_top = 0.12
-	sun.anchor_bottom = 0.12
-	sun.custom_minimum_size = Vector2(104, 104)
-	sun.offset_left = -52
-	sun.offset_right = 52
-	sun.offset_top = -52
-	sun.offset_bottom = 52
-	add_child(sun)
-
-	_add_hill("MenuHillFar", Color("#cfe3c2"), 230, -70, 0.92)
-	_add_hill("MenuHillNear", Color("#bcd6ae"), 170, 90, 1.25)
-
-	for entry in [["MenuDecoSunflower", "🌻", 64, Vector2(0.09, 0.68)], ["MenuDecoWheat", "🌾", 52, Vector2(0.22, 0.78)], ["MenuDecoCarrot", "🥕", 44, Vector2(0.80, 0.74)], ["MenuDecoHen", "🐔", 44, Vector2(0.66, 0.82)]]:
-		var label := _label(str(entry[1]), int(entry[2]), Color.WHITE)
-		label.name = str(entry[0])
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var anchor: Vector2 = entry[3]
-		label.anchor_left = anchor.x
-		label.anchor_right = anchor.x
-		label.anchor_top = anchor.y
-		label.anchor_bottom = anchor.y
-		add_child(label)
-		_float_labels.append(label)
-		_float_bases.append(anchor)
-
-
-func _add_hill(hill_name: String, fill: Color, height: int, x_shift: int, width_ratio: float) -> void:
-	var hill := PanelContainer.new()
-	hill.name = hill_name
-	var style := StyleBoxFlat.new()
-	style.bg_color = fill
-	style.corner_radius_top_left = height
-	style.corner_radius_top_right = height
-	hill.add_theme_stylebox_override("panel", style)
-	hill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hill.anchor_left = 0.5
-	hill.anchor_right = 0.5
-	hill.anchor_top = 1.0
-	hill.anchor_bottom = 1.0
-	hill.offset_left = int(-720 * width_ratio) + x_shift
-	hill.offset_right = int(720 * width_ratio) + x_shift
-	hill.offset_top = -height
-	hill.offset_bottom = 0
-	add_child(hill)
-
+	var container := SubViewportContainer.new()
+	container.name = "MenuFarmScenery"
+	container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	container.stretch = true
+	container.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(container)
+	var viewport := SubViewport.new()
+	viewport.size = Vector2i(1280,800)
+	viewport.own_world_3d = true
+	viewport.gui_disable_input = true
+	viewport.msaa_3d = Viewport.MSAA_4X
+	container.add_child(viewport)
+	var world := Node3D.new()
+	viewport.add_child(world)
+	SceneArt.landscape(world)
+	for entry in [[Vector3(-5.4,0,-5.9),Color("#779574"),"杂货铺",true],[Vector3(5,0,-5.9),Color("#b78e64"),"仓库",false]]:
+		var building := Node3D.new()
+		building.position = entry[0]
+		world.add_child(building)
+		SceneArt.cottage(building,entry[2],entry[1],entry[3])
+	for row in range(2):
+		for col in range(5):
+			var plot: Node3D = load("res://assets/models/plot_cabbage_mature.glb").instantiate()
+			plot.position = Vector3((col-2)*2.7,0,0.5+row*2.7)
+			world.add_child(plot)
+	var env := WorldEnvironment.new()
+	env.environment = Environment.new()
+	env.environment.background_mode = Environment.BG_COLOR
+	env.environment.background_color = Color("#c6dcd0")
+	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.environment.ambient_light_color = Color("#ecf3ea")
+	env.environment.ambient_light_energy = 0.65
+	world.add_child(env)
+	var sun := DirectionalLight3D.new()
+	sun.rotation_degrees = Vector3(-58,-25,0)
+	sun.light_color = Color("#fffaf0")
+	sun.light_energy = 0.7
+	sun.shadow_enabled = true
+	world.add_child(sun)
+	var camera := Camera3D.new()
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.size = 19
+	camera.position = Vector3(6.8,15.8,22.6)
+	world.add_child(camera)
+	camera.look_at(Vector3(0,0.4,-1.1))
+	camera.make_current()
+	var veil := ColorRect.new()
+	veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	veil.color = Color(0.88,0.91,0.81,0.22)
+	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(veil)
 
 func _process(_delta: float) -> void:
-	## 装饰 emoji 轻微上下浮动，让首页有生命感。
-	var time := float(Time.get_ticks_msec()) / 1000.0
-	for index in _float_labels.size():
-		var label: Label = _float_labels[index]
-		if not is_instance_valid(label):
-			continue
-		var base: Vector2 = _float_bases[index]
-		var drift := sin(time * 1.6 + float(index) * 1.7) * 0.012
-		label.anchor_top = base.y + drift
-		label.anchor_bottom = base.y + drift
+	pass
 
 
 # —— 小工具 ———————————————————————————————————————————————
@@ -364,7 +346,7 @@ func _panel(fill: Color, border: Color, radius: int) -> PanelContainer:
 func _label(content: String, size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = content
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", maxi(18,size))
 	label.add_theme_color_override("font_color", color)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return label

@@ -24,18 +24,14 @@ var upgrades_column: VBoxContainer
 var goals_column: VBoxContainer
 var pending_label: Label
 var coins_label: Label
+var selected_recipe := ""
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
-	var theme_root := Theme.new()
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
-	theme_root.default_font = font
-	theme_root.default_font_size = 16
-	theme = theme_root
+	theme = LifeUI.make_theme()
 	_build()
 
 
@@ -61,13 +57,14 @@ func _build() -> void:
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
 	var panel := _panel(CREAM, Color("#d5c9aa"), 16)
-	panel.custom_minimum_size = Vector2(1020, 660)
+	panel.custom_minimum_size = Vector2(920, 650)
 	center.add_child(panel)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 6)
 	panel.add_child(column)
 
 	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation",16)
 	column.add_child(title_row)
 	var title := _label("制作台与成长", 22, FOREST)
 	# 标题不换行：autowrap 标签在 HBox 里会被压到一字宽，竖排成单字列并把按钮拉高。
@@ -77,7 +74,7 @@ func _build() -> void:
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	title_row.add_child(info)
 	coins_label = info
-	var close_button := _button("返回", Color("#eaf4df"), Color("#87b06f"))
+	var close_button := _button("收起 · 回工坊", Color("#eaf4df"), Color("#87b06f"))
 	close_button.pressed.connect(_on_close)
 	title_row.add_child(close_button)
 	pending_label = _label("", 13, WARN_GOLD)
@@ -87,17 +84,19 @@ func _build() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(status_label)
 
-	var body := HBoxContainer.new()
+	var body := TabContainer.new()
 	body.add_theme_constant_override("separation", 10)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(body)
-	recipes_column = _section(body, "配方（制作立即完成，不占用等待）", 400)
-	upgrades_column = _section(body, "设施升级（永久保留）", 280)
-	goals_column = _section(body, "成长看板（完成与领奖分开）", 280)
+	recipes_column = _section(body, "制作配方", 0)
+	upgrades_column = _section(body, "永久升级", 0)
+	goals_column = _section(body, "成长与领奖", 0)
 
 
-func _section(parent: HBoxContainer, title: String, width: int) -> VBoxContainer:
+func _section(parent: TabContainer, title: String, width: int) -> VBoxContainer:
 	var scroll := ScrollContainer.new()
+	scroll.name = title
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.custom_minimum_size = Vector2(width, 0)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	parent.add_child(scroll)
@@ -131,7 +130,14 @@ func _refresh_recipes() -> void:
 		recipes_column.remove_child(child)
 		child.queue_free()
 	var counts := crafting.material_counts()
-	for recipe_id in CraftingDefs.RECIPES:
+	var recipe_ids: Array = CraftingDefs.RECIPES.keys()
+	recipe_ids.sort_custom(func(a,b):
+		var ca := bool(crafting.recipe_status(a)["can_craft"])
+		var cb := bool(crafting.recipe_status(b)["can_craft"])
+		return ca and not cb if ca != cb else str(a)<str(b))
+	if selected_recipe.is_empty() or not CraftingDefs.RECIPES.has(selected_recipe):
+		selected_recipe = str(recipe_ids[0])
+	for recipe_id in recipe_ids:
 		var recipe: Dictionary = CraftingDefs.RECIPES[recipe_id]
 		var status := crafting.recipe_status(recipe_id)
 		var row := PanelContainer.new()
@@ -149,17 +155,25 @@ func _refresh_recipes() -> void:
 		row.add_child(column)
 		var head := HBoxContainer.new()
 		column.add_child(head)
-		var title := _label("%s：%s" % [recipe["name"], str(recipe.get("desc", ""))], 14, TEXT_DARK)
+		var title := _button(str(recipe["name"])+(" · 已选" if selected_recipe==recipe_id else " · 查看"),Color("#eaf4df") if selected_recipe==recipe_id else Color("#f7f1de"),Color("#87b06f"))
+		title.name = "Recipe_"+str(recipe_id)
 		title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		title.pressed.connect(_select_recipe.bind(str(recipe_id)))
 		head.add_child(title)
 		if not status["unlocked"]:
 			head.add_child(_label("未解锁", 12, TEXT_MUTED))
-		else:
+		elif selected_recipe==recipe_id:
 			var button := _button("制作", Color("#eaf4df"), Color("#87b06f"))
 			button.disabled = not status["can_craft"]
 			button.pressed.connect(_on_craft.bind(recipe_id))
 			head.add_child(button)
+		if selected_recipe!=recipe_id:
+			continue
+		var description := _label(str(recipe.get("desc","")),18,TEXT_DARK)
+		description.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		column.add_child(description)
+		var product: Dictionary = ItemDefs.get_item(str(recipe["output"]))
+		column.add_child(_label("产物：%s ×1 · 占 %d×%d 格" % [product["name"],product["size"].x,product["size"].y],18,FOREST))
 		var materials_text := ""
 		for material in recipe["materials"]:
 			var key := "%s:%s" % [str(material["kind"]), str(material["id"])]
@@ -173,6 +187,10 @@ func _refresh_recipes() -> void:
 		var materials := _label(materials_text, 12, TEXT_MUTED)
 		materials.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		column.add_child(materials)
+
+func _select_recipe(recipe_id: String) -> void:
+	selected_recipe = recipe_id
+	_refresh_recipes()
 
 
 func _refresh_upgrades() -> void:
@@ -325,7 +343,7 @@ func _panel(fill: Color, border: Color, radius: int) -> PanelContainer:
 func _label(content: String, size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = content
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", maxi(18,size))
 	label.add_theme_color_override("font_color", color)
 	# 默认不换行：autowrap 标签在 HBox 里会被压到一字宽竖排；长文本处显式开启。
 	return label
@@ -334,11 +352,12 @@ func _label(content: String, size: int, color: Color) -> Label:
 func _button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
+	button.custom_minimum_size.y = 38
 	button.add_theme_color_override("font_color", Color("#35513d"))
 	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
 	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
 	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
-	button.add_theme_font_size_override("font_size", 14)
+	button.add_theme_font_size_override("font_size", 18)
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill
 	style.border_color = border

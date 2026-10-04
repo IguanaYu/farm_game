@@ -40,7 +40,7 @@ func _layout() -> void:
 		art.position = rect.position + Vector2(0, 1)
 		art.size = Vector2(rect.size.x, maxf(20, rect.size.y - 21))
 		add_child(art)
-		var label := ExpeditionUI.label(str(def.get("name", "?")), 11, ExpeditionUI.TEXT)
+		var label := ExpeditionUI.label(str(def.get("name", "?")), 14, ExpeditionUI.TEXT)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		label.position = rect.position + Vector2(2, rect.size.y - 21)

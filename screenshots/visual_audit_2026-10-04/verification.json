@@ -1,0 +1,74 @@
+{
+	"crafting_1024": {
+		"minimum_height": 660,
+		"minimum_width": 1020,
+		"viewport": "[P: (0.0, 0.0), S: (1440.0, 900.0)]"
+	},
+	"directory_escape": {
+		"directory_visible": true,
+		"pause_visible": true
+	},
+	"friend_house": {
+		"camera": "/root/FarmWorld/FarmCamera",
+		"door_collision_layer": 0,
+		"farm_visible": false,
+		"location": "visit_house",
+		"window_collision_layer": 0
+	},
+	"friend_return": {
+		"camera": "/root/FarmWorld/FarmCamera",
+		"farm_visible": false,
+		"location": "farm",
+		"visiting": false
+	},
+	"friend_yard": {
+		"camera": "/root/FarmWorld/FarmCamera",
+		"farm_visible": false,
+		"gate_collision_layer": 0,
+		"house_collision_layer": 0,
+		"location": "visit_yard",
+		"owned_in_snapshot": [
+			1,
+			2,
+			3,
+			4,
+			5,
+			6
+		],
+		"rendered_owned_plots": [
+			"VisitPlot_01",
+			"VisitPlot_02",
+			"VisitPlot_03"
+		]
+	},
+	"isolated_user_data": true,
+	"network_connected": false,
+	"shots": [
+		"01_main_menu",
+		"02_online_login",
+		"03_farm_tutorial",
+		"04_farm_clear",
+		"05_farm_mature",
+		"06_seed_picker",
+		"07_warehouse",
+		"08_breeder",
+		"09_crafting",
+		"10_shop_clear",
+		"11_shop_purchase",
+		"12_shop_market",
+		"13_cave_camp",
+		"14_cave_departure",
+		"15_loadout",
+		"16_offline_room",
+		"17_directory_demo",
+		"18_directory_after_escape",
+		"19_friend_yard",
+		"20_friend_house",
+		"21_friend_return",
+		"22_pause",
+		"23_settings",
+		"24_crafting_1024",
+		"25_directory_736"
+	],
+	"source_commit": "2064954"
+}

@@ -1,0 +1,277 @@
+[
+  {
+    "file": "01_main_menu.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "02_online_login.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "03_farm_tutorial.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "04_farm_clear.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "05_farm_mature.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "06_seed_picker.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "07_warehouse.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "08_breeder.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "09_crafting.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "10_shop_clear.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "11_shop_purchase.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "12_shop_market.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "13_cave_camp.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "14_cave_departure.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "15_loadout.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "16_offline_room.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "17_directory_demo.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "18_directory_after_escape.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "19_friend_yard.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "20_friend_house.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "21_friend_return.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "22_pause.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "23_settings.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "24_crafting_1024.png",
+    "width": 1024,
+    "height": 640
+  },
+  {
+    "file": "25_directory_736.png",
+    "width": 736,
+    "height": 460
+  },
+  {
+    "file": "26_plot_care.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "27_harvest.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "28_seed_warehouse.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "29_equipment_warehouse.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "30_online_route_demo.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "31_online_settlement_demo.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "32_online_room_demo.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/01_camp_first_visit.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/02_camp_ready.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/03_battle.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/04_target_preview.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/05_pile_inspector.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/06_next_round.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/07_victory.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/08_route.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/09_route_preview.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/10_encounter.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/11_rewards.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/12_exit.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/13_extraction.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/14_settlement.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "expedition_redesign/15_small_window_ten_cards.png",
+    "width": 1024,
+    "height": 640
+  },
+  {
+    "file": "loot_redesign/01_battle_loot.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "loot_redesign/02_drag_rotated.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "loot_redesign/03_choice_locked.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "loot_redesign/04_protected_seed.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "loot_redesign/05_drop_confirmation.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "loot_redesign/06_leave_confirmation.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "loot_redesign/07_full_backpack.png",
+    "width": 1280,
+    "height": 800
+  },
+  {
+    "file": "loot_redesign/08_small_window.png",
+    "width": 1024,
+    "height": 640
+  }
+]

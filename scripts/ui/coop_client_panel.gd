@@ -24,18 +24,18 @@ var loot_panel: ExpeditionLootPanel
 var main_frame: CenterContainer
 ## 镜像版本：仅快照变化时重建界面，避免每帧重建按钮。
 var _mirror_version := -1
+var selected_route := Vector2i(-1,-1)
+var route_detail: VBoxContainer
+var settlement_receipt: Dictionary = {}
+var live_actions: HBoxContainer
+var return_button: Button
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
-	var theme_root := Theme.new()
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
-	theme_root.default_font = font
-	theme_root.default_font_size = 17
-	theme = theme_root
+	theme = ExpeditionUI.make_theme()
 	_build()
 	set_process(true)
 
@@ -100,25 +100,35 @@ func _on_result(action_id: String, result: Dictionary) -> void:
 
 
 func _on_settlement(settlement: Dictionary) -> void:
-	_flash("结算已应用到你的农场：%s（%s）" % [str(settlement.get("kind", "")), str(settlement.get("settlement_id", ""))])
+	settlement_receipt = settlement.duplicate(true)
+	_mirror_serial_dirty()
+	_flash("结算单已收到，正在核对农场入库记录。")
 
 
 func _build() -> void:
+	ExpeditionUI.backdrop(self)
 	var shade := ColorRect.new()
-	shade.color = Color(0.09, 0.13, 0.10, 0.9)
+	shade.color = Color(0.09,0.13,0.10,0.15)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(shade)
 	var center := CenterContainer.new()
 	main_frame = center
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
-	var panel := _panel(Color("#20332a"), Color("#6f9b71"), 16)
-	panel.custom_minimum_size = Vector2(880, 620)
+	var panel := _panel(ExpeditionUI.PANEL, ExpeditionUI.LINE, 16)
+	panel.custom_minimum_size = Vector2(1120, 730)
 	center.add_child(panel)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 8)
 	panel.add_child(column)
-	column.add_child(_label("合作探险（客机）", 22, CREAM))
+	var heading := HBoxContainer.new()
+	column.add_child(heading)
+	var title := _label("洞内探险 · 与队友同行",26,CREAM)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	heading.add_child(title)
+	var journal := ExpeditionUI.button("探险记录")
+	journal.pressed.connect(func(): log_label.visible = not log_label.visible)
+	heading.add_child(journal)
 	state_label = _label("", 15, Color("#e8d9a8"))
 	state_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(state_label)
@@ -136,11 +146,13 @@ func _build() -> void:
 	log_label = RichTextLabel.new()
 	log_label.bbcode_enabled = false
 	log_label.scroll_following = true
-	log_label.custom_minimum_size = Vector2(0, 120)
+	log_label.custom_minimum_size = Vector2(0, 90)
+	log_label.visible = false
 	log_label.add_theme_font_size_override("normal_font_size", 13)
 	log_label.add_theme_color_override("default_color", Color("#cfe2c2"))
 	column.add_child(log_label)
 	var bottom := HBoxContainer.new()
+	live_actions = bottom
 	bottom.add_theme_constant_override("separation", 8)
 	column.add_child(bottom)
 	var signal_button := _small("建议撤离", Color("#e8f0d8"), Color("#87b06f"))
@@ -151,9 +163,10 @@ func _build() -> void:
 	var abandon_button := _button("个人放弃（损失未保护物）", Color("#f0d9cf"), Color("#a4543f"))
 	abandon_button.pressed.connect(func() -> void: client.send_action("abandon_member", {}))
 	bottom.add_child(abandon_button)
-	var close_button := _button("返回农场并暂停（局保留）", Color("#fff5df"), Color("#d5b87d"))
+	var close_button := _button("回营地休息 · 当前探险保留", Color("#fff5df"), Color("#d5b87d"))
 	close_button.pressed.connect(_on_close)
-	bottom.add_child(close_button)
+	column.add_child(close_button)
+	return_button = close_button
 	## 客机战斗界面：p2 视角，出牌/结束回合经会话意图发给主机（F-04）。
 	battle_screen = preload("res://scenes/battle_screen.tscn").instantiate()
 	battle_screen.player_key = "p2"
@@ -179,6 +192,10 @@ func _refresh() -> void:
 		state_label.text = "等待主机开局……"
 		return
 	_mirror_version = client.mirror_serial
+	ExpeditionUI.set_layer(self,str(run.get("layer_id","moss_stone_shallow")))
+	live_actions.visible = str(run.get("phase","")) != "over"
+	return_button.visible = true
+	return_button.text = "回洞口营地 · 整理收获" if not live_actions.visible else "回营地休息 · 当前探险保留"
 	main_frame.visible = not ExpeditionLootPanel.is_loot_phase(run)
 	loot_panel.display(run, "p2", client.mirror_serial)
 	if battle_screen != null and battle_screen.visible and str(run.get("phase", "")) != "battle":
@@ -203,7 +220,12 @@ func _refresh() -> void:
 		"battle":
 			_open_battle()
 		"over":
-			body_column.add_child(_label("本局已结束（%s）。结算单到达后会自动应用到你的农场。" % str(run.get("outcome", "")), 15, LIGHT_TEXT))
+			if str(settlement_receipt.get("run_id","")) == str(run.get("run_id","")) and not settlement_receipt.is_empty():
+				return_button.visible = false
+				var applied: bool = client.farm_game != null and client.farm_game.state["expedition"].get("applied_settlements",[]).has(str(settlement_receipt.get("settlement_id","")))
+				body_column.add_child(ExpeditionSettlement.build(settlement_receipt,applied,_on_close))
+			else:
+				body_column.add_child(_label("探险已结束，等待本次结算单。",20,LIGHT_TEXT))
 	var entries: Array = run.get("log", [])
 	log_label.text = "\n".join(entries.slice(maxi(0, entries.size() - 8), entries.size()))
 
@@ -211,34 +233,49 @@ func _refresh() -> void:
 ## 地图阶段：下一排每列一个投票按钮（F-04：不再固定列 0）。
 func _refresh_map_votes() -> void:
 	var run: Dictionary = client.mirror_run
-	var rows: Array = run.get("map", {}).get("rows", [])
-	var next_row := int(run.get("current", {}).get("row", 0)) + 1
-	if next_row >= rows.size():
-		body_column.add_child(_label("已到最后一排：在撤离点投票撤离回家。", 15, LIGHT_TEXT))
-		return
-	var row_nodes: Array = rows[next_row]
-	var intro := _label("投票前进到第 %d 排（队友投同一格才前进）：" % next_row, 15, LIGHT_TEXT)
-	intro.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	body_column.add_child(intro)
+	var next_row := int(run.get("current",{}).get("row",0))+1
+	if selected_route.x != next_row:
+		selected_route = Vector2i(-1,-1)
 	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
+	row.add_theme_constant_override("separation",24)
 	body_column.add_child(row)
-	for col_index in range(row_nodes.size()):
-		var node: Dictionary = row_nodes[col_index]
-		var label := "%s·列 %d" % [ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node.get("type", "?")), "?"), col_index]
-		var button := _button(label, Color("#eaf4df"), Color("#87b06f"))
-		button.pressed.connect(func() -> void:
-			client.send_action("vote_move", {"row": next_row, "col": col_index})
-			_flash("已投票第 %d 排·列 %d（需队友同票）。" % [next_row, col_index]))
-		row.add_child(button)
-	var votes: Dictionary = run.get("votes", {})
-	if str(votes.get("p2", "")) != "":
-		body_column.add_child(_label("你已投票第 %s 排·列 %s。" % [str(votes["p2"]).split(",")[0], str(votes["p2"]).split(",")[1]], 13, LIGHT_MUTED))
-	if str(votes.get("p1", "")) != "":
-		body_column.add_child(_label("队友已投票第 %s 排·列 %s。" % [str(votes["p1"]).split(",")[0], str(votes["p1"]).split(",")[1]], 13, LIGHT_MUTED))
+	var route := ExpeditionRoute.new()
+	route.custom_minimum_size = Vector2(460,450)
+	route.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(route)
+	route.display(run)
+	var panel := ExpeditionUI.panel()
+	panel.custom_minimum_size.x = 400
+	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(panel)
+	route_detail = VBoxContainer.new()
+	panel.add_child(route_detail)
+	route.node_selected.connect(func(r,c): selected_route = Vector2i(r,c); _refresh_route_detail())
+	_refresh_route_detail()
+
+func _refresh_route_detail() -> void:
+	ExpeditionUI.clear(route_detail)
+	var run: Dictionary = client.mirror_run
+	if selected_route.x < 0:
+		var art := ExpeditionArt.new()
+		art.subject = "start"
+		art.stage_scene = true
+		art.layer_id = str(run.get("layer_id","moss_stone_shallow"))
+		art.custom_minimum_size.y = 210
+		route_detail.add_child(art)
+		route_detail.add_child(_label("下一步，走向哪里？",26,CREAM))
+		route_detail.add_child(_label("先看节点，再投票；两人同票才前进。",18,LIGHT_MUTED))
+	else:
+		var node: Dictionary = run["map"]["rows"][selected_route.x][selected_route.y]
+		var r := selected_route.x
+		var c := selected_route.y
+		route_detail.add_child(ExpeditionNodePreview.build(node,str(run.get("layer_id","moss_stone_shallow")),"投票前进 · 等待两人一致",func(): client.send_action("vote_move",{"row":r,"col":c})))
+	for key in ["p2","p1"]:
+		var vote := str(run.get("votes",{}).get(key,""))
+		var text := ("你" if key=="p2" else "队友")+("正在选路" if vote=="" else "已选节点 "+vote)
+		route_detail.add_child(_label(text,18,ExpeditionUI.TEAL))
 
 
-## 节点阶段：按节点类型给出对应操作（领取/事件/休整/撤离/离开/分享）。
 func _refresh_node() -> void:
 	var run: Dictionary = client.mirror_run
 	var current: Dictionary = run.get("current", {})
@@ -250,6 +287,12 @@ func _refresh_node() -> void:
 		if int(current.get("col", 0)) < row_nodes.size():
 			node = row_nodes[int(current.get("col", 0))]
 	var resolved: Dictionary = run.get("resolved", {}).get(key, {})
+	var art := ExpeditionArt.new()
+	art.stage_scene = true
+	art.layer_id = str(run.get("layer_id","moss_stone_shallow"))
+	art.subject = ExpeditionNodePreview.subject(node)
+	art.custom_minimum_size.y = 220
+	body_column.add_child(art)
 	body_column.add_child(_label("当前位置：%s（%s）" % [ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node.get("type", "?")), "?"), str(node.get("hint", ""))], 17, CREAM))
 	match str(node.get("type", "")):
 		"battle", "elite", "gate":
@@ -265,7 +308,7 @@ func _refresh_node() -> void:
 			_refresh_claims(key, resolved, false)
 		"event":
 			_refresh_event(resolved)
-		"rest_exit":
+		"rest_exit", "exit":
 			_refresh_rest(resolved)
 	_refresh_share()
 	var leave := _button("离开本节点（未领候选放弃）", Color("#eaf4df"), Color("#87b06f"))
@@ -393,7 +436,8 @@ func _open_battle() -> void:
 		battle_screen.combat = combat
 		battle_screen._refresh()
 	else:
-		battle_screen.open_run(combat, "p2")
+		battle_screen.layer_id = str(client.mirror_run.get("layer_id","moss_stone_shallow"))
+	battle_screen.open_run(combat, "p2")
 
 
 func _mirror_combat() -> CombatGame:
@@ -445,25 +489,26 @@ func _panel(fill: Color, border: Color, radius: int) -> PanelContainer:
 func _label(content: String, size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = content
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", maxi(18,size))
 	label.add_theme_color_override("font_color", color)
 	return label
 
 
 func _small(content: String, fill: Color, border: Color) -> Button:
 	var button := _button(content, fill, border)
-	button.add_theme_font_size_override("font_size", 13)
+	button.add_theme_font_size_override("font_size", 18)
 	return button
 
 
 func _button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
+	button.custom_minimum_size.y = 42
 	button.add_theme_color_override("font_color", Color("#35513d"))
 	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
 	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
 	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
-	button.add_theme_font_size_override("font_size", 14)
+	button.add_theme_font_size_override("font_size", 18)
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill
 	style.border_color = border

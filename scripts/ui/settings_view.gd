@@ -14,6 +14,7 @@ var fullscreen_option: OptionButton
 var resolution_option: OptionButton
 var vsync_check: CheckButton
 var tutorial_replay_check: CheckButton
+var reduce_motion_check: CheckButton
 var relay_address_edit: LineEdit
 var hint_label: Label
 
@@ -57,6 +58,15 @@ func _build() -> void:
 	vsync_check.toggled.connect(_on_vsync_toggled)
 	vsync_row.add_child(vsync_check)
 	add_child(vsync_row)
+	var motion_row := _row()
+	var motion_label := _row_label("减少动作")
+	motion_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	motion_row.add_child(motion_label)
+	reduce_motion_check = CheckButton.new()
+	reduce_motion_check.name = "ReduceMotionCheck"
+	reduce_motion_check.toggled.connect(SettingsStore.set_reduce_motion)
+	motion_row.add_child(reduce_motion_check)
+	add_child(motion_row)
 
 	_build_volume_row("主音量", "MasterVolumeSlider", "Master")
 	_build_volume_row("音乐", "MusicVolumeSlider", "Music")
@@ -168,6 +178,7 @@ func refresh() -> void:
 	fullscreen_option.selected = 1 if SettingsStore.get_fullscreen() else 0
 	resolution_option.selected = _nearest_resolution_index(SettingsStore.get_window_size())
 	vsync_check.set_pressed_no_signal(SettingsStore.get_vsync())
+	reduce_motion_check.set_pressed_no_signal(SettingsStore.get_reduce_motion())
 	for bus_name in ["Master", "Music", "SFX"]:
 		var row_info: Dictionary = _volume_rows.get(bus_name, {})
 		if row_info.is_empty():
@@ -222,6 +233,6 @@ func _row_label(content: String) -> Label:
 func _label(content: String, size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = content
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", maxi(18,size))
 	label.add_theme_color_override("font_color", color)
 	return label

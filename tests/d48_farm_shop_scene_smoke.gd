@@ -32,20 +32,18 @@ func _run() -> void:
 	var farm: Node3D = world.farm_location
 
 	# —— 段1：农场环境结构 ——
-	var porch: Node = farm.get_node_or_null("ShopPorch")
-	_check(porch != null and porch.get_node_or_null("AwningStrip_0") != null and porch.get_node_or_null("ShopPorchEntry") != null, "门廊：条纹雨棚+可点击踏步")
+	var porch: Node = farm.get_node_or_null("ShopBuilding")
+	_check(porch != null and porch.find_child("AwningStripe*",true,false) != null and porch is StaticBody3D and not porch.input_event.get_connections().is_empty(), "门廊：条纹雨棚+建筑点击入口")
 	var stairs: Node = farm.get_node_or_null("HillStairs")
-	_check(stairs != null and stairs.get_node_or_null("StairsEntry") != null and stairs.get_node_or_null("StairLampHead") != null, "石阶：台阶+提灯+可点击入口")
-	var neighbor: Node = farm.get_node_or_null("NeighborEntry")
-	_check(neighbor != null and neighbor.get_node_or_null("WestStream") != null and neighbor.get_node_or_null("StoneBridge") != null and neighbor.get_node_or_null("NeighborMailbox") != null, "邻里入口：溪流+石桥+信箱")
+	_check(stairs != null and stairs.find_child("StoneStep*",true,false) != null and not stairs.input_event.get_connections().is_empty(), "石阶：台阶+可点击入口")
+	_check(farm.get_node_or_null("MeadowStream") != null and farm.get_node_or_null("NeighborBridge") != null and farm.get_node_or_null("NeighborEntry/Mailbox") != null and farm.get_node_or_null("NeighborHouse") != null, "邻里入口：溪流+桥+信箱+住宅")
 	var hill_count := 0
 	var tree_count := 0
 	for child in farm.get_children():
-		if child.has_meta("env_layer"):
-			if child is MeshInstance3D:
-				hill_count += 1
-			else:
-				tree_count += 1
+		if str(child.name).begins_with("FarHill"):
+			hill_count += 1
+		if str(child.name).begins_with("WoodlandTree"):
+			tree_count += 1
 	_check(hill_count >= 4, "远景山影 ≥4（%d）" % hill_count)
 	_check(tree_count >= 10, "林带树列 ≥10（%d）" % tree_count)
 
@@ -66,7 +64,8 @@ func _run() -> void:
 					continue
 				var t := -corner_origin.y / forward.y
 				var ground := corner_origin + forward * t
-				if absf(ground.x) > 23.5 or absf(ground.z) > 19.0:
+				var terrain: BoxMesh = farm.get_node("ContinuousGround").mesh
+				if absf(ground.x) > terrain.size.x/2 or absf(ground.z) > terrain.size.z/2:
 					covered = false
 	_check(covered, "三分辨率四角射线均落在扩展地台内（无裸露截面）")
 
@@ -78,7 +77,7 @@ func _run() -> void:
 		if body == null:
 			continue
 		plots_visible += 1
-		var stub: MeshInstance3D = body.get_node_or_null("PlotStub")
+		var stub: Node3D = body.get_node_or_null("PlotStub")
 		if stub != null and stub.visible:
 			stubs_visible += 1
 	_check(plots_visible == 10, "十块地全部可见（含未购）")

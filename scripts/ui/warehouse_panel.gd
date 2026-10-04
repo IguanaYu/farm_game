@@ -29,12 +29,7 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
-	var theme_root := Theme.new()
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
-	theme_root.default_font = font
-	theme_root.default_font_size = 16
-	theme = theme_root
+	theme = LifeUI.make_theme()
 	_build()
 
 
@@ -133,6 +128,11 @@ func _refresh() -> void:
 		var def: Dictionary = entry["def"]
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 6)
+		var art := ExpeditionArt.new()
+		art.subject = ExpeditionLootPanel.item_art(key)
+		art.tint = ExpeditionLootPanel.item_tint(key)
+		art.custom_minimum_size = Vector2(62,62)
+		row.add_child(art)
 		var info := _label("%s×%d（%d×%d → %d 张牌，%s，%s）" % [
 			def["name"], int(entry["count"]), def["size"].x, def["size"].y, def["cards"].size(),
 			"可售 %d" % int(def.get("base_value", 0)) if bool(def.get("sellable", false)) else "不可售",
@@ -276,7 +276,7 @@ func _panel(fill: Color, border: Color, radius: int) -> PanelContainer:
 func _label(content: String, size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = content
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", maxi(18,size))
 	label.add_theme_color_override("font_color", color)
 	# 默认不换行：autowrap 标签在 HBox 里会被压到一字宽竖排；长文本处显式开启。
 	return label
@@ -284,18 +284,19 @@ func _label(content: String, size: int, color: Color) -> Label:
 
 func _button(content: String, fill: Color, border: Color) -> Button:
 	var button := _small_button(content, fill, border)
-	button.add_theme_font_size_override("font_size", 15)
+	button.add_theme_font_size_override("font_size", 18)
 	return button
 
 
 func _small_button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
+	button.custom_minimum_size.y = 38
 	button.add_theme_color_override("font_color", Color("#35513d"))
 	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
 	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
 	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
-	button.add_theme_font_size_override("font_size", 13)
+	button.add_theme_font_size_override("font_size", 18)
 	var style := StyleBoxFlat.new()
 	style.bg_color = fill
 	style.border_color = border

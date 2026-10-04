@@ -55,6 +55,7 @@ var online_request: Callable = Callable()
 var selected_instance_id := -1
 var filter := "all"
 var dirty := false
+var pending_placement := false
 
 var stats_label: Label
 var warehouse_column: VBoxContainer
@@ -75,12 +76,7 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	visible = false
 	set_process_unhandled_key_input(true)
-	var theme_root := Theme.new()
-	var font := SystemFont.new()
-	font.font_names = PackedStringArray(["Microsoft YaHei UI", "Microsoft YaHei", "Noto Sans CJK SC"])
-	theme_root.default_font = font
-	theme_root.default_font_size = 18
-	theme = theme_root
+	theme = LifeUI.make_theme()
 	_build()
 
 
@@ -108,150 +104,121 @@ func mark_saved() -> void:
 
 func _build() -> void:
 	var shade := ColorRect.new()
-	shade.color = Color(0.11, 0.20, 0.14, 0.55)
+	shade.color = Color(0.11,0.20,0.14,0.30)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(shade)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
-	var panel := _panel(CREAM, Color("#d5c9aa"), 18)
-	panel.custom_minimum_size = Vector2(1180, 660)
+	var panel := _panel(CREAM,Color("#c9ceb4"),14)
+	panel.custom_minimum_size = Vector2(1160,710)
 	center.add_child(panel)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 8)
+	column.add_theme_constant_override("separation",10)
 	panel.add_child(column)
-
-	var title_row := HBoxContainer.new()
-	column.add_child(title_row)
-	title_row.add_child(_label("战备箱", 24, FOREST))
-	var hint := _label("点击物品选中，再点一个容器放入（自动找位）；点已放入的物品可查看并放回。", 14, TEXT_MUTED)
-	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	title_row.add_child(hint)
-
-	stats_label = _label("", 16, TEXT_DARK)
+	var top := HBoxContainer.new()
+	column.add_child(top)
+	var title := _label("洞口战备箱",28,FOREST)
+	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	top.add_child(title)
+	var close_button := _button("回洞口营地 ×",Color("#e8efdb"),Color("#b2bd9d"))
+	close_button.pressed.connect(_on_close)
+	top.add_child(close_button)
+	stats_label = _label("",18,TEXT_DARK)
+	stats_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(stats_label)
-
 	var body := HBoxContainer.new()
-	body.add_theme_constant_override("separation", 12)
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation",14)
 	column.add_child(body)
-
-	# 左：仓库与筛选。
+	var left_scroll := ScrollContainer.new()
+	left_scroll.custom_minimum_size.x = 290
+	left_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body.add_child(left_scroll)
 	warehouse_column = VBoxContainer.new()
-	warehouse_column.add_theme_constant_override("separation", 6)
-	warehouse_column.custom_minimum_size = Vector2(250, 0)
-	body.add_child(warehouse_column)
-
-	# 中：三个容器。
-	var center_column := VBoxContainer.new()
-	center_column.add_theme_constant_override("separation", 8)
-	center_column.custom_minimum_size = Vector2(430, 0)
-	body.add_child(center_column)
+	warehouse_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	left_scroll.add_child(warehouse_column)
+	var bags := TabContainer.new()
+	bags.custom_minimum_size.x = 390
+	bags.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(bags)
 	for container in ExpeditionBaseline.CONTAINERS:
 		var box := _build_container_box(container)
-		center_column.add_child(box)
+		box.name = ExpeditionBaseline.CONTAINER_DISPLAY[container]
+		bags.add_child(box)
 		container_boxes[container] = box
-
-	# 右：详情／牌组／检查。
-	var right_column := VBoxContainer.new()
-	right_column.add_theme_constant_override("separation", 8)
-	right_column.custom_minimum_size = Vector2(380, 0)
-	right_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_child(right_column)
-	detail_column = _section(right_column, "物品详情")
-	deck_column = _section(right_column, "牌组预览（按加入回合）")
-	check_column = _section(right_column, "出发前检查")
-
-	# 配装预设行：保存/切换多套战备方案（交付遗留项）。
-	var preset_row := HBoxContainer.new()
-	preset_row.add_theme_constant_override("separation", 8)
-	column.add_child(preset_row)
-	preset_row.add_child(_label("配装预设", 15, FOREST))
+	var right_scroll := ScrollContainer.new()
+	right_scroll.custom_minimum_size.x = 330
+	right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	body.add_child(right_scroll)
+	var right := VBoxContainer.new()
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right_scroll.add_child(right)
+	detail_column = _section(right,"物品详情")
+	deck_column = _section(right,"牌组与加入回合")
+	check_column = _section(right,"出发前检查")
+	var presets := HBoxContainer.new()
+	column.add_child(presets)
 	preset_option = OptionButton.new()
-	preset_option.add_theme_font_size_override("font_size", 14)
-	preset_option.custom_minimum_size = Vector2(170, 0)
-	preset_row.add_child(preset_option)
+	preset_option.custom_minimum_size.x = 190
+	presets.add_child(preset_option)
 	preset_name_edit = LineEdit.new()
-	preset_name_edit.placeholder_text = "名称（留空自动编号）"
+	preset_name_edit.placeholder_text = "配装预设名称"
 	preset_name_edit.max_length = LoadoutPresets.NAME_MAX_CHARS
-	preset_name_edit.custom_minimum_size = Vector2(150, 0)
-	preset_row.add_child(preset_name_edit)
-	var save_preset_button := _small_button("存为预设", Color("#eaf4df"), Color("#87b06f"))
-	save_preset_button.tooltip_text = "把当前三个容器的布局存成一套预设；同名覆盖旧内容。"
-	save_preset_button.pressed.connect(func() -> void: save_preset(preset_name_edit.text))
-	preset_row.add_child(save_preset_button)
-	var apply_preset_button := _small_button("应用预设", Color("#ffd98a"), Color("#9b713a"))
-	apply_preset_button.tooltip_text = "清空当前容器并按预设复原；缺失物品会逐件提示。"
-	apply_preset_button.pressed.connect(apply_selected)
-	preset_row.add_child(apply_preset_button)
-	var delete_preset_button := _small_button("删除", Color("#fff5df"), Color("#d5b87d"))
-	delete_preset_button.pressed.connect(delete_selected)
-	preset_row.add_child(delete_preset_button)
-
-	# 底部操作。
-	var bottom := HBoxContainer.new()
-	bottom.add_theme_constant_override("separation", 10)
-	column.add_child(bottom)
-	var kit_button := _button("领取／补领基础装备", Color("#eaf4df"), Color("#87b06f"))
-	kit_button.pressed.connect(_on_grant_kit)
-	bottom.add_child(kit_button)
-	var demo_button := _button("载入演示物品", Color("#fff5df"), Color("#d5b87d"))
-	demo_button.pressed.connect(_on_inject_demo)
-	bottom.add_child(demo_button)
-	var demo_battle := _button("演示战斗", Color("#ffd98a"), Color("#9b713a"))
-	demo_battle.tooltip_text = "用基础套装打一场演示战斗（2.2）：不消耗物品、不写存档。"
-	demo_battle.pressed.connect(func() -> void: demo_battle_requested.emit())
-	bottom.add_child(demo_battle)
-	var clear_button := _button("清空配置", Color("#fff5df"), Color("#d5b87d"))
-	clear_button.pressed.connect(_on_clear_loadout)
-	bottom.add_child(clear_button)
-	put_back_button = _button("放回仓库", Color("#fff5df"), Color("#d5b87d"))
-	put_back_button.visible = false
+	preset_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	presets.add_child(preset_name_edit)
+	for entry in [["保存预设",func(): save_preset(preset_name_edit.text)],["应用预设",apply_selected],["删除预设",delete_selected]]:
+		var button := _small_button(entry[0],Color("#e8efdb"),Color("#b2bd9d"))
+		button.pressed.connect(entry[1])
+		presets.add_child(button)
+	var actions := HFlowContainer.new()
+	column.add_child(actions)
+	for entry in [["补领基础装备",_on_grant_kit],["清空配置",_on_clear_loadout]]:
+		var button := _small_button(entry[0],Color("#e8efdb"),Color("#b2bd9d"))
+		button.pressed.connect(entry[1])
+		actions.add_child(button)
+	put_back_button = _small_button("放回仓库",Color("#f1e8d3"),Color("#cfc4a6"))
 	put_back_button.pressed.connect(_on_put_back)
-	bottom.add_child(put_back_button)
-	rotate_button = _button("旋转（R）", Color("#fff5df"), Color("#d5b87d"))
-	rotate_button.visible = false
+	actions.add_child(put_back_button)
+	rotate_button = _small_button("旋转 R",Color("#f1e8d3"),Color("#cfc4a6"))
 	rotate_button.pressed.connect(_on_rotate)
-	bottom.add_child(rotate_button)
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	bottom.add_child(spacer)
-	status_label = _label("", 14, BAD_RED)
-	status_label.custom_minimum_size = Vector2(260, 0)
+	actions.add_child(rotate_button)
+	if OS.is_debug_build():
+		for entry in [["演示物品",_on_inject_demo],["演示战斗",func(): demo_battle_requested.emit()]]:
+			var button := _small_button(entry[0],Color("#f1e8d3"),Color("#cfc4a6"))
+			button.pressed.connect(entry[1])
+			actions.add_child(button)
+	var bottom := HBoxContainer.new()
+	column.add_child(bottom)
+	status_label = _label("",18,BAD_RED)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bottom.add_child(status_label)
-	var depart := _button("出发（单人）", Color("#ffd98a"), Color("#9b713a"))
-	depart.tooltip_text = "校验通过后直接出发进洞窟；失败原因会显示在旁边。"
-	depart.pressed.connect(func() -> void: depart_requested.emit())
+	var depart := _button("准备妥当 · 单人出发 →",Color("#dce8c8"),Color("#839b6b"))
+	depart.pressed.connect(func(): depart_requested.emit())
 	bottom.add_child(depart)
-	var close_button := _button("返回", Color("#eaf4df"), Color("#87b06f"))
-	close_button.pressed.connect(_on_close)
-	bottom.add_child(close_button)
 
 
 func _build_container_box(container: String) -> VBoxContainer:
-	var box := DropBox.new()
-	box.add_theme_constant_override("separation", 4)
-	box.dropped.connect(_on_drop_into_container.bind(container))
-	var header := HBoxContainer.new()
-	box.add_child(header)
-	var display: String = ExpeditionBaseline.CONTAINER_DISPLAY[container]
-	var size: Vector2i = ExpeditionBaseline.CONTAINER_SIZE[container]
-	var join_round: int = ExpeditionBaseline.JOIN_ROUND[container]
-	var round_note := "第 1 回合加入牌库" if join_round == 1 else "第 %d 回合加入牌库" % join_round
-	header.add_child(_label("%s（%d×%d，%s）" % [display, size.x, size.y, round_note], 15, FOREST))
-	var spacer := Control.new()
-	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	header.add_child(spacer)
-	var tidy_button := _small_button("自动整理", Color("#fff5df"), Color("#d5b87d"))
-	tidy_button.pressed.connect(_on_auto_tidy.bind(container))
-	header.add_child(tidy_button)
-	var grid := GridContainer.new()
-	grid.columns = size.x
-	grid.add_theme_constant_override("h_separation", 2)
-	grid.add_theme_constant_override("v_separation", 2)
+	var box := VBoxContainer.new()
+	box.add_theme_constant_override("separation",12)
+	var dims: Vector2i = ExpeditionBaseline.CONTAINER_SIZE[container]
+	var round_id: int = ExpeditionBaseline.JOIN_ROUND[container]
+	var caption := _label("%d × %d 格 · 第 %d 回合加入牌库" % [dims.x,dims.y,round_id],18,FOREST)
+	box.add_child(caption)
+	box.set_meta("caption",caption)
+	var grid := EquipmentGrid.new()
+	grid.name = "EquipmentGrid_"+container
+	grid.container = container
+	grid.loadout_owner = self
+	grid.loot_owner = self
+	grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	grid.item_selected.connect(_on_select_instance)
 	box.add_child(grid)
-	box.set_meta("grid", grid)
+	box.set_meta("grid",grid)
+	var tidy := _small_button("自动整理这个容器",Color("#e8efdb"),Color("#b2bd9d"))
+	tidy.pressed.connect(_on_auto_tidy.bind(container))
+	box.add_child(tidy)
 	return box
 
 
@@ -579,7 +546,7 @@ func _refresh_warehouse() -> void:
 	for child in warehouse_column.get_children():
 		warehouse_column.remove_child(child)
 		child.queue_free()
-	var filter_row := HBoxContainer.new()
+	var filter_row := HFlowContainer.new()
 	filter_row.add_theme_constant_override("separation", 4)
 	warehouse_column.add_child(filter_row)
 	var filters := [["all", "全部"], ["weapon", "武器"], ["armor", "防具"], ["tool", "工具"], ["supply", "补给"], ["material", "材料"], ["cargo", "货物"]]
@@ -597,10 +564,14 @@ func _refresh_warehouse() -> void:
 			continue
 		shown += 1
 		var row := DragButton.new()
-		row.payload = {"instance_id": int(instance["instance_id"])}
+		row.payload = {"instance_id":int(instance["instance_id"]),"def_id":instance["def_id"],"rotated":instance.get("rotated",false),"loadout_owner":get_instance_id()}
 		var demo_mark := "［演示］" if bool(instance.get("demo", false)) else ""
 		row.text = "%s%s  %d×%d → %d 张牌" % [demo_mark, def["name"], def["size"].x, def["size"].y, def["cards"].size()]
-		row.add_theme_font_size_override("font_size", 14)
+		row.add_theme_font_size_override("font_size", 18)
+		row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		row.clip_text = true
+		row.custom_minimum_size = Vector2(250,54)
+		row.tooltip_text = row.text
 		row.add_theme_color_override("font_color", Color("#35513d"))
 		row.add_theme_color_override("font_hover_color", Color("#1f3327"))
 		row.add_theme_color_override("font_pressed_color", Color("#1f3327"))
@@ -616,43 +587,15 @@ func _refresh_warehouse() -> void:
 
 
 func _refresh_container(container: String) -> void:
-	var box: VBoxContainer = container_boxes[container]
-	var grid: GridContainer = box.get_meta("grid")
-	for child in grid.get_children():
-		grid.remove_child(child)
-		child.queue_free()
-	var size: Vector2i = ExpeditionBaseline.CONTAINER_SIZE[container]
-	var instances: Array = inventory.loadout_list(container)
-	var cell_owner := {}
+	var grid: EquipmentGrid = container_boxes[container].get_meta("grid")
+	var instances: Array = inventory.loadout_list(container).duplicate(true)
 	for instance in instances:
-		var def := ItemDefs.get_item(str(instance["def_id"]))
-		for covered in ExpeditionBaseline.cells_of(def["size"], Vector2i(int(instance["cell"][0]), int(instance["cell"][1])), bool(instance.get("rotated", false))):
-			cell_owner[ExpeditionBaseline.cell_key(covered)] = instance
-	var dark := container == "safe"
-	for y in range(size.y):
-		for x in range(size.x):
-			var cell := Button.new()
-			cell.custom_minimum_size = Vector2(34, 30)
-			var key := ExpeditionBaseline.cell_key(Vector2i(x, y))
-			if cell_owner.has(key):
-				var instance: Dictionary = cell_owner[key]
-				var def := ItemDefs.get_item(str(instance["def_id"]))
-				var fill: Color = CATEGORY_COLOR.get(str(def["category"]), CELL_EMPTY)
-				if dark:
-					fill = fill.darkened(0.18)
-				var border := Color("#4a6f4a") if int(instance["instance_id"]) != selected_instance_id else Color("#2f4f2f")
-				cell.add_theme_stylebox_override("normal", _style(fill, border, 3))
-				cell.add_theme_stylebox_override("hover", _style(fill, border, 3))
-				cell.add_theme_stylebox_override("pressed", _style(fill, border, 3))
-				cell.tooltip_text = "%s%s" % [def["name"], "（演示）" if bool(instance.get("demo", false)) else ""]
-				cell.pressed.connect(_on_select_instance.bind(int(instance["instance_id"])))
-			else:
-				var empty_fill = CELL_EMPTY.darkened(0.06) if dark else CELL_EMPTY
-				cell.add_theme_stylebox_override("normal", _style(empty_fill, CELL_BORDER, 3))
-				cell.add_theme_stylebox_override("hover", _style(empty_fill.lightened(0.05), CELL_BORDER, 3))
-				cell.add_theme_stylebox_override("pressed", _style(empty_fill, CELL_BORDER, 3))
-				cell.pressed.connect(_on_container_clicked.bind(container))
-			grid.add_child(cell)
+		instance["loot_art"] = ExpeditionLootPanel.item_art(str(instance["def_id"]))
+		instance["loot_tint"] = ExpeditionLootPanel.item_tint(str(instance["def_id"]))
+	var dims := ExpeditionBaseline.size_for(game.state["expedition"],container)
+	var caption: Label = container_boxes[container].get_meta("caption")
+	caption.text = "%d × %d 格 · 第 %d 回合加入牌库" % [dims.x,dims.y,ExpeditionBaseline.JOIN_ROUND[container]]
+	grid.display(instances,dims,selected_instance_id)
 
 
 func _refresh_detail() -> void:
@@ -783,7 +726,8 @@ func _style(fill: Color, border: Color, radius: int) -> StyleBoxFlat:
 func _label(content: String, size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = content
-	label.add_theme_font_size_override("font_size", size)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.add_theme_font_size_override("font_size", maxi(18,size))
 	label.add_theme_color_override("font_color", color)
 	return label
 
@@ -791,11 +735,12 @@ func _label(content: String, size: int, color: Color) -> Label:
 func _button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
+	button.custom_minimum_size.y = 38
 	button.add_theme_color_override("font_color", Color("#35513d"))
 	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
 	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
 	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
-	button.add_theme_font_size_override("font_size", 15)
+	button.add_theme_font_size_override("font_size", 18)
 	var style := _style(fill, border, 12)
 	style.content_margin_left = 12
 	style.content_margin_right = 12
@@ -808,5 +753,23 @@ func _button(content: String, fill: Color, border: Color) -> Button:
 
 func _small_button(content: String, fill: Color, border: Color) -> Button:
 	var button := _button(content, fill, border)
-	button.add_theme_font_size_override("font_size", 13)
+	button.add_theme_font_size_override("font_size", 18)
 	return button
+
+func place_item(payload: Dictionary, container: String, cell: Vector2i) -> void:
+	if pending_placement:
+		return
+	pending_placement = true
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("inv.place_at",{"instance_id":int(payload["instance_id"]),"container":container,"cell":{"x":cell.x,"y":cell.y},"rotated":bool(payload.get("rotated",false))})
+		result = _online_result(reply)
+	else:
+		result = inventory.place_at(int(payload["instance_id"]),container,cell,bool(payload.get("rotated",false)))
+	pending_placement = false
+	if result.is_empty():
+		return
+	if bool(result.get("ok",false)):
+		dirty = true
+	_flash("已放入%s。" % ExpeditionBaseline.CONTAINER_DISPLAY[container] if bool(result.get("ok",false)) else str(result.get("reason","放置失败")))
+	_refresh()

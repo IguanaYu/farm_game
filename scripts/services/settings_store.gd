@@ -117,6 +117,16 @@ static func set_tutorial_replay(value: bool) -> void:
 	_save(config)
 
 
+static func get_reduce_motion() -> bool:
+	return bool(_load().get_value("accessibility", "reduce_motion", false))
+
+
+static func set_reduce_motion(value: bool) -> void:
+	var config := _load()
+	config.set_value("accessibility", "reduce_motion", value)
+	_save(config)
+
+
 # —— 版本号 ————————————————————————————————————————————————————
 
 static func game_version() -> String:

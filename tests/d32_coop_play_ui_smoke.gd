@@ -84,8 +84,8 @@ func _run() -> void:
 	await _pump(8)
 	_check(int(run["current"]["row"]) == 0, "投票：主机单方投票不前进")
 	_check(str((client.mirror_run.get("votes", {}) as Dictionary).get("p1", "")) == "1,0", "镜像：客机看到主机投票")
-	if not _click(coop_panel, "·列 0"):
-		_check(false, "投票：客机界面有列 0 投票按钮")
+	if not _vote_route(coop_panel,1,0):
+		_check(false, "投票：客机预览并确认第 1 排列 0")
 	await _pump(10)
 	_check(int(run["current"]["row"]) == 1, "投票：双方同票后进入第 1 排")
 	_check(int(client.mirror_run.get("current", {}).get("row", -1)) == 1, "镜像：客机位置同步")
@@ -169,8 +169,8 @@ func _run() -> void:
 			await _pump(10)
 		map_panel._on_move(target_row, 0)
 		await _pump(6)
-		if not _click(coop_panel, "·列 0"):
-			_check(false, "投票：第 %d 排客机投票按钮存在" % target_row)
+		if not _vote_route(coop_panel,target_row,0):
+			_check(false, "投票：第 %d 排客机路线与确认按钮存在" % target_row)
 		await _pump(10)
 		_check(int(run["current"]["row"]) == target_row, "推进：第 %d 排经双票到达" % target_row)
 
@@ -196,6 +196,20 @@ func _click(panel: Control, text: String) -> bool:
 			button.pressed.emit()
 			return true
 	return false
+
+
+func _vote_route(panel: CoopClientPanel, row: int, col: int) -> bool:
+	var button: Button = panel.find_child("Route_%d_%d" % [row,col],true,false)
+	if button==null or not button.is_visible_in_tree() or button.disabled:
+		return false
+	var before := int(panel.client.mirror_run["current"]["row"])
+	button.pressed.emit()
+	_check(int(panel.client.mirror_run["current"]["row"])==before,"预览：选择节点不提前推进镜像")
+	var confirm: Button = panel.find_child("ConfirmRoute",true,false)
+	if confirm==null or not confirm.is_visible_in_tree() or confirm.disabled:
+		return false
+	confirm.pressed.emit()
+	return true
 
 
 func _pump(frames: int) -> void:

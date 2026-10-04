@@ -14,7 +14,7 @@ var bridge: OnlineFarmBridge
 var state_label: Label
 var code_label: Label
 var members_column: VBoxContainer
-var action_row: HBoxContainer
+var action_row: VBoxContainer
 var status_label: Label
 var join_edit: LineEdit
 var main_frame: CenterContainer
@@ -22,7 +22,7 @@ var main_frame: CenterContainer
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	theme = ExpeditionUI.make_theme()
 	_build()
@@ -46,13 +46,16 @@ func _on_room(_room: Dictionary) -> void:
 
 
 func _build() -> void:
-	ExpeditionUI.backdrop(self)
 	var center := CenterContainer.new()
 	main_frame = center
-	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	center.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	center.offset_left = -570
+	center.offset_right = -24
+	center.offset_top = 112
+	center.offset_bottom = 720
 	add_child(center)
 	var panel := ExpeditionUI.panel(Color("#20332a"), Color("#6f9b71"), 16)
-	panel.custom_minimum_size = Vector2(720, 460)
+	panel.custom_minimum_size = Vector2(540, 460)
 	center.add_child(panel)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
@@ -62,7 +65,7 @@ func _build() -> void:
 	var overline := _label("COOP ROOM   /   好友组队", 14, ExpeditionUI.GOLD)
 	overline.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(overline)
-	var close_button := ExpeditionUI.button("返回农场   ×")
+	var close_button := ExpeditionUI.button("留在营地 ×")
 	close_button.pressed.connect(func() -> void: close_requested.emit())
 	top.add_child(close_button)
 	column.add_child(_label("输入朋友的房号，或者自己开一间。", 22, CREAM))
@@ -75,7 +78,7 @@ func _build() -> void:
 	members_column.add_theme_constant_override("separation", 6)
 	members_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(members_column)
-	action_row = HBoxContainer.new()
+	action_row = VBoxContainer.new()
 	action_row.add_theme_constant_override("separation", 10)
 	column.add_child(action_row)
 	status_label = _label("", 13, ExpeditionUI.RED)
@@ -204,6 +207,6 @@ func _on_leave() -> void:
 func _label(content: String, size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = content
-	label.add_theme_font_size_override("font_size", size)
+	label.add_theme_font_size_override("font_size", maxi(18,size))
 	label.add_theme_color_override("font_color", color)
 	return label

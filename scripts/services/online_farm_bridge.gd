@@ -24,6 +24,7 @@ var _bootstrapped := false
 var mirror_run := {}
 var mirror_run_version := 0
 var mirror_room := {}
+var mirror_settlement: Dictionary = {}
 ## R7：当前拜访的家园（空=未拜访；{owner, farm}）。
 var visiting := {}
 
@@ -114,6 +115,7 @@ func _on_push(kind: String, msg: Dictionary) -> void:
 		"settlement":
 			var settlement: Variant = msg.get("settlement", {})
 			if settlement is Dictionary:
+				mirror_settlement = settlement.duplicate(true)
 				settlement_arrived.emit(settlement)
 
 
@@ -124,6 +126,8 @@ func _apply_run(run: Variant, version: int) -> void:
 	var rid := str(run.get("run_id", ""))
 	if rid != "" and rid != str(mirror_run.get("run_id", "")):
 		mirror_run_version = 0
+		if str(mirror_settlement.get("run_id","")) != rid:
+			mirror_settlement.clear()
 	if version <= mirror_run_version and not mirror_run.is_empty():
 		return
 	mirror_run = run

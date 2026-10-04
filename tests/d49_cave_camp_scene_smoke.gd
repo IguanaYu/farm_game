@@ -37,8 +37,8 @@ func _run() -> void:
 		quit(1)
 		return
 	_check(camp.get_node_or_null("CampCamera") != null, "营地相机存在")
-	_check(camp.get_node_or_null("CliffWall") != null and camp.get_node_or_null("CaveMouth") != null, "山壁与暗洞口存在")
-	_check(camp.get_node_or_null("CaveMouth/MouthDark") != null, "洞腔有深度（暗腔）")
+	_check(camp.find_child("CliffRock*",true,false) != null and camp.get_node_or_null("CaveMouth") != null, "山壁与暗洞口存在")
+	_check(camp.get_node_or_null("CaveDepth") != null and camp.find_child("ArchCrown*",true,false) != null, "洞腔有深度和石拱")
 	_check(camp.get_node_or_null("Campfire") != null and camp.get_node_or_null("Campfire/FireFlame") != null, "篝火存在（石圈+火焰）")
 	_check(camp.get_node_or_null("WarBench") != null, "战备台存在")
 	_check(camp.get_node_or_null("CampTent") != null, "帐篷装饰存在")
@@ -47,7 +47,7 @@ func _run() -> void:
 	_check(camp.get_node_or_null("CaveMouth").get_meta("entry", "") == "depart", "洞口入口标记=depart")
 
 	# —— 段2：路由与相机 ——
-	var stairs: Node = farm.get_node_or_null("HillStairs/StairsEntry")
+	var stairs: Node = farm.get_node_or_null("HillStairs")
 	if not _check(stairs != null, "上山石阶入口存在"):
 		_finish(backup)
 		quit(1)
@@ -84,7 +84,7 @@ func _run() -> void:
 
 
 func _simulate_click(body: StaticBody3D) -> void:
-	## 直调 input_event 处理器（等价鼠标左键按下；无需真实视口射线）。
+	## 这里只核对处理器绑定；真实视口拾取另由 capture_scene_alignment 验证。
 	var event := InputEventMouseButton.new()
 	event.button_index = MOUSE_BUTTON_LEFT
 	event.pressed = true

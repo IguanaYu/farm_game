@@ -25,7 +25,8 @@ var _busy := false
 
 
 func _ready() -> void:
-	add_theme_constant_override("separation", 10)
+	theme = LifeUI.make_theme()
+	add_theme_constant_override("separation", 12)
 
 	var title := Label.new()
 	title.text = "线上农场"
@@ -35,7 +36,7 @@ func _ready() -> void:
 
 	var hint := Label.new()
 	hint.text = "线上进度由服务器实时保存；操作需要联网。与本地存档完全独立。"
-	hint.add_theme_font_size_override("font_size", 13)
+	hint.add_theme_font_size_override("font_size", 18)
 	hint.add_theme_color_override("font_color", TEXT_MUTED)
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(hint)
@@ -60,10 +61,15 @@ func _ready() -> void:
 	address_edit = _line_edit("服务器地址")
 	address_edit.text = SettingsStore.get_online_server_url()
 	address_edit.text_changed.connect(_on_address_changed)
+	var advanced := CheckButton.new()
+	advanced.text = "连接设置"
+	advanced.toggled.connect(func(on): address_edit.visible = on)
+	add_child(advanced)
+	address_edit.visible = false
 	add_child(address_edit)
 
 	status_label = Label.new()
-	status_label.add_theme_font_size_override("font_size", 14)
+	status_label.add_theme_font_size_override("font_size", 18)
 	status_label.add_theme_color_override("font_color", TEXT_MUTED)
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(status_label)
@@ -76,6 +82,9 @@ func _refresh_session() -> void:
 	var has_session := not session.is_empty()
 	login_button.visible = has_session
 	revoke_button.visible = has_session
+	nick_edit.visible = not has_session
+	invite_edit.visible = not has_session
+	activate_button.visible = not has_session
 	if has_session:
 		status_label.text = "本机已保存「%s」的登录凭据。" % str(session.get("nick", ""))
 
