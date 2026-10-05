@@ -1708,6 +1708,7 @@ func _on_coop_run_started_host(expedition: ExpeditionGame) -> void:
 	active_expedition = expedition
 	coop_host = room_panel.host
 	if coop_host != null:
+		map_panel.watch_host(coop_host)
 		## F-04：合作局所有推进/出牌动作走同一会话裁定入口（host_action），
 		## 战斗对象在每次裁定后从权威局重新恢复。
 		map_panel.host_action_sink = func(kind: String, args: Dictionary) -> Dictionary:
@@ -1897,6 +1898,7 @@ func enter_online_run() -> void:
 
 ## 回到单人路径时清掉合作裁定入口：地图/战斗面板恢复直调本地 ExpeditionGame。
 func _clear_coop_sinks() -> void:
+	map_panel.watch_host(null)
 	map_panel.host_action_sink = Callable()
 	battle_screen.action_sink = Callable()
 	battle_screen.combat_refresher = Callable()

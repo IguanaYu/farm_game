@@ -1,0 +1,101 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+Opened database successfully (E:/gpt/worktree/55ba/farm/.zcode/m1/run/d45_farm.db)
+Closed database (E:/gpt/worktree/55ba/farm/.zcode/m1/run/d45_farm.db)
+D45-PASS 四客户端 WSS 连接（证书钉扎）
+D45-PASS 四账户激活并完成战备（基础套装入胸挂）
+D45-PASS 甲建房
+D45-PASS 房码 6 位（W96VTE）
+D45-PASS 重复建房 → op_failed 已在房间中
+D45-PASS 无效房码 → op_failed 房码无效
+D45-PASS 乙按房码加入
+D45-PASS 重复加入 → op_failed 已在这个房间
+D45-PASS 第三人加入 → op_failed 房间已满（双人）
+D45-PASS 无人准备出发 → op_failed 还有成员未准备
+D45-PASS 乙准备
+D45-PASS 甲准备
+D45-PASS 甲收到房间推送（含乙）
+D45-PASS 双方就绪后出发
+D45-PASS 局 ID 下发（run-1791170180302-9f85）
+D45-PASS 双人局 coop=true
+D45-PASS 房间 phase=running
+D45-PASS 乙收到开局推送（同一局）
+D45-PASS 局快照版本 1
+D45-PASS 甲重连：welcome 带活动局
+D45-PASS 甲重连：welcome 带房间
+D45-PASS 甲农场占用=局 ID
+D45-PASS 甲活动局引用
+D45-PASS 丙建第二个房间（与甲乙房并存）
+D45-PASS 在等待房间中单人出发 → op_failed 已在房间
+D45-PASS 丙离房
+D45-PASS 强杀服务端进程退出
+D45-PASS 强杀重启后乙重连：局恢复（同 run_id）
+D45-PASS 局位置不变（row=0）
+D45-PASS 甲先投票 → 等待乙
+D45-PASS 乙同票 → 前进到第 1 排
+D45-PASS 局位置=第 1 排
+D45-PASS 发起战斗
+D45-PASS 双人战斗胜利（自动出牌，outcome=won）
+D45-PASS 结束战斗进入搜刮
+D45-PASS 初始网络快照隐藏未知物品
+D45-PASS 开始在线尸体搜索
+D45-PASS 权威端拒绝提前完成搜索
+D45-PASS 在线逐格揭晓
+D45-PASS 在线逐格揭晓
+D45-PASS 在线逐格揭晓
+D45-PASS 在线逐格揭晓
+D45-PASS 在线逐格揭晓
+D45-PASS 在线逐格揭晓
+D45-PASS 甲领取候选奖励
+D45-PASS 重复领取同一候选被拒
+D45-PASS 乙领取已发现的另一件物品
+D45-PASS 另一账户不能复制领取甲的物品
+D45-PASS 快捷信号（C10）
+D45-PASS 同号同参重放 → duplicate=true
+D45-PASS 同号异参 → req_id_conflict
+D45-PASS 离开节点回地图
+D45-PASS 事件选择（narrow_crevice）
+D45-PASS 休整恢复
+D45-PASS 甲同意撤离
+D45-PASS 乙确认撤离（双票达成）
+D45-PASS 双方都收到结算推送
+D45-PASS 结算类型=extract（甲/乙）
+D45-PASS 结算 ID 唯一且不同
+D45-PASS 甲：占用解除（active_run_ref 清空）
+D45-PASS 甲：occupied_by_run 清空
+D45-PASS 甲：结算已登记应用
+D45-PASS 乙：占用解除（active_run_ref 清空）
+D45-PASS 乙：occupied_by_run 清空
+D45-PASS 乙：结算已登记应用
+D45-PASS 甲结算：带入装备返还清单非空
+D45-PASS 丙单人出发
+D45-PASS 单人局 coop=false
+D45-PASS 局中再出发 → op_failed 已有进行中的探险
+D45-PASS 乙无局时发动作 → op_failed 没有进行中的探险
+D45-PASS 丙直通选路（无投票）
+D45-PASS 丙单人战斗胜利（outcome=won）
+D45-PASS 开始在线尸体搜索
+D45-PASS 权威端拒绝提前完成搜索
+D45-PASS 在线逐格揭晓
+D45-PASS 在线逐格揭晓
+D45-PASS 在线逐格揭晓
+D45-PASS 在线逐格揭晓
+D45-PASS 在线逐格揭晓
+D45-PASS 在线逐格揭晓
+D45-PASS 丙撤离（单人无投票）
+D45-PASS 丙结算类型=extract
+D45-PASS 丙：占用解除
+D45-PASS 丙：获得物全部入仓（逐件对账）
+D45-PASS 双房建立（房码不同）
+D45-PASS 房1 出发
+D45-PASS 房2 出发
+D45-PASS 两局 ID 不同
+D45-PASS 两局位置互不串扰（col 0 vs 1）
+D45-PASS 各自仍在自己的局
+D45-PASS 房1 甲个人放弃（终局）
+D45-PASS 房1 终局后乙重连无活动局（自动补结算）
+D45-PASS 乙占用解除（自动补结算）
+D45-PASS 房2 终局后丁无活动局
+D45-PASS 局终后重连无活动局
+D45-PASS 局终后占用解除（放弃路径）
+D45-SUMMARY checks=96 failed=0

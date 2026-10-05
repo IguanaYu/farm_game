@@ -50,20 +50,26 @@ func _initialize() -> void:
 	_check(finish["ok"] and str(finish.get("outcome", "")) == "won", "战斗：胜利回到节点")
 	_check(str(expedition.run["phase"]) == "node", "战斗：进入搜刮")
 
-	# —— 搜刮：二选一 + 公共物资（F-02：领取事务化，重复领取被拒）——
+	# —— 搜刮：固定尸体、搜索后领取，同一实例只能拿一次 ——
 	var key := expedition.node_id(1, 0)
 	var resolved: Dictionary = expedition.run["resolved"][key]
-	_check(resolved["rewards"].size() == 2 and resolved["public"].size() == 1, "奖励：个人二选一＋公共 1 件")
-	var first_reward := str(resolved["rewards"][0])
-	var second_reward := str(resolved["rewards"][1])
-	var claim1: Dictionary = expedition.claim_node_reward("p1", key, first_reward, "pack")
-	_check(claim1["ok"], "搜刮：领取候选之一")
+	_check(resolved["corpses"].size() == 1 and resolved["rewards"].is_empty(), "奖励：小泥团留下独立遗骸")
+	var body: Dictionary = resolved["corpses"][0]["regions"][0]
+	var first_id := int(body["items"][0]["instance_id"])
+	_check(not expedition.loot_action("p1", "claim_corpse", {"instance_id": first_id})["ok"], "搜刮：未知物品不能领取")
+	var clock := [1000]
+	expedition.search_clock = func() -> int: return clock[0]
+	expedition.loot_action("p1", "search_start", {"source": "e1", "region": "body"})
+	while not expedition.run.get("loot_searches", {}).get("p1", {}).is_empty():
+		clock[0] += int(expedition.run["loot_searches"]["p1"]["duration"]) + 1
+		_check(expedition.loot_action("p1", "search_step", {})["ok"], "搜刮：顺序搜索")
+	var claim1: Dictionary = expedition.loot_action("p1", "claim_corpse", {"instance_id": first_id, "container": "pack"})
+	_check(claim1["ok"], "搜刮：领取已发现物品")
 	var claim_id := int(claim1["instance_id"])
-	_check(not expedition.claim_node_reward("p1", key, first_reward, "pack")["ok"], "搜刮：同一候选不能领两次")
-	_check(not expedition.claim_node_reward("p1", key, second_reward, "pack")["ok"], "搜刮：二选一锁定后另一件不能领")
-	var public_def := str(resolved["public"][0])
-	_check(expedition.claim_node_public("p1", key, public_def)["ok"], "搜刮：公共物资可领")
-	_check(not expedition.claim_node_public("p1", key, public_def)["ok"], "搜刮：公共物资领完即止")
+	_check(not expedition.loot_action("p1", "claim_corpse", {"instance_id": first_id})["ok"], "搜刮：同一实例不能领两次")
+	var second_id := int(body["items"][1]["instance_id"])
+	_check(expedition.loot_action("p1", "claim_corpse", {"instance_id": second_id})["ok"], "搜刮：容量允许可拿第二件")
+	expedition.search_clock = Callable()
 	var before_count := expedition.run_inventory().loadout_list("pack").size()
 	_check(expedition.leave_node()["ok"], "节点：完成并离开（其余候选放弃）")
 	_check(str(expedition.run["phase"]) == "map", "节点：回到地图")

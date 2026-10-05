@@ -11,6 +11,13 @@ const SETTLEMENT_FMT := 1
 var run: Dictionary = {}
 var game: FarmGame
 var rng := RandomNumberGenerator.new()
+var search_clock: Callable
+
+func search_now() -> int:
+	return int(search_clock.call()) if search_clock.is_valid() else Time.get_ticks_msec()
+
+func visible_run() -> Dictionary:
+	return CorpseLootGame.view(run, search_now())
 ## M3 服务器模式注入：apply_guest_too=true 时，p2 结算单在同一事务内直接应用到
 ## guest_farm（线上无"客机自行应用"）。单机 coop 不设置，保持 guest_handoff 语义。
 var apply_guest_too := false
@@ -337,6 +344,7 @@ static func resume(farm_game: FarmGame) -> Dictionary:
 	var instance := ExpeditionGame.new()
 	instance.game = farm_game
 	instance.run = saved
+	CorpseLootGame.cancel(instance.run)
 	## JSON 往返会把整数变 float；Godot 的数组 has() 对 int/float 不相等，
 	## 带入与消耗清单必须归一成 int，否则恢复后的结算把带入物误判为获得物。
 	instance.run["carried_from_farm"] = (saved.get("carried_from_farm", []) as Array).map(func(v): return int(v))
@@ -424,6 +432,11 @@ func _resolve_node(node: Dictionary) -> void:
 			resolved["event_rolls"] = {"dig_outcome": _roll_dig_outcome()}
 		"gate":
 			resolved["rewards"] = ExpeditionDefs.gate_rewards(str(run["layer_id"])).duplicate()
+	if str(node["type"]) in ["battle", "elite", "gate"]:
+		resolved["corpses"] = CorpseLootGame.build(run, node, _encounter_id(node), resolved["rewards"], resolved["public"], rng)
+		resolved["choose_one"] = false
+		resolved["rewards"] = []
+		resolved["public"] = []
 	run["resolved"][key] = resolved
 
 
@@ -607,6 +620,10 @@ func leave_node() -> Dictionary:
 	var node := current_node()
 	var key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
 	var resolved: Dictionary = run["resolved"][key]
+	CorpseLootGame.expire(run, search_now())
+	if bool(run.get("coop", false)) and not (run.get("loot_searches", {}) as Dictionary).is_empty():
+		return _fail("还有成员正在搜索，请先结束搜索再继续探索")
+	CorpseLootGame.cancel(run)
 	if str(node["type"]) in ["battle", "elite", "gate"] and not bool(resolved.get("battle_won", false)):
 		return {"ok": false, "reason": "先处理这里的战斗"}
 	resolved["completed"] = true
@@ -759,6 +776,21 @@ func loot_action(member_key: String, kind: String, args: Dictionary) -> Dictiona
 	var rotated := bool(args.get("rotated", false))
 	var key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
 	match kind:
+		"search_start", "search_step", "search_cancel", "claim_corpse":
+			var resolved: Dictionary = run["resolved"].get(key, {})
+			if not resolved.has("corpses"):
+				return _fail("当前节点没有可搜索的尸体")
+			var result: Dictionary
+			match kind:
+				"search_start": result = CorpseLootGame.start(run, resolved, key, member_key, str(args.get("source", "")), str(args.get("region", "")), search_now())
+				"search_step": result = CorpseLootGame.step(run, resolved, member_key, search_now())
+				"search_cancel":
+					CorpseLootGame.cancel(run, member_key)
+					result = {"ok": true}
+				"claim_corpse": result = _claim_corpse(member_key, resolved, int(args.get("instance_id", -1)), container, cell, rotated)
+			if bool(result.get("ok", false)):
+				save()
+			return result
 		"claim_reward": return claim_node_reward(member_key, key, str(args.get("def_id", "")), container, cell, rotated)
 		"claim_public": return claim_node_public(member_key, key, str(args.get("def_id", "")), container, cell, rotated)
 		"pick_drop": return pick_node_drop(member_key, int(args.get("instance_id", -1)), container, cell, rotated)
@@ -789,6 +821,20 @@ func loot_action(member_key: String, kind: String, args: Dictionary) -> Dictiona
 				save()
 			return result
 	return _fail("未知的搜刮操作")
+
+func _claim_corpse(member_key: String, resolved: Dictionary, instance_id: int, container: String, cell: Vector2i, rotated: bool) -> Dictionary:
+	for source in resolved.get("corpses", []):
+		for region in source["regions"]:
+			for item in region["items"]:
+				if int(item["instance_id"]) != instance_id:
+					continue
+				if not bool(item.get("revealed", false)) or bool(item.get("taken", false)):
+					return _fail("物品尚未发现或已被拿走")
+				var result := member_inventory(member_key).claim_loot_instance(item, container, cell, rotated)
+				if bool(result.get("ok", false)):
+					item["taken"] = true
+				return result
+	return _fail("尸体中没有这件物品")
 
 
 func _record_consumed() -> void:

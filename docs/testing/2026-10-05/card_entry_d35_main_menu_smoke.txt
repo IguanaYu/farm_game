@@ -1,0 +1,28 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: 继续按钮存在
+  ok: 无档时继续按钮禁用
+  ok: 无档文案提示暂无存档
+  ok: 新游戏按钮存在
+  ok: 好友联机按钮存在
+  ok: 退出按钮存在
+  ok: 页脚显示版本号
+  ok: 设置页打开
+  ok: 非法中继地址被拒绝
+  ok: 合法中继地址写入 relay_prefs.cfg（与房间页共用）
+  ok: 重播引导写入 settings.cfg
+  ok: 重播引导同步 GameFlow 标志
+  ok: 关掉重播引导写回 false
+  ok: 设置页 ESC 返回主按钮页
+  ok: 有档时继续按钮启用
+  ok: 继续按钮显示存档摘要（第 4 天 · 金币 999）
+  ok: 已有档时新游戏先弹覆盖确认
+  ok: 确认后切换进农场世界
+  ok: 新游戏模式不读旧档（金币回到 0）
+  ok: 新档引导从头开始
+  ok: farm_world 消费后 GameFlow 复位
+  ok: 旧档 999 自动进 .bak 备份
+  ok: cfg 重播标志：读档后引导归零
+  ok: cfg 重播标志消费即清（下次不再重播）
+  ok: 消费后 GameFlow 全复位
+D35_MAIN_MENU_PASS

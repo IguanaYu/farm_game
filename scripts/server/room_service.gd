@@ -145,13 +145,17 @@ func attach_on_login(account_id: int, nick: String) -> Dictionary:
 		for key in box.members:
 			if int(box.members[key]["account_id"]) == account_id:
 				box.members[key]["nick"] = nick
-		out["run"] = box.game.run
+		out["run"] = box.game.visible_run()
 		out["version"] = box.version
 	return out
 
 
 ## 断线：房间成员在线状态变化 → 推送房间视图（成员保留，重连可回）。
 func notify_offline(account_id: int) -> void:
+	var box: _RunBox = _runs_by_account.get(account_id)
+	if box != null:
+		CorpseLootGame.cancel(box.game.run)
+		_broadcast_run(box)
 	var room: _Room = _rooms_by_account.get(account_id)
 	if room != null:
 		_broadcast_room(room)
@@ -533,8 +537,8 @@ func _finish_depart(tx: Array, env: Dictionary, req_id: String, op: String, room
 	else:
 		var peer := auth.peer_of_account(int(_receipt_account(env)))
 		if peer != 0 and send.is_valid():
-			send.call(peer, _push("run", {"run": box.game.run, "version": box.version}))
-	var result := {"run": box.game.run, "version": box.version}
+			send.call(peer, _push("run", {"run": box.game.visible_run(), "version": box.version}))
+	var result := {"run": box.game.visible_run(), "version": box.version}
 	if room != null:
 		result["room"] = room_view(room)
 	return _req_ok(req_id, op, result)
@@ -617,7 +621,7 @@ func _op_run_action(account_id: int, req_id: String, args: Dictionary) -> Dictio
 			send.call(peer, _push("settlement", {"settlement": settlements[key]}))
 	if str(new_run.get("outcome", "")) != "":
 		_finish_run(box_ref)
-	var extras := {"run": box_ref.game.run, "version": box_ref.version}
+	var extras := {"run": box_ref.game.visible_run(), "version": box_ref.version}
 	if dirty.has(account_id):
 		extras["snapshot"] = _farm_snapshot(account_id)
 	return _req_ok_extra(req_id, "run.action", _sanitize(result), false, extras)
@@ -784,8 +788,8 @@ func _dispatch_action(instance: ExpeditionGame, member_key: String, kind: String
 			return instance.loot_action(member_key, "claim_public", args)
 		"pick_drop":
 			return instance.loot_action(member_key, "pick_drop", args)
-		"loot_manage":
-			return instance.loot_action(member_key, "loot_manage", args)
+		"loot_manage", "search_start", "search_step", "search_cancel", "claim_corpse":
+			return instance.loot_action(member_key, kind, args)
 		"take_rest":
 			return instance.take_rest(str(args.get("option", "")))
 		"choose_event":
@@ -842,7 +846,7 @@ func _broadcast_room(room: _Room) -> void:
 func _broadcast_run(box: _RunBox) -> void:
 	if not send.is_valid():
 		return
-	var payload := _push("run", {"run": box.game.run, "version": box.version})
+	var payload := _push("run", {"run": box.game.visible_run(), "version": box.version})
 	for key in box.members:
 		var peer := auth.peer_of_account(int(box.members[key]["account_id"]))
 		if peer != 0:

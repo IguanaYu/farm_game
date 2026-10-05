@@ -6,6 +6,7 @@ var subject := "crystal"
 var tint := Color("#7ac7b3")
 var layer_id := "moss_stone_shallow"
 var stage_scene := false
+var fallen := false
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -31,6 +32,25 @@ func _draw() -> void:
 	var light := tint.lightened(0.3)
 	draw_circle(Vector2(100, 100), 82, Color(tint, 0.055))
 	match subject:
+		"skeleton_scout":
+			draw_ellipse_shadow()
+			# 铜剑、护腕、腰包与背包对应实际敌人配装。
+			draw_style_box(ExpeditionUI.style(Color("#715b43"), Color("#a38b65"), 9, 0), Rect2(62, 74, 65, 78))
+			draw_circle(Vector2(103, 55), 29, Color("#d7d2b5"))
+			draw_circle(Vector2(94, 56), 7, Color("#25353b"))
+			draw_circle(Vector2(115, 55), 7, Color("#25353b"))
+			draw_line(Vector2(95, 72), Vector2(115, 72), Color("#586056"), 4)
+			for i in range(4):
+				draw_line(Vector2(85, 91 + i * 10), Vector2(119, 91 + i * 10), Color("#c4c3a8"), 5)
+			draw_line(Vector2(102, 85), Vector2(102, 137), Color("#dad6ba"), 6)
+			for side in [-1, 1]:
+				draw_polyline(PackedVector2Array([Vector2(102 + side * 21, 90), Vector2(102 + side * 40, 112), Vector2(102 + side * 36, 140)]), Color("#d7d2b5"), 7, true)
+				draw_line(Vector2(102 + side * 13, 133), Vector2(102 + side * 22, 180), Color("#d7d2b5"), 8, true)
+			draw_rect(Rect2(59, 119, 15, 17), Color("#8d6343"))
+			draw_rect(Rect2(87, 127, 30, 21), Color("#776a43"))
+			draw_line(Vector2(143, 142), Vector2(165, 58), Color("#d29c67"), 10, true)
+			draw_line(Vector2(133, 139), Vector2(151, 145), Color("#a77a4a"), 7, true)
+			draw_line(Vector2(139, 144), Vector2(134, 164), Color("#70513c"), 8, true)
 		"farmer":
 			_poly([[66,113],[132,113],[145,168],[116,171],[103,148],[85,171],[56,166]],Color("#899b75"))
 			_poly([[76,157],[95,157],[95,189],[79,189]],Color("#927453"))
@@ -156,6 +176,9 @@ func draw_ellipse_shadow() -> void:
 		var angle := TAU * i / 32.0
 		points.append(Vector2(100 + cos(angle) * 65, 168 + sin(angle) * 9))
 	draw_colored_polygon(points, Color("#0e1a20"))
+	if fallen:
+		var angle := -0.9
+		draw_set_transform(size / 2 + Vector2(-100, -100).rotated(angle) * unit * 0.85, angle, Vector2.ONE * unit * 0.85)
 
 func _draw_cave() -> void:
 	var iron := layer_id == "iron_root_deeps"

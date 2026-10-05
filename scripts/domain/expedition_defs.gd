@@ -54,7 +54,7 @@ const LAYERS := {
 			[{"type": "gather", "risk": "none", "hint": "偏材料"},
 				{"type": "battle", "risk": "low", "hint": "浅层敌人", "encounter": "tutorial"}],
 			[{"type": "event", "risk": "mid", "hint": "取舍"},
-				{"type": "battle", "risk": "low", "hint": "浅层敌人", "encounter": "normal"}],
+				{"type": "battle", "risk": "mid", "hint": "带着武器和两个包的骷髅巡逻兵", "encounter": "skeleton_patrol"}],
 			[{"type": "rest_exit", "risk": "none", "hint": "免费小休整＋撤离"}],
 			[{"type": "chest", "risk": "none", "hint": "偏装备与货物"},
 				{"type": "event", "risk": "mid", "hint": "取舍"}],

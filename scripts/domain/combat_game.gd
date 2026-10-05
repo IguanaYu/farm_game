@@ -7,6 +7,11 @@ extends RefCounted
 
 
 const ENEMIES := {
+	"skeleton_scout": {
+		"name": "骷髅巡逻兵", "hp": 26,
+		"equipment": {"weapon": "copper_shortsword", "armor": "leather_bracer"},
+		"cycle": [{"kind": "attack", "value": 7}, {"kind": "block", "value": 5}, {"kind": "attack", "value": 9}],
+	},
 	"slime": {
 		"name": "小泥团", "hp": 18,
 		"cycle": [
@@ -101,6 +106,7 @@ const ENEMIES := {
 const HP_SCALE_2P := 1.6
 
 const ENCOUNTERS := {
+	"skeleton_patrol": {"name": "骷髅巡逻兵", "enemies": ["skeleton_scout"]},
 	"tutorial": {"name": "教学场（单只小泥团）", "enemies": ["slime"]},
 	"normal": {"name": "普通验证场（泥团＋蝠）", "enemies": ["slime", "cave_bat"]},
 	"defensive": {"name": "防御验证场（碎石蟹）", "enemies": ["rock_crab"]},
@@ -123,7 +129,7 @@ static func basic_kit_demo_deck() -> Array:
 		var def := ItemDefs.get_item(def_id)
 		var seq := 0
 		for card_id in def["cards"]:
-			deck.append({"card_id": card_id, "source_instance_id": 0, "source_seq": seq, "join_round": 1})
+			deck.append({"card_id": card_id, "source_instance_id": 0, "source_def_id": def_id, "source_quality": int(def.get("quality", 1)), "source_seq": seq, "join_round": 1})
 			seq += 1
 	return deck
 
@@ -166,6 +172,7 @@ static func create(players: Array, encounter_id: String, seed_value: int, player
 			"cycle_index": 0,
 			"intent": {},
 			"alive": true,
+			"equipment": def.get("equipment", {}).duplicate(true),
 		})
 	var player_map := {}
 	var next_uid := 1
@@ -179,6 +186,8 @@ static func create(players: Array, encounter_id: String, seed_value: int, player
 				"uid": next_uid,
 				"card_id": str(entry["card_id"]),
 				"source_instance_id": int(entry.get("source_instance_id", 0)),
+				"source_def_id": str(entry.get("source_def_id", "")),
+				"source_quality": clampi(int(entry.get("source_quality", 1)), 1, 5),
 				"source_seq": int(entry.get("source_seq", 0)),
 				"owner": key,
 			}

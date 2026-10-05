@@ -78,15 +78,25 @@ func _initialize() -> void:
 	_check(bool(finish_result.get("ok", false)), "战斗：胜利收尾")
 	_check(str(host.expedition.run["phase"]) == "node", "战斗：进入搜刮")
 
-	# —— 搜刮：双方各自领取（主机原子裁定；F-02 重复领取被拒、F-01 编号不冲突）——
+	# —— 搜刮：共享搜索，两人领取不同实例，同一物品不能复制 ——
 	var resolved: Dictionary = host.expedition.run["resolved"]["r1c0"]
-	if not (resolved.get("rewards", []) as Array).is_empty():
-		var host_first: Dictionary = host.host_action("claim_reward", {"def_id": str(resolved["rewards"][0]), "container": "pack"})
+	var body: Dictionary = resolved["corpses"][0]["regions"][0]
+	var search_time := [1000]
+	host.expedition.search_clock = func() -> int: return search_time[0]
+	_check(host.host_action("search_start", {"source": "e1", "region": "body"})["ok"], "搜刮：主机开始搜索")
+	while not host.expedition.run.get("loot_searches", {}).get("p1", {}).is_empty():
+		search_time[0] += int(host.expedition.run["loot_searches"]["p1"]["duration"]) + 1
+		_check(host.host_action("search_step", {})["ok"], "搜刮：主机裁定揭晓")
+	_pump(60)
+	if body["items"].size() >= 2:
+		var first_id := int(body["items"][0]["instance_id"])
+		var second_id := int(body["items"][1]["instance_id"])
+		var host_first: Dictionary = host.host_action("claim_corpse", {"instance_id": first_id, "container": "pack"})
 		_check(bool(host_first.get("ok", false)), "搜刮：主机领取成功")
 		var host_id := int(host_first.get("instance_id", -1))
-		var host_again: Dictionary = host.host_action("claim_reward", {"def_id": str(resolved["rewards"][0]), "container": "pack"})
+		var host_again: Dictionary = host.host_action("claim_corpse", {"instance_id": first_id, "container": "pack"})
 		_check(not bool(host_again.get("ok", false)), "搜刮：主机重复领取同一候选被拒（F-02）")
-		client.send_action("claim_reward", {"def_id": str(resolved["rewards"][0]), "container": "pack"})
+		client.send_action("claim_corpse", {"instance_id": second_id, "container": "pack"})
 		_pump(60)
 		var guest_items: Array = host.expedition.member_inventory("p2").loadout_list("pack")
 		_check(guest_items.size() >= 1, "搜刮：客机领到自己的一份")
@@ -95,6 +105,7 @@ func _initialize() -> void:
 	var host_pack: int = host.expedition.member_inventory("p1").loadout_list("pack").size()
 	var guest_pack: int = host.expedition.member_inventory("p2").loadout_list("pack").size()
 	_check(host_pack >= 1 and guest_pack >= 1, "搜刮：双方各得一件（按到达序裁定）")
+	host.expedition.search_clock = Callable()
 
 	# —— 分享：客机提出→主机确认接收；一次移动所有权 ——
 	var share_moved := false

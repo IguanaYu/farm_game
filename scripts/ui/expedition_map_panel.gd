@@ -11,6 +11,14 @@ signal settlement_presented(receipt: Dictionary)
 ## 合作局会话裁定入口（F-04）：设置后所有推进/领取/撤离动作改走主机裁定，
 ## 双人同票才推进；单人局此入口为空，直接调本地 ExpeditionGame。
 var host_action_sink: Callable = Callable()
+var watched_host: SessionHost
+
+func watch_host(host: SessionHost) -> void:
+	if watched_host != null and watched_host.run_updated.is_connected(_refresh):
+		watched_host.run_updated.disconnect(_refresh)
+	watched_host = host
+	if host != null:
+		host.run_updated.connect(_refresh)
 
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
@@ -171,7 +179,7 @@ func _refresh() -> void:
 	var run: Dictionary = expedition.run
 	var looting := ExpeditionLootPanel.is_loot_phase(run)
 	map_frame.visible = not looting
-	loot_panel.display(run)
+	loot_panel.display(expedition.visible_run())
 	var inventory := expedition.run_inventory()
 	var supplies := 0
 	for container in ExpeditionBaseline.CONTAINERS:

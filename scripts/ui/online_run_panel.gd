@@ -160,13 +160,18 @@ func _build() -> void:
 	loot_panel = ExpeditionLootPanel.new()
 	loot_panel.z_index = 10
 	loot_panel.action_sink = func(kind: String, args: Dictionary) -> Variant:
-		_fire(kind, args)
+		_fire_loot(kind, args)
 		return "sent"
 	loot_panel.menu_requested.connect(_on_close)
 	add_child(loot_panel)
 
 
 ## 发送意图（fire-and-forget 协程）：失败闪提示；成功后新快照经推送/应答到达自动刷新。
+func _fire_loot(kind: String, args: Dictionary) -> void:
+	var result: Dictionary = await bridge.run_action(kind, args)
+	loot_panel._consume_result(result)
+	loot_panel.display(bridge.mirror_run, member_key, bridge.mirror_run_version)
+
 func _fire(kind: String, args: Dictionary = {}) -> void:
 	if pending_action:
 		return

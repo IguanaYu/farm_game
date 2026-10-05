@@ -576,7 +576,7 @@ func _refresh_warehouse() -> void:
 		row.add_theme_color_override("font_hover_color", Color("#1f3327"))
 		row.add_theme_color_override("font_pressed_color", Color("#1f3327"))
 		var fill := Color("#fffbea") if int(instance["instance_id"]) != selected_instance_id else Color("#e8f0d8")
-		var style := _style(fill, CATEGORY_COLOR.get(str(def["category"]), Color("#77a76d")), 8)
+		var style := _style(fill, ItemDefs.quality_color(ItemDefs.quality_of(instance)), 8)
 		row.add_theme_stylebox_override("normal", style)
 		row.add_theme_stylebox_override("hover", style)
 		row.add_theme_stylebox_override("pressed", style)
@@ -591,7 +591,7 @@ func _refresh_container(container: String) -> void:
 	var instances: Array = inventory.loadout_list(container).duplicate(true)
 	for instance in instances:
 		instance["loot_art"] = ExpeditionLootPanel.item_art(str(instance["def_id"]))
-		instance["loot_tint"] = ExpeditionLootPanel.item_tint(str(instance["def_id"]))
+		instance["loot_tint"] = ItemDefs.quality_color(ItemDefs.quality_of(instance))
 	var dims := ExpeditionBaseline.size_for(game.state["expedition"],container)
 	var caption: Label = container_boxes[container].get_meta("caption")
 	caption.text = "%d × %d 格 · 第 %d 回合加入牌库" % [dims.x,dims.y,ExpeditionBaseline.JOIN_ROUND[container]]
@@ -610,7 +610,7 @@ func _refresh_detail() -> void:
 		return
 	var def := ItemDefs.get_item(str(instance["def_id"]))
 	var demo_mark := "［演示］" if bool(instance.get("demo", false)) else ""
-	detail_column.add_child(_label("%s%s（品质 %d）" % [demo_mark, def["name"], int(def["quality"])], 17, FOREST))
+	detail_column.add_child(_label("%s%s（%s）" % [demo_mark, def["name"], ItemDefs.quality_name(ItemDefs.quality_of(instance))], 17, FOREST))
 	detail_column.add_child(_label("类别：%s ｜ 占格：%d×%d%s" % [
 		ExpeditionBaseline.CATEGORY_DISPLAY.get(str(def["category"]), "?"),
 		def["size"].x, def["size"].y,

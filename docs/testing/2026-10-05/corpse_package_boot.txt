@@ -1,0 +1,79 @@
+WorkerThreadPool: 12 threads, 3 max low-priority.
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+TextServer: Added interface "Dummy"
+TextServer: Added interface "ICU / HarfBuzz / Graphite (Built-in)"
+Unrecognized output string "misc2" in mapping:
+030000000d0f00000202000000000000,Horipad O Nintendo Switch 2 Controller,a:b1,b:b0,back:b8,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,guide:b12,leftshoulder:b4,leftstick:b10,lefttrigger:b6,leftx:a0,lefty:a1,misc1:b13,misc2:b14,rightshoulder:b5,rightstick:b11,righttrigger:b7,rightx:a2,righty:a3,start:b9,x:b3,y:b2,platform:Windows,
+Unrecognized output string "misc2" in mapping:
+030000000d0f00009601000000000000,Horipad Steam,a:b0,b:b1,back:b10,dpdown:h0.4,dpleft:h0.8,dpright:h0.2,dpup:h0.1,guide:b12,leftshoulder:b6,leftstick:b13,lefttrigger:b8,leftx:a0,lefty:a1,misc2:b2,paddle1:b5,paddle2:b15,paddle3:b18,paddle4:b19,rightshoulder:b7,rightstick:b14,righttrigger:b9,rightx:a3,righty:a4,start:b11,x:b3,y:b4,platform:Windows,
+Unrecognized output string "misc2" in mapping:
+030000007e0500006920000000000000,Nintendo Switch 2 Pro Controller,a:b0,b:b1,back:b14,dpdown:b8,dpleft:b10,dpright:b9,dpup:b11,guide:b16,leftshoulder:b12,leftstick:b15,lefttrigger:b13,leftx:a0,lefty:a1~,misc1:b17,misc2:b20,paddle1:b18,paddle2:b19,rightshoulder:b4,rightstick:b7,righttrigger:b5,rightx:a2,righty:a3~,start:b6,x:b2,y:b3,platform:Windows,
+Native OpenGL API detected: 3.3: NVIDIA - NVIDIA GeForce RTX 4060 Ti
+NVAPI: Init OK!
+NVAPI: Disabled OpenGL threaded optimization successfully
+NVAPI: Disabled G-SYNC for windowed mode successfully
+SDL: Init OK!
+Using "winink" pen tablet driver...
+Shader 'CanvasSdfShaderGLES3' SHA256: 5e48f2c990cc8de6ef064f689c69251c596fc45df9215fa9b22fbd3024fee1ed
+Shader 'SkeletonShaderGLES3' SHA256: 85639ab95ec8230afb7d3a62b60851e938453f718816b85466608c18c2173ca5
+Shader 'ParticlesShaderGLES3' SHA256: 03a05dcd7d548ff7bdcc311f19b887a812a65b9c29b0db3c7c0117306d187bb8
+Shader 'ParticlesCopyShaderGLES3' SHA256: e0a50320768ba05fd1c31510da68144915e7f6a1e7d88f6b137153146ea21afd
+Shader 'CopyShaderGLES3' SHA256: c12a3704a44bad84b81bf8a011751dc02f93bb7e5aff47cc234b88da9c6d7b03
+Shader 'CubemapFilterShaderGLES3' SHA256: d891f13141abb3db92b5f89e2442273ae347cf1747a017ebd5c31a8265d0523e
+Shader 'GlowShaderGLES3' SHA256: ba6a5e405f784be51ad84cfb8e814092810b114142aeaa28db76d24014e9d524
+Shader 'PostShaderGLES3' SHA256: 50a6774fac82197d9c6312bc2879da819a7be6a4b99961de24a0e7438329aeb3
+Shader 'FeedShaderGLES3' SHA256: b438d58e7709ec98d75691396b55efe591a10d8ab3836b2ff8c9a4527b020056
+Shader 'CanvasShaderGLES3' SHA256: 96726ec6ee21b1842c1d89e6948d50f49a8f6b8202161c097b8d8a514a563dd9
+Shader 'CanvasOcclusionShaderGLES3' SHA256: 5b651e3cc8a919be62a626262840e3fe803be073b3c4e3664d49d93669246ac3
+Shader 'SceneShaderGLES3' SHA256: a637b5b7a0cea5b759f6ef1d6a1854d267891317ad82d8ab0de78a31df9ad8bd
+Shader 'SkyShaderGLES3' SHA256: b3d5ba57325fb7d3460318f31297a06df310449c71a6310b6c60c2d75714a18f
+OpenGL API 3.3.0 NVIDIA 591.86 - Compatibility - Using Device: NVIDIA - NVIDIA GeForce RTX 4060 Ti
+WASAPI: Activated output_device using IAudioClient3 interface
+WASAPI: wFormatTag = 65534
+WASAPI: nChannels = 2
+WASAPI: nSamplesPerSec = 48000
+WASAPI: nAvgBytesPerSec = 384000
+WASAPI: nBlockAlign = 8
+WASAPI: wBitsPerSample = 32
+WASAPI: cbSize = 22
+WASAPI: mix_rate = 48000
+WASAPI: fundamental_period_frames = 480
+WASAPI: min_period_frames = 480
+WASAPI: max_period_frames = 480
+WASAPI: selected a period frame size of 480
+WASAPI: detected 2 channels
+WASAPI: audio buffer frames: 480 calculated latency: 10ms
+
+TextServer: Primary interface set to: "ICU / HarfBuzz / Graphite (Built-in)".
+Loading resource: res://.godot/exported/133200997/export-19246414aa9fb561ced4b8dce477acec-default_bus_layout.res
+CORE API HASH: 0
+EDITOR API HASH: 0
+SceneTreeFTI: traversal method DEFAULT
+Loaded system CA certificates
+Loading resource: res://.godot/exported/133200997/export-c3c40bb4d42d26c7c74cc88080d6723d-boot.scn
+Loading resource: res://scripts/boot.gdc
+Loading resource: res://.godot/exported/133200997/export-ea5c6ad4629af728dc514cefde332394-main_menu.scn
+Loading resource: res://scripts/ui/main_menu.gdc
+Loading resource: res://assets/models/plot_cabbage_mature.glb
+Loading resource: res://.godot/imported/plot_cabbage_mature.glb-8976e3dbedc127223f8418f9f32f6262.scn
+Loading resource: res://assets/models/plot_cabbage_mature.glb
+Loading resource: res://.godot/imported/plot_cabbage_mature.glb-8976e3dbedc127223f8418f9f32f6262.scn
+Loading resource: res://assets/models/plot_cabbage_mature.glb
+Loading resource: res://.godot/imported/plot_cabbage_mature.glb-8976e3dbedc127223f8418f9f32f6262.scn
+Loading resource: res://assets/models/plot_cabbage_mature.glb
+Loading resource: res://.godot/imported/plot_cabbage_mature.glb-8976e3dbedc127223f8418f9f32f6262.scn
+Loading resource: res://assets/models/plot_cabbage_mature.glb
+Loading resource: res://.godot/imported/plot_cabbage_mature.glb-8976e3dbedc127223f8418f9f32f6262.scn
+Loading resource: res://assets/models/plot_cabbage_mature.glb
+Loading resource: res://.godot/imported/plot_cabbage_mature.glb-8976e3dbedc127223f8418f9f32f6262.scn
+Loading resource: res://assets/models/plot_cabbage_mature.glb
+Loading resource: res://.godot/imported/plot_cabbage_mature.glb-8976e3dbedc127223f8418f9f32f6262.scn
+Loading resource: res://assets/models/plot_cabbage_mature.glb
+Loading resource: res://.godot/imported/plot_cabbage_mature.glb-8976e3dbedc127223f8418f9f32f6262.scn
+Loading resource: res://assets/models/plot_cabbage_mature.glb
+Loading resource: res://.godot/imported/plot_cabbage_mature.glb-8976e3dbedc127223f8418f9f32f6262.scn
+Loading resource: res://assets/models/plot_cabbage_mature.glb
+Loading resource: res://.godot/imported/plot_cabbage_mature.glb-8976e3dbedc127223f8418f9f32f6262.scn
+XR: Clearing primary interface
+XR: Removed interface "Native mobile"
+XR: Removed interface "OpenXR"

@@ -16,6 +16,7 @@ const GOLD_FILL := Color("#fff5df")
 const GOLD_LINE := Color("#d5b87d")
 
 const WORLD_SCENE := "res://scenes/main.tscn"
+const CARD_PLAYTEST_SCENE := "res://scenes/card_playtest.tscn"
 
 var main_view: VBoxContainer
 var confirm_view: VBoxContainer
@@ -82,6 +83,11 @@ func _build() -> void:
 	new_game_button.name = "NewGameButton"
 	new_game_button.pressed.connect(_on_new_game)
 	main_view.add_child(new_game_button)
+	var card_button := _menu_button("单人卡牌试玩 · 战斗与搜刮", Color("#f4e4bc"), Color("#b18d4c"), 46, 19)
+	card_button.name = "CardPlaytestButton"
+	card_button.tooltip_text = "自动配好装备，直接开打；可切换敌人、测试尸体搜索和装包。试玩进度独立。"
+	card_button.pressed.connect(_on_card_playtest)
+	main_view.add_child(card_button)
 	var online_button := _menu_button("线上农场 · 服务器进度", Color("#eef4e7"), Color("#9fbf8a"), 44, 20)
 	online_button.name = "OnlineButton"
 	online_button.pressed.connect(_on_online)
@@ -206,6 +212,9 @@ func _on_new_game() -> void:
 func _on_settings() -> void:
 	settings_panel.refresh()
 	_show_view(settings_view)
+
+func _on_card_playtest() -> void:
+	get_tree().change_scene_to_file(CARD_PLAYTEST_SCENE)
 
 
 func _on_online() -> void:

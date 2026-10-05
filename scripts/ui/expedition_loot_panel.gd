@@ -37,6 +37,27 @@ var filter_buttons: Array[Button] = []
 var modal: CenterContainer
 var modal_content: VBoxContainer
 var modal_shade: ColorRect
+var workspace_frame: Control
+var battlefield: CorpseLootStage
+var return_button: Button
+var search_source := ""
+var search_region := ""
+var scene_mode := true
+var source_grid: CorpseSearchGrid
+var source_grids: Dictionary = {}
+var region_buttons: Dictionary = {}
+var search_layout_key := ""
+var render_after_drag := false
+var ground_drops: VBoxContainer
+var search_deadline := 0
+var search_step := ""
+var search_retry_at := 0
+var leave_after_cancel := false
+var revealed_seen: Dictionary = {}
+var filters_container: Control
+var sort_control: Control
+var loot_heading: Label
+var stop_search_pending := false
 
 class LootButton extends Button:
 	var loot_owner: Control
@@ -72,6 +93,7 @@ func _ready() -> void:
 func _build() -> void:
 	ExpeditionUI.backdrop(self)
 	var frame := ExpeditionUI.frame(self, 24)
+	workspace_frame = frame
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 14)
 	frame.add_child(column)
@@ -87,8 +109,11 @@ func _build() -> void:
 	summary_label = ExpeditionUI.label("", 15, ExpeditionUI.TEAL)
 	summary_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	header.add_child(summary_label)
+	return_button = ExpeditionUI.button("← 返回战场")
+	return_button.pressed.connect(_return_to_battlefield)
+	header.add_child(return_button)
 	var menu := ExpeditionUI.button("☰  菜单")
-	menu.pressed.connect(func() -> void: menu_requested.emit())
+	menu.pressed.connect(_open_menu)
 	header.add_child(menu)
 	rule_label = _wrapped("", 15, ExpeditionUI.MUTED)
 	column.add_child(rule_label)
@@ -97,8 +122,10 @@ func _build() -> void:
 	body.add_theme_constant_override("separation", 14)
 	column.add_child(body)
 	var loot := _section(body, 1.0)
-	loot.add_child(ExpeditionUI.label("01  现场战利品", 19, ExpeditionUI.PAPER))
+	loot_heading = ExpeditionUI.label("01  现场战利品", 19, ExpeditionUI.PAPER)
+	loot.add_child(loot_heading)
 	var filters := HBoxContainer.new()
+	filters_container = filters
 	filters.add_theme_constant_override("separation", 5)
 	loot.add_child(filters)
 	for i in range(3):
@@ -110,6 +137,7 @@ func _build() -> void:
 		filters.add_child(button)
 		filter_buttons.append(button)
 	var sort_button := ExpeditionUI.button("按每格售价排序  ⇅")
+	sort_control = sort_button
 	sort_button.custom_minimum_size.y = 30
 	sort_button.add_theme_font_size_override("font_size", 12)
 	sort_button.pressed.connect(func() -> void:
@@ -166,6 +194,12 @@ func _build() -> void:
 	leave_button.custom_minimum_size = Vector2(275, 50)
 	leave_button.pressed.connect(_confirm_leave)
 	footer.add_child(leave_button)
+	battlefield = CorpseLootStage.new()
+	battlefield.loot_owner = self
+	battlefield.corpse_selected.connect(_open_corpse)
+	battlefield.leave_requested.connect(_confirm_leave)
+	battlefield.menu_requested.connect(_open_menu)
+	add_child(battlefield)
 	modal_shade = ColorRect.new()
 	modal_shade.color = Color(0.02, 0.05, 0.07, 0.8)
 	modal_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -201,6 +235,13 @@ func _wrapped(content: String, font_size: int, color: Color) -> Label:
 func display(snapshot: Dictionary, member_key := "p1", serial := -1) -> void:
 	var next := str(snapshot.get("run_id", "")) + _node_key(snapshot)
 	if screen_identity != next:
+		scene_mode = true
+		search_source = ""
+		search_region = ""
+		search_step = ""
+		leave_after_cancel = false
+		stop_search_pending = false
+		revealed_seen.clear()
 		screen_identity = next
 		selected_token = ""
 		current_container = "pack"
@@ -218,6 +259,22 @@ func display(snapshot: Dictionary, member_key := "p1", serial := -1) -> void:
 	visible = is_loot_phase(run)
 	if not visible:
 		return
+	var corpses: Array = _resolved().get("corpses", [])
+	var searchable := not corpses.is_empty()
+	filters_container.visible = not searchable
+	sort_control.visible = not searchable
+	loot_heading.text = "01  搜索尸体与背包" if searchable else "01  现场战利品"
+	return_button.visible = searchable
+	battlefield.visible = searchable and scene_mode
+	workspace_frame.visible = not battlefield.visible
+	if searchable:
+		battlefield.display(run, corpses)
+		var session: Dictionary = run.get("loot_searches", {}).get(player_key, {})
+		if str(session.get("step", "")) != search_step:
+			search_step = str(session.get("step", ""))
+			search_deadline = Time.get_ticks_msec() + int(session.get("remaining", 0)) + 60
+		else:
+			search_deadline = mini(search_deadline, Time.get_ticks_msec() + int(session.get("remaining", 0)) + 60)
 	if pending_acknowledged and snapshot_serial > pending_serial:
 		pending_action = false
 		pending_acknowledged = false
@@ -230,16 +287,21 @@ func display(snapshot: Dictionary, member_key := "p1", serial := -1) -> void:
 	if _entry(selected_token).is_empty():
 		selected_token = ""
 		for entry in entries:
-			if bool(entry.get("available", false)):
+			if bool(entry.get("available", false)) and (not searchable or (str(entry["kind"]) == "claim_corpse" and str(entry.get("source_id", "")) == search_source and str(entry.get("region_id", "")) == search_region)):
 				selected_token = str(entry["token"])
 				break
-		if selected_token == "" and not entries.is_empty():
+		if selected_token == "" and not entries.is_empty() and not searchable:
 			selected_token = str(entries[0]["token"])
 	var type := str(_node().get("type", ""))
 	title_label.text = {"chest": "打开宝箱", "gather": "采集与搜刮"}.get(type, "战场搜刮 · 战斗胜利")
 	var player: Dictionary = run.get("guest", {}) if player_key == "p2" else run.get("player", {})
 	summary_label.text = "生命 %d / %d     深度 %02d\n携带售价 %d 金币  ·  已保护 %d 件" % [int(player.get("hp", 0)), int(player.get("max_hp", 40)), int(run["current"]["row"]), inventory.carry_sell_value(), inventory.loadout_list("safe").size()]
 	rule_label.text = ("个人战利品任选一件，装入成功才锁定选择。" if _choose_one() else "这里的个人物资都可领取，能带多少取决于你的空间。") + ("公共物资全队一份，先领取者获得。" if bool(run.get("coop", false)) else "公共物资不占个人选择次数。")
+	if searchable:
+		rule_label.text = "所有包裹同时展开，点击各区域开始搜索。品质越高，搜索越久；已发现的物品可直接装包。" + ("尸体物资全队一份。" if bool(run.get("coop", false)) else "")
+	if get_viewport().gui_is_dragging():
+		render_after_drag = true
+		return
 	_render_list()
 	_render_detail()
 	_render_bag()
@@ -264,6 +326,15 @@ func _member_inventory() -> Dictionary:
 func _build_entries() -> void:
 	entries.clear()
 	var resolved := _resolved()
+	for source in resolved.get("corpses", []):
+		for region in source["regions"]:
+			for item in region["items"]:
+				if bool(item.get("revealed", false)) and not bool(item.get("taken", false)):
+					var id := int(item["instance_id"])
+					if not revealed_seen.has(id):
+						revealed_seen[id] = true
+						AudioKit.play(self, "open", -12)
+					entries.append({"token": "corpse:%d" % int(item["instance_id"]), "def_id": item["def_id"], "instance_id": int(item["instance_id"]), "kind": "claim_corpse", "source_id": source["id"], "region_id": region["id"], "source": "%s · %s" % [source["name"], region["name"]], "available": true, "state": "已发现 · 可装包", "instance": item})
 	var mine: Array = resolved.get("claimed", {}).get(player_key, [])
 	var locked := _choose_one() and not mine.is_empty()
 	for id in resolved.get("rewards", []):
@@ -287,7 +358,12 @@ func select_item(token: String) -> void:
 		return
 	selected_token = token
 	AudioKit.play(self, "ui_click", -8)
-	_render_list()
+	if _resolved().has("corpses"):
+		for region_grid in source_grids.values():
+			if is_instance_valid(region_grid):
+				region_grid.queue_redraw()
+	else:
+		_render_list()
 	_render_detail()
 	# 选择不重建网格，以免销毁拖动源。
 	if is_instance_valid(grid):
@@ -295,6 +371,12 @@ func select_item(token: String) -> void:
 		grid.queue_redraw()
 
 func _render_list() -> void:
+	if _resolved().has("corpses"):
+		_render_search()
+		return
+	search_layout_key = ""
+	source_grids.clear()
+	region_buttons.clear()
 	ExpeditionUI.clear(list_column)
 	for i in range(filter_buttons.size()):
 		ExpeditionUI.decorate_button(filter_buttons[i], i == filter_index)
@@ -335,7 +417,7 @@ func _render_list() -> void:
 		var art := ExpeditionArt.new()
 		art.custom_minimum_size.x = 70
 		art.subject = item_art(str(entry["def_id"]))
-		art.tint = item_tint(str(entry["def_id"])) if available else ExpeditionUI.MUTED
+		art.tint = ItemDefs.quality_color(_entry_quality(entry)) if available else ExpeditionUI.MUTED
 		row.add_child(art)
 		var info := VBoxContainer.new()
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -355,10 +437,11 @@ func _render_detail() -> void:
 	ExpeditionUI.clear(detail_column)
 	var entry := _entry(selected_token)
 	if entry.is_empty():
-		detail_column.add_child(_wrapped("搜刮完成。\n点选背包中的物品继续整理，或带着收获前进。", 19, ExpeditionUI.MUTED))
+		detail_column.add_child(_wrapped("搜索圆环转完后，物品才会显现。\n点击已经发现的物品查看属性，或直接拖进自己的背包。" if _resolved().has("corpses") else "搜刮完成。\n点选背包中的物品继续整理，或带着收获前进。", 19, ExpeditionUI.MUTED))
 		return
 	var def := ItemDefs.get_item(str(entry["def_id"]))
-	var tint := item_tint(str(entry["def_id"]))
+	var quality := _entry_quality(entry)
+	var tint := ItemDefs.quality_color(quality)
 	var hero := ExpeditionUI.panel(Color("#13272e"), tint.darkened(0.4), 10)
 	detail_column.add_child(hero)
 	var hero_row := HBoxContainer.new()
@@ -371,7 +454,7 @@ func _render_detail() -> void:
 	var title := VBoxContainer.new()
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hero_row.add_child(title)
-	title.add_child(_wrapped("精良" if int(def.get("quality", 1)) > 1 else "普通", 12, tint))
+	title.add_child(_wrapped(ItemDefs.quality_name(quality), 12, tint))
 	title.add_child(_wrapped(str(def["name"]), 25, ExpeditionUI.PAPER))
 	title.add_child(_wrapped(ExpeditionBaseline.CATEGORY_DISPLAY.get(str(def["category"]), "物品"), 13, ExpeditionUI.MUTED))
 	title.add_child(_wrapped("%d×%d 格   /   %s" % [def["size"].x, def["size"].y, _price(def)], 14, ExpeditionUI.GOLD))
@@ -473,7 +556,7 @@ func _render_bag() -> void:
 	var display_items := items.duplicate(true)
 	for instance in display_items:
 		instance["loot_art"] = item_art(str(instance["def_id"]))
-		instance["loot_tint"] = item_tint(str(instance["def_id"]))
+		instance["loot_tint"] = ItemDefs.quality_color(ItemDefs.quality_of(instance))
 	grid.display(display_items, dimensions, int(_entry(selected_token).get("instance_id", -1)) if selected_token.begins_with("carried:") else -1)
 	bag_column.add_child(_wrapped({"chest": "胸挂：装备的牌从第 1 回合加入，适合主力武器和防具。", "pack": "背包：物品的牌从第 2 回合加入；物资越多，牌组越厚。", "safe": "保险箱：允许的材料 / 种子可保住；其牌从第 3 回合加入。"}[current_container], 13, ExpeditionUI.GOLD))
 	var tidy := ExpeditionUI.button("自动整理当前容器")
@@ -535,7 +618,7 @@ func _request(kind: String, args: Dictionary, success_text: String) -> void:
 	pending_acknowledged = false
 	pending_serial = snapshot_serial
 	action_message = success_text
-	action_sound = "open" if kind in ["claim_reward", "claim_public", "pick_drop", "share_accept"] else "ui_click"
+	action_sound = "open" if kind in ["claim_reward", "claim_public", "pick_drop", "share_accept", "claim_corpse"] else "ui_click"
 	feedback_label.text = "正在处理……"
 	var result: Variant = action_sink.call(kind, args)
 	if result is String and result != "":
@@ -559,7 +642,11 @@ func acknowledge(action_id: String, result: Dictionary, serial := -1) -> void:
 
 func _consume_result(result: Dictionary, wait_snapshot := false) -> void:
 	var ok := bool(result.get("ok", false))
-	AudioKit.play(self, action_sound if ok else "warn", -6)
+	if not ok:
+		leave_after_cancel = false
+		search_retry_at = Time.get_ticks_msec() + 500
+	if not action_message.begins_with("搜索继续"):
+		AudioKit.play(self, action_sound if ok else "warn", -6)
 	pending_acknowledged = ok and wait_snapshot
 	pending_action = ok and wait_snapshot and snapshot_serial <= pending_serial
 	feedback_label.text = action_message if ok else str(result.get("reason", "操作失败，请重试。"))
@@ -574,18 +661,19 @@ func drag_payload(token: String) -> Dictionary:
 	var entry := _entry(token)
 	if entry.is_empty() or pending_action or modal.visible or not bool(entry.get("available", false)):
 		return {}
-	return {"loot_owner": get_instance_id(), "token": token, "def_id": str(entry["def_id"]), "instance_id": int(entry.get("instance_id", -1)) if str(entry["kind"]) == "loot_manage" else -1, "rotated": bool(entry.get("instance", {}).get("rotated", false))}
+	return {"loot_owner": get_instance_id(), "token": token, "def_id": str(entry["def_id"]), "quality": _entry_quality(entry), "instance_id": int(entry.get("instance_id", -1)) if str(entry["kind"]) == "loot_manage" else -1, "rotated": bool(entry.get("instance", {}).get("rotated", false))}
 
 func drag_preview(payload: Dictionary) -> Control:
-	var panel := ExpeditionUI.panel(Color("#213c42dd"), ExpeditionUI.GOLD, 8)
+	var tint := ItemDefs.quality_color(ItemDefs.quality_of(payload))
+	var panel := ExpeditionUI.panel(tint.darkened(0.8), tint, 8)
 	var row := VBoxContainer.new()
 	panel.add_child(row)
 	var art := ExpeditionArt.new()
 	art.subject = item_art(str(payload["def_id"]))
-	art.tint = item_tint(str(payload["def_id"]))
+	art.tint = tint
 	art.custom_minimum_size = Vector2(64, 64)
 	row.add_child(art)
-	row.add_child(ExpeditionUI.label(str(ItemDefs.get_item(str(payload["def_id"]))["name"]), 13))
+	row.add_child(ExpeditionUI.label(str(ItemDefs.get_item(str(payload["def_id"]))["name"]), 13, tint))
 	row.add_child(ExpeditionUI.label("R 旋转", 11, ExpeditionUI.GOLD))
 	ExpeditionUI.ignore_tree(panel)
 	return panel
@@ -598,6 +686,9 @@ func _pending_count() -> int:
 	return total
 
 func _confirm_leave() -> void:
+	if _has_unknown():
+		_confirm("还有未搜索的区域", "战场上还有未搜索的区域或未拿走的物品。\n离开后无法找回，确认继续探索？", "确认离开本节点", _cancel_and_leave)
+		return
 	if _pending_count() > 0:
 		_confirm("还有物资留在现场", "还有 %d 件候选 / 公共物资 / 丢弃物未带走。\n离开后这些物品会消失，确认继续？" % _pending_count(), "确认离开本节点", func() -> void: _request("leave_node", {}, "搜刮完成，继续探索。"))
 	else:
@@ -636,8 +727,10 @@ func _input(event: InputEvent) -> void:
 	if event.keycode == KEY_ESCAPE:
 		if modal.visible:
 			_close_modal()
+		elif _resolved().has("corpses") and not scene_mode:
+			_return_to_battlefield()
 		else:
-			menu_requested.emit()
+			_open_menu()
 		get_viewport().set_input_as_handled()
 	elif event.keycode == KEY_R and not modal.visible and not pending_action:
 		if get_viewport().gui_is_dragging():
@@ -648,6 +741,181 @@ func _input(event: InputEvent) -> void:
 		elif selected_token.begins_with("carried:"):
 			_request("loot_manage", {"operation": "rotate", "instance_id": int(_entry(selected_token).get("instance_id", -1))}, "物品已旋转。")
 			get_viewport().set_input_as_handled()
+
+func _open_corpse(id: String) -> void:
+	if pending_action:
+		return
+	search_source = id
+	selected_token = ""
+	scene_mode = false
+	for source in _resolved().get("corpses", []):
+		if str(source["id"]) == id:
+			search_region = str(source["regions"][0]["id"])
+			break
+	_request("search_start", {"source": search_source, "region": search_region}, "开始搜索，已发现的物品可以直接装包。")
+
+func _return_to_battlefield() -> void:
+	if pending_action:
+		return
+	scene_mode = true
+	_request("search_cancel", {}, "搜索已暂停，已发现的物品仍在原处。")
+
+func _open_menu() -> void:
+	stop_search_pending = true
+	if not pending_action and not run.get("loot_searches", {}).get(player_key, {}).is_empty():
+		stop_search_pending = false
+		_request("search_cancel", {}, "搜索已暂停。")
+	menu_requested.emit()
+
+func _render_search() -> void:
+	var sources: Array = _resolved().get("corpses", [])
+	var source: Dictionary = {}
+	for value in sources:
+		if str(value["id"]) == search_source:
+			source = value
+	if source.is_empty():
+		count_label.text = "点击战场上的尸体开始搜索。"
+		return
+	var layout_key := screen_identity + ":" + search_source
+	if search_layout_key != layout_key:
+		search_layout_key = layout_key
+		source_grids.clear()
+		region_buttons.clear()
+		ExpeditionUI.clear(list_column)
+		var picker := OptionButton.new()
+		picker.custom_minimum_size.y = 36
+		for i in range(sources.size()):
+			picker.add_item(str(sources[i]["name"]))
+			if str(sources[i]["id"]) == search_source:
+				picker.select(i)
+		picker.item_selected.connect(func(index: int) -> void: _open_corpse(str(sources[index]["id"])))
+		list_column.add_child(picker)
+		var regions := GridContainer.new()
+		regions.columns = 2 if source["regions"].size() > 1 else 1
+		regions.add_theme_constant_override("h_separation", 8)
+		regions.add_theme_constant_override("v_separation", 8)
+		list_column.add_child(regions)
+		for region in source["regions"]:
+			var id := str(region["id"])
+			var panel := ExpeditionUI.panel(Color("#13262e"), ExpeditionUI.LINE, 6)
+			panel.name = "SearchRegion_" + id
+			panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			regions.add_child(panel)
+			var column := VBoxContainer.new()
+			column.add_theme_constant_override("separation", 6)
+			panel.add_child(column)
+			var header := HBoxContainer.new()
+			column.add_child(header)
+			var title := ExpeditionUI.label(str(region["name"]), 14)
+			title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			header.add_child(title)
+			var button := ExpeditionUI.button("搜索")
+			button.custom_minimum_size = Vector2(54, 30)
+			button.add_theme_font_size_override("font_size", 12)
+			button.pressed.connect(_search_region.bind(id))
+			header.add_child(button)
+			region_buttons[id] = button
+			var region_grid := CorpseSearchGrid.new()
+			region_grid.loot_owner = self
+			region_grid.compact = source["regions"].size() > 1
+			column.add_child(region_grid)
+			source_grids[id] = region_grid
+		ground_drops = VBoxContainer.new()
+		list_column.add_child(ground_drops)
+	ExpeditionUI.clear(ground_drops)
+	for entry in entries:
+		if str(entry["kind"]) == "pick_drop":
+			var button := LootButton.new()
+			button.loot_owner = self
+			button.token = str(entry["token"])
+			button.text = "捡回 · " + str(ItemDefs.get_item(str(entry["def_id"]))["name"])
+			button.pressed.connect(select_item.bind(str(entry["token"])))
+			ground_drops.add_child(button)
+	var checked := 0
+	var total := 0
+	for region in source["regions"]:
+		var id := str(region["id"])
+		var session := {}
+		for member in run.get("loot_searches", {}):
+			var candidate: Dictionary = run["loot_searches"][member]
+			if str(candidate["source"]) == search_source and str(candidate["region"]) == id:
+				session = candidate.duplicate(true)
+				session["viewer_owner"] = member == player_key
+		var complete: bool = region["searched"].size() == int(region["size"][0]) * int(region["size"][1])
+		var button: Button = region_buttons[id]
+		button.text = "完成" if complete else ("暂停" if bool(session.get("viewer_owner", false)) else ("队友" if not session.is_empty() else "搜索"))
+		button.disabled = pending_action or complete or (not session.is_empty() and not bool(session.get("viewer_owner", false)))
+		ExpeditionUI.decorate_button(button, bool(session.get("viewer_owner", false)))
+		button.add_theme_font_size_override("font_size", 12)
+		for style_key in ["normal", "hover", "pressed", "disabled"]:
+			var button_style := button.get_theme_stylebox(style_key).duplicate() as StyleBoxFlat
+			button_style.content_margin_top = 5
+			button_style.content_margin_bottom = 5
+			button_style.content_margin_left = 6
+			button_style.content_margin_right = 6
+			button.add_theme_stylebox_override(style_key, button_style)
+		var region_grid: CorpseSearchGrid = source_grids[id]
+		region_grid.display(region, session)
+		if id == search_region:
+			source_grid = region_grid
+		checked += region["searched"].size()
+		total += int(region["size"][0]) * int(region["size"][1])
+	count_label.text = "已检查 %d / %d 格 · 点击物品查看，拖动装包\n品质：白 → 蓝 → 紫 → 金 → 红" % [checked, total]
+
+func _search_region(id: String) -> void:
+	if pending_action or modal.visible:
+		return
+	var session: Dictionary = run.get("loot_searches", {}).get(player_key, {})
+	if str(session.get("source", "")) == search_source and str(session.get("region", "")) == id:
+		_request("search_cancel", {}, "搜索已暂停。")
+		return
+	search_region = id
+	_request("search_start", {"source": search_source, "region": id}, "搜索中 · 已发现的物品可直接装包。")
+
+func _has_unknown() -> bool:
+	for source in _resolved().get("corpses", []):
+		for region in source["regions"]:
+			if region["searched"].size() < int(region["size"][0]) * int(region["size"][1]):
+				return true
+	return false
+
+func _cancel_and_leave() -> void:
+	leave_after_cancel = true
+	_request("search_cancel", {}, "搜索结束。")
+
+func _process(_delta: float) -> void:
+	if render_after_drag and not get_viewport().gui_is_dragging():
+		render_after_drag = false
+		_render_list()
+		_render_detail()
+		_render_bag()
+	if pending_action:
+		return
+	if stop_search_pending:
+		stop_search_pending = false
+		if str(run.get("phase", "")) == "node" and not run.get("loot_searches", {}).get(player_key, {}).is_empty():
+			_request("search_cancel", {}, "搜索已暂停。")
+		return
+	if not is_visible_in_tree() or modal.visible:
+		return
+	if input_blocked.is_valid() and bool(input_blocked.call()):
+		return
+	if leave_after_cancel:
+		leave_after_cancel = false
+		_request("leave_node", {}, "搜刮完成，继续探索。")
+		return
+	if scene_mode or get_viewport().gui_is_dragging() or Time.get_ticks_msec() < search_retry_at:
+		return
+	var session: Dictionary = run.get("loot_searches", {}).get(player_key, {})
+	if not session.is_empty():
+		if str(session["source"]) != search_source or str(session["region"]) != search_region:
+			_request("search_cancel", {}, "旧区域的搜索已暂停。")
+		elif Time.get_ticks_msec() >= search_deadline:
+			_request("search_step", {}, "搜索继续 · 已发现物品可装包。")
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_VISIBILITY_CHANGED and not is_visible_in_tree():
+		stop_search_pending = true
 
 func _price(def: Dictionary) -> String:
 	return "售价 %d 金币" % int(def.get("base_value", 0)) if bool(def.get("sellable", false)) else "不可出售"
@@ -698,8 +966,8 @@ static func item_art(id: String) -> String:
 		return "bandage"
 	return {"weapon": "attack", "armor": "shield", "tool": "tools", "supply": "heal", "rare_seed": "seed", "cargo": "relic", "material": "fiber" if id == "fiber_clump" else "ore"}.get(category, "crystal")
 
-static func item_tint(id: String) -> Color:
-	var def := ItemDefs.get_item(id)
-	if int(def.get("quality", 1)) > 1:
-		return Color("#a6d7d4")
-	return {"weapon": Color("#dca581"), "armor": Color("#9eb6c3"), "supply": Color("#9cc5a2"), "rare_seed": Color("#b7c988"), "cargo": ExpeditionUI.GOLD, "tool": Color("#c3b7dc")}.get(str(def.get("category", "")), Color("#b4a58e"))
+func _entry_quality(entry: Dictionary) -> int:
+	return ItemDefs.quality_of(entry.get("instance", {"def_id": entry.get("def_id", "")}))
+
+static func item_tint(id: String, quality := -1) -> Color:
+	return ItemDefs.quality_color(ItemDefs.quality_of({"def_id": id}) if quality < 0 else quality)

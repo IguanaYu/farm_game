@@ -2,7 +2,7 @@ class_name BattleScreen
 extends Control
 var layer_id := "moss_stone_shallow"
 ## 战斗界面（2.2 设计 D2.2-01/02/06）。规则裁定全部走 CombatGame；本脚本只消费事件、
-## 展示状态与轻量反馈（浮动数字），不做第二次结算。长动画不阻塞操作（本版无长动画）。
+## 展示状态、出牌轨迹、护盾/命中/恢复特效与浮动数字，不做第二次结算或阻塞输入。
 
 signal battle_closed
 signal inventory_mutated
@@ -16,6 +16,8 @@ const WARN_GOLD := Color("#9b713a")
 var combat: CombatGame
 var last_combat: CombatGame
 var run_mode := false
+var defeat_close_text := "查看结算"
+var compact_layout := false
 var game: FarmGame
 var carried_hp := -1  # 两场之间生命延续（2.3 设计 §5：各场战斗生命延续，首场按出发状态）
 var selected_uid := -1
@@ -57,6 +59,7 @@ var pending_action_id := ""
 var pending_acknowledged := false
 var modal_shade: ColorRect
 var drag_uid := -1
+var feedback_generation := 0
 
 class CardButton extends Button:
 	var card_uid := -1
@@ -93,6 +96,7 @@ func _ready() -> void:
 
 
 func open_run(combat: CombatGame, actor := "p1") -> void:
+	_clear_feedback()
 	pending_action = false
 	hovered_uid = -1
 	hovered_target = ""
@@ -113,6 +117,7 @@ func open_run(combat: CombatGame, actor := "p1") -> void:
 
 
 func open_demo(target_game: FarmGame = null) -> void:
+	_clear_feedback()
 	pending_action = false
 	_close_inspector()
 	run_mode = false
@@ -134,6 +139,9 @@ func open_demo(target_game: FarmGame = null) -> void:
 func _build() -> void:
 	ExpeditionUI.backdrop(self)
 	var frame := ExpeditionUI.frame(self)
+	if compact_layout:
+		frame.add_theme_constant_override("margin_top", 4)
+		frame.add_theme_constant_override("margin_bottom", 4)
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 12)
 	frame.add_child(column)
@@ -153,7 +161,7 @@ func _build() -> void:
 	chooser_column.add_child(quit_button)
 
 	battle_column = VBoxContainer.new()
-	battle_column.add_theme_constant_override("separation", 8)
+	battle_column.add_theme_constant_override("separation", 5 if compact_layout else 8)
 	battle_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	column.add_child(battle_column)
 	var top := HBoxContainer.new()
@@ -277,6 +285,7 @@ func _build() -> void:
 
 
 func _on_choose_encounter(encounter_id: String) -> void:
+	_clear_feedback()
 	var deck: Array = []
 	var inventory := _inventory()
 	if inventory != null:
@@ -360,11 +369,13 @@ func _cancel_selection() -> void:
 func _on_card_clicked(uid: int) -> void:
 	if not _can_act() or not _playable_card(uid):
 		return
+	var immediate := _immediate_target(uid)
+	if immediate != "":
+		selected_uid = uid
+		hovered_uid = -1
+		_on_target_clicked(immediate)
+		return
 	if selected_uid == uid:
-		var def := CardDefs.get_card(str(_hand_card(uid)["card_id"]))
-		if str(def["target"]) == "self":
-			_on_target_clicked(player_key)
-			return
 		selected_uid = -1
 	else:
 		selected_uid = uid
@@ -428,6 +439,8 @@ func _on_end_turn() -> void:
 		else:
 			status_label.text = "已请求结束行动，等待主机裁定……"
 		_refresh()
+		if sent is Dictionary and bool(sent.get("ok", false)):
+			_flash_events(sent.get("events", []))
 		return
 	var result := combat.end_turn(player_key)
 	if result.get("waiting", false):
@@ -452,7 +465,7 @@ func _refresh() -> void:
 		selected_uid = -1
 	round_label.text = "第 %02d 回合  ·  %s" % [int(combat.state["round"]), "战斗结束" if combat.is_over() else "你的行动"]
 	energy_label.text = "能量  %d / %d" % [int(player["energy"]), ExpeditionBaseline.ENERGY_PER_TURN]
-	hand_hint.text = "手牌 %d  ·  点击选牌 / 拖到目标  ·  1–0 选牌  ·  右键取消" % player["hand"].size()
+	hand_hint.text = "手牌 %d  ·  自身牌点击即用 / 攻击牌选择目标  ·  1–0 出牌" % player["hand"].size()
 	end_button.text = "等待队友…" if bool(player.get("ended", false)) else "结束回合   [E]"
 	end_button.disabled = not _can_act()
 	_refresh_enemies()
@@ -534,8 +547,10 @@ func _refresh_hand() -> void:
 		button.disabled = not _playable_card(uid)
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		var accent := _card_color(str(card["card_id"]))
+		var source := _card_source(card)
+		var quality_tint := ItemDefs.quality_color(ItemDefs.quality_of(source))
 		var selected := uid == selected_uid
-		button.add_theme_stylebox_override("normal", ExpeditionUI.style(Color("#f6ecd7") if selected else ExpeditionUI.PAPER, ExpeditionUI.GOLD if selected else accent, 10, 0))
+		button.add_theme_stylebox_override("normal", ExpeditionUI.style(Color("#f6ecd7") if selected else ExpeditionUI.PAPER, ExpeditionUI.GOLD if selected else quality_tint.darkened(0.25), 10, 0))
 		button.add_theme_stylebox_override("hover", ExpeditionUI.style(Color("#fff3dc"), ExpeditionUI.GOLD, 10, 0))
 		button.add_theme_stylebox_override("pressed", ExpeditionUI.style(Color("#e4d2b2"), ExpeditionUI.GOLD, 10, 0))
 		button.add_theme_stylebox_override("disabled", ExpeditionUI.style(Color("#b3b6ad"), Color("#6b7b7b"), 10, 0))
@@ -559,18 +574,25 @@ func _refresh_hand() -> void:
 		var art := ExpeditionArt.new()
 		art.subject = _card_subject(str(card["card_id"]))
 		art.tint = accent
-		art.custom_minimum_size.y = 67
+		art.custom_minimum_size.y = 44
 		content.add_child(art)
+		var source_chip := ExpeditionUI.panel(Color("#172b36"), quality_tint, 3)
+		content.add_child(source_chip)
+		var source_label := _label("来自：" + str(ItemDefs.get_item(str(source.get("def_id", ""))).get("name", "基础牌组")), 12, quality_tint)
+		source_label.name = "CardSource"
+		source_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+		source_label.tooltip_text = ItemDefs.quality_name(ItemDefs.quality_of(source))
+		source_chip.add_child(source_label)
 		var desc := _label(_short_effect(def), 14, ExpeditionUI.INK)
 		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		content.add_child(desc)
 		var footer := _label("%s  ·  %s" % [_target_display(str(def["target"])), "消耗" if str(def["after"]) == "exhaust_source" else ("本场移除" if str(def["after"]) == "exhaust" else "弃牌")], 11, Color("#655e50"))
 		content.add_child(footer)
-		var hotkey := _label("已选中 · 点击目标" if selected else ("能量不足" if int(def["cost"]) > int(player["energy"]) else "[%d]" % (index % 10)), 11, accent.darkened(0.4))
+		var hotkey := _label("已选中 · 点击目标" if selected else ("能量不足" if int(def["cost"]) > int(player["energy"]) else "[%d] %s" % [index % 10, "点击即用" if _immediate_target(uid) != "" else "选择目标"]), 11, accent.darkened(0.4))
 		content.add_child(hotkey)
 		ExpeditionUI.ignore_tree(margin)
-		button.tooltip_text = str(def["desc"])
+		button.tooltip_text = str(def["desc"]) + "\n" + source_label.text + " · " + ItemDefs.quality_name(ItemDefs.quality_of(source))
 		var source_inventory := _inventory()
 		if source_inventory != null and int(card.get("source_instance_id", 0)) > 0:
 			button.tooltip_text += "\n" + DeckBuilder.source_summary(source_inventory, int(card["source_instance_id"]))
@@ -672,7 +694,7 @@ func _show_outcome() -> void:
 		if child != overlay_label:
 			overlay_column.remove_child(child)
 			child.queue_free()
-	var close_button := _button("继续探索" if run_mode else "返回战备", Color("#eaf4df"), Color("#87b06f"))
+	var close_button := _button(("清理战场 · 搜索遗骸" if won else defeat_close_text) if run_mode else "返回战备", Color("#eaf4df"), Color("#87b06f"))
 	close_button.pressed.connect(_on_close)
 	overlay_column.add_child(close_button)
 
@@ -681,14 +703,31 @@ func _show_outcome() -> void:
 
 
 func _flash_events(events: Array) -> void:
+	_present_events.call_deferred(events.duplicate(true), feedback_generation)
+
+func _present_events(events: Array, generation: int) -> void:
+	# 等布局完成后定位，避免刷新手牌/敌人时将特效放到上一帧的位置。
+	await get_tree().process_frame
+	if generation != feedback_generation or not is_visible_in_tree():
+		return
 	for event in events:
+		var kind := str(event.get("type", ""))
+		var unit := str(event.get("target", event.get("who", event.get("owner", ""))))
+		if kind in ["card_played", "damage", "block", "heal", "poison", "draw", "rescue", "status"]:
+			_spawn_effect(kind, unit)
 		match str(event.get("type", "")):
 			"damage":
-				_popup_on_unit(str(event["target"]), "-%d" % int(event["amount"]), BAD_RED if int(event.get("to_hp", 0)) > 0 else Color("#9aa5b5"))
+				_popup_on_unit(unit, "-%d 生命" % int(event.get("to_hp", 0)) if int(event.get("to_hp", 0)) > 0 else "格挡 %d" % int(event["amount"]), Color("#ff9d85") if int(event.get("to_hp", 0)) > 0 else Color("#b3daff"))
 			"block":
-				_popup_on_unit(str(event["target"]), "+%d 格挡" % int(event["amount"]), Color("#8fb6d8"))
+				_popup_on_unit(unit, "+%d 护甲" % int(event["amount"]), Color("#a4dbff"))
 			"heal":
-				_popup_on_unit(str(event["target"]), "+%d 生命" % int(event["amount"]), GOOD_GREEN)
+				_popup_on_unit(unit, "+%d 生命" % int(event["amount"]), Color("#a7f0ae"))
+			"draw":
+				_popup_on_unit(unit, "+%d 抽牌" % int(event["count"]), Color("#ffe5a0"))
+			"status":
+				_popup_on_unit(unit, "%s +%d" % [CardDefs.STATUS_DISPLAY.get(str(event["status"]), event["status"]), int(event["stacks"])], Color("#dac1ff"))
+			"rescue":
+				_popup_on_unit(unit, "救起 · %d 生命" % int(event["hp"]), Color("#a7f0ae"))
 			"poison":
 				_popup_on_unit(str(event["target"]), "毒 -%d" % int(event["amount"]), Color("#a5679f"))
 			"outcome":
@@ -713,9 +752,20 @@ func _popup_center(text: String, color: Color) -> void:
 
 
 func _popup_at(anchor: Control, text: String, color: Color) -> void:
-	var label := _label(text, 24, color)
+	var label := _label(text, 28, color)
+	label.add_theme_color_override("font_outline_color", Color("#101f2b"))
+	label.add_theme_constant_override("outline_size", 7)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	label.custom_minimum_size.x = 220
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	label.add_to_group("battle_feedback_%d" % get_instance_id())
 	label.z_index = 50
-	label.position = anchor.get_global_rect().get_center() - global_position + Vector2(-30, -20)
+	var stack := 0
+	for child in get_children():
+		if child is Label and child.get_meta("popup_unit", 0) == anchor.get_instance_id():
+			stack += 1
+	label.set_meta("popup_unit", anchor.get_instance_id())
+	label.position = anchor.get_global_rect().get_center() - global_position + Vector2(-110, -55 + (stack % 3) * 30)
 	add_child(label)
 	var tween := label.create_tween()
 	tween.set_parallel(true)
@@ -726,12 +776,58 @@ func _popup_at(anchor: Control, text: String, color: Color) -> void:
 
 
 func _unit_anchor(unit_key: String) -> Control:
+	if target_controls.has(unit_key) and is_instance_valid(target_controls[unit_key]):
+		return target_controls[unit_key]
 	if str(unit_key).begins_with("p"):
 		return player_panel
 	for child in enemy_row.get_children():
 		if str(child.get_meta("unit_key", "")) == unit_key:
 			return child
 	return null
+
+func _spawn_effect(kind: String, unit: String) -> void:
+	var anchor := _unit_anchor(unit)
+	if anchor == null:
+		return
+	var effect := BattleEffect.new()
+	effect.kind = kind
+	effect.tint = {"damage": Color("#ffb086"), "poison": Color("#c196eb"), "block": Color("#74cfff"), "heal": Color("#8de8a5"), "rescue": Color("#8de8a5"), "draw": Color("#ffe08e"), "status": Color("#cda2ff")}.get(kind, ExpeditionUI.GOLD)
+	effect.center = anchor.get_global_rect().get_center() - global_position
+	effect.from = hand_row.get_global_rect().get_center() - global_position
+	effect.reduce_motion = SettingsStore.get_reduce_motion()
+	effect.add_to_group("battle_feedback_%d" % get_instance_id())
+	add_child(effect)
+
+func _clear_feedback() -> void:
+	feedback_generation += 1
+	for child in get_children():
+		if child.is_in_group("battle_feedback_%d" % get_instance_id()):
+			remove_child(child)
+			child.queue_free()
+
+func _card_source(card: Dictionary) -> Dictionary:
+	if str(card.get("source_def_id", "")) != "":
+		return {"def_id": card["source_def_id"], "quality": int(card.get("source_quality", 1))}
+	var source_inventory := _inventory()
+	if source_inventory != null:
+		return source_inventory.find_instance(int(card.get("source_instance_id", 0)))
+	return {}
+
+func _immediate_target(uid: int) -> String:
+	var card := _hand_card(uid)
+	if card.is_empty():
+		return ""
+	var rule := str(CardDefs.get_card(str(card["card_id"])).get("target", ""))
+	if rule == "self":
+		return player_key if _legal_target(uid, player_key) else ""
+	if rule == "ally":
+		var legal: Array = []
+		for key in combat.state["players"]:
+			if _legal_target(uid, str(key)):
+				legal.append(str(key))
+		if legal.size() == 1:
+			return legal[0]
+	return ""
 
 
 # —— 工具 ————————————————————————————————————————————————————————
@@ -832,7 +928,7 @@ func _refresh_player() -> void:
 	portrait.custom_minimum_size.y = 80
 	player_panel.add_child(portrait)
 	var self_target := _target_button(player_key)
-	self_target.text = "以自己为目标"
+	self_target.text = "自身牌 · 点击即用" if selected_uid < 0 else "选择自己"
 	self_target.custom_minimum_size.y = 48
 	player_panel.add_child(self_target)
 	player_panel.add_child(_label("%d / %d 生命" % [int(player["hp"]), int(player["max_hp"])], 23, CREAM))

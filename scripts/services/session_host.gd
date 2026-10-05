@@ -8,6 +8,7 @@ extends RefCounted
 
 signal packet_received(peer_id: int, message: Dictionary)
 signal relay_error(reason: String)
+signal run_updated
 
 const DEFAULT_PORT := 31967
 const MAX_MEMBERS := 2
@@ -89,8 +90,11 @@ func _mark_member_offline(peer_id: int) -> void:
 		return
 	member["online"] = false
 	if expedition != null:
+		CorpseLootGame.cancel(expedition.run)
 		expedition.run["log"].append("%s 掉线：本局暂停推进，等待重连" % str(member.get("name", "队友")))
 	broadcast({"t": "room", "room": _room_view()})
+	if expedition != null:
+		_push_snapshot()
 
 
 ## 掉线检测：超时成员标记离线并广播暂停（不凭掉线判负/判撤离）。
@@ -106,7 +110,11 @@ func sweep_members(now_ms: int) -> void:
 			if expedition != null:
 				expedition.run["log"].append("%s 掉线：本局暂停推进，等待重连" % str(member.get("name", "队友")))
 	if changed:
+		if expedition != null:
+			CorpseLootGame.cancel(expedition.run)
 		broadcast({"t": "room", "room": _room_view()})
+		if expedition != null:
+			_push_snapshot()
 
 
 func any_member_offline() -> bool:
@@ -276,7 +284,7 @@ func _try_begin_run() -> void:
 		broadcast({"t": "depart_failed", "reason": result["reason"]})
 		return
 	expedition = result["game"]
-	broadcast({"t": "depart", "run": expedition.run})
+	broadcast({"t": "depart", "run": expedition.visible_run()})
 	_push_snapshot()
 
 
@@ -402,7 +410,7 @@ func _execute_action(member_key: String, kind: String, args: Dictionary) -> Dict
 			var r := expedition.loot_action(member_key, "pick_drop", args)
 			r["run_changed"] = true
 			return r
-		"loot_manage":
+		"loot_manage", "search_start", "search_step", "search_cancel", "claim_corpse":
 			var r := expedition.loot_action(member_key, kind, args)
 			r["run_changed"] = bool(r.get("ok", false))
 			return r
@@ -456,11 +464,13 @@ func _execute_action(member_key: String, kind: String, args: Dictionary) -> Dict
 
 
 func _push_snapshot() -> void:
-	broadcast({"t": "snapshot", "version": state_version, "run": expedition.run})
+	state_version += 1
+	run_updated.emit()
+	broadcast({"t": "snapshot", "version": state_version, "run": expedition.visible_run()})
 
 
 func _push_snapshot_to(peer_id: int) -> void:
-	_send(peer_id, {"t": "snapshot", "version": state_version, "run": expedition.run})
+	_send(peer_id, {"t": "snapshot", "version": state_version, "run": expedition.visible_run()})
 
 
 ## 未确认结算重发：重连时补发（客户端按 applied_settlements 幂等去重）。

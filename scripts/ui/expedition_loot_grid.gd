@@ -64,7 +64,7 @@ func _gui_input(event: InputEvent) -> void:
 		for instance in items:
 			if int(instance["instance_id"]) == hovered:
 				var def := ItemDefs.get_item(str(instance["def_id"]))
-				tooltip_text = "%s · %d×%d 格 · %d 张牌\n点选查看，拖动移动，R 旋转。" % [def["name"], def["size"].x, def["size"].y, def["cards"].size()]
+				tooltip_text = "%s · %s · %d×%d 格 · %d 张牌\n点选查看，拖动移动，R 旋转。" % [def["name"], ItemDefs.quality_name(ItemDefs.quality_of(instance)), def["size"].x, def["size"].y, def["cards"].size()]
 				break
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		var id := int(occupied.get(ExpeditionBaseline.cell_key(_cell(event.position)), -1))

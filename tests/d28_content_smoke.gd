@@ -14,7 +14,7 @@ func _initialize() -> void:
 	for def_id in CombatGame.ENEMIES:
 		if str(CombatGame.ENEMIES[def_id]["name"]).find("首领") < 0:
 			enemy_count += 1
-	_check(enemy_count == 9, "预算：普通敌人 9 种（浅 3＋深 3＋晶脉 3）")
+	_check(enemy_count == 10, "预算：普通敌人 10 种（原 9 种＋装备骷髅）")
 	_check(ExpeditionDefs.DEEP_EVENTS.size() == 6 and ExpeditionDefs.EVENTS.size() == 3, "预算：事件 9 个（浅 3＋深 6）")
 	_check(PlantDefs.is_known_plant("glow_berry") and PlantDefs.is_known_plant("star_bloom"), "预算：稀有植物第 2/3 种（萤果/星瓣花）")
 	_check(CombatGame.ENCOUNTERS.has("layer2_guardian") and CombatGame.ENCOUNTERS.has("layer3_guardian"), "预算：两层首领遭遇（根须守卫/晶暴君）")

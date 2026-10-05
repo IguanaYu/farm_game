@@ -57,6 +57,7 @@ func _run() -> void:
 	# —— 主机地图与战斗界面（按 farm_hud 同款接线）——
 	var map_panel := ExpeditionMapPanel.new()
 	root.add_child(map_panel)
+	map_panel.watch_host(host)
 	map_panel.host_action_sink = func(kind: String, args: Dictionary) -> Dictionary:
 		return host.host_action(kind, args)
 	map_panel.open(expedition)
@@ -144,20 +145,34 @@ func _run() -> void:
 	var key1 := expedition.node_id(1, 0)
 	var resolved1: Dictionary = run["resolved"][key1]
 	var host_pack_before: int = expedition.member_inventory("p1").loadout_list("pack").size()
-	map_panel._on_claim_reward(key1, str(resolved1["rewards"][0]), "pack", true)
+	var body: Dictionary = resolved1["corpses"][0]["regions"][0]
+	var search_time := [1000]
+	expedition.search_clock = func() -> int: return search_time[0]
+	map_panel.loot_panel._open_corpse("e1")
+	while not run.get("loot_searches", {}).get("p1", {}).is_empty():
+		search_time[0] += int(expedition.run["loot_searches"]["p1"]["duration"]) + 1
+		host.host_action("search_step", {})
+		await _pump(4)
+	map_panel._loot_action("claim_corpse", {"instance_id": int(body["items"][0]["instance_id"]), "container": "pack"})
 	await _pump(6)
 	_check(expedition.member_inventory("p1").loadout_list("pack").size() == host_pack_before + 1, "领取：主机领取成功")
+	coop_panel.loot_panel._open_corpse("e1")
+	await _pump(20)
+	coop_panel.loot_panel.select_item("corpse:%d" % int(body["items"][1]["instance_id"]))
+	_check(not coop_panel.loot_panel.pending_action, "搜索：客机收到回执和新快照后解锁")
 	if not _click(coop_panel, "放入背包"):
 		_check(false, "领取：客机界面有领取按钮")
 	await _pump(10)
 	var guest_items: Array = expedition.member_inventory("p2").loadout_list("pack")
 	_check(guest_items.size() >= 1, "领取：客机领取经主机裁定成功")
+	_check(map_panel.loot_panel._entry("corpse:%d" % int(body["items"][1]["instance_id"])).is_empty(), "领取：主机界面实时移除客机拿走的物品")
 	if guest_items.size() >= 1 and host_pack_before >= 0:
 		var host_ids := {}
 		for instance in expedition.member_inventory("p1").loadout_list("pack"):
 			host_ids[int(instance["instance_id"])] = true
 		for instance in guest_items:
 			_check(not host_ids.has(int(instance["instance_id"])), "领取：双端实例编号不冲突（F-01 联动）")
+	expedition.search_clock = Callable()
 
 	# —— 采集两排 + 休整撤离站（先离开当前节点，再双票前进）——
 	for target_row in [2, 3, 4]:

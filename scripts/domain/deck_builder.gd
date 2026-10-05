@@ -19,6 +19,8 @@ static func build(inventory: InventoryGame) -> Dictionary:
 				entries.append({
 					"card_id": card_id,
 					"source_instance_id": int(instance["instance_id"]),
+					"source_def_id": str(instance["def_id"]),
+					"source_quality": ItemDefs.quality_of(instance),
 					"source_seq": seq,
 					"join_round": join_round,
 				})

@@ -46,6 +46,8 @@ func open(target_client: SessionClient) -> void:
 		client.run_received.connect(_on_run)
 	if not client.action_result_received.is_connected(_on_result):
 		client.action_result_received.connect(_on_result)
+	if not client.welcome_received.is_connected(_on_search_reconnect):
+		client.welcome_received.connect(_on_search_reconnect)
 	if not client.settlement_received.is_connected(_on_settlement):
 		client.settlement_received.connect(_on_settlement)
 	_mirror_version = -1
@@ -76,6 +78,14 @@ func _mirror_dirty() -> bool:
 func _mirror_serial_dirty() -> void:
 	_mirror_version = -1
 
+
+func _on_search_reconnect(ok: bool, _reason: String) -> void:
+	if ok and loot_panel != null:
+		# 重连后的权威快照恢复状态；丢失的旧回执不再锁住搜刮界面。
+		loot_panel.pending_action = false
+		loot_panel.pending_acknowledged = false
+		loot_panel.pending_action_id = ""
+		_mirror_serial_dirty()
 
 func _on_run(run: Dictionary) -> void:
 	_mirror_serial_dirty()  # 新快照到达：置脏，下一帧重建

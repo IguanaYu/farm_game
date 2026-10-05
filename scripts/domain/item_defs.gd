@@ -173,6 +173,23 @@ const ITEMS := {
 	},
 }
 
+# 装备与物资共用五档品质；实例优先，旧存档无字段时回退定义。
+const QUALITY_NAMES := ["白色 · 普通", "蓝色 · 精良", "紫色 · 稀有", "金色 · 史诗", "红色 · 传说"]
+const QUALITY_COLORS := [Color("#dce5eb"), Color("#58aaff"), Color("#bc83ff"), Color("#ffd064"), Color("#ff686e")]
+const SEARCH_MS := [850, 1400, 2200, 3300, 4800]
+
+static func quality_of(instance: Dictionary) -> int:
+	return clampi(int(instance.get("quality", get_item(str(instance.get("def_id", ""))).get("quality", 1))), 1, 5)
+
+static func quality_name(quality: int) -> String:
+	return QUALITY_NAMES[clampi(quality, 1, 5) - 1]
+
+static func quality_color(quality: int) -> Color:
+	return QUALITY_COLORS[clampi(quality, 1, 5) - 1]
+
+static func search_ms(quality: int) -> int:
+	return SEARCH_MS[clampi(quality, 1, 5) - 1]
+
 
 static func get_item(def_id: String) -> Dictionary:
 	return ITEMS.get(def_id, {})

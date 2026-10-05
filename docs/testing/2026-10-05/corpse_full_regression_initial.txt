@@ -1,0 +1,96 @@
+---- d28_content_smoke.gd (exit=1) ----
+
+Godot_v4.6.1-stable_win64_console.exe : ERROR:   FAIL: 预算：普通敌人 9 种（浅 3＋深 3＋晶脉 3）
+    + CategoryInfo          : NotSpecified: (ERROR:   FAIL: 预算：普通敌人 9 种（浅 3＋深 3＋晶脉 3）:String) [], RemoteException
+ERROR: D28_CONTENT_SMOKE_FAIL
+---- d30_asset_smoke.gd (SCRIPT ERROR（永不放行）) ----
+Godot_v4.6.1-stable_win64_console.exe : SCRIPT ERROR: Invalid access of index '0' on a base object of type: 'Array'.
+    + CategoryInfo          : NotSpecified: (SCRIPT ERROR: I... type: 'Array'.:String) [], RemoteException
+---- d42_online_auth_farm_smoke.gd (exit=1) ----
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+---- d43_online_client_bridge_smoke.gd (exit=1) ----
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+---- d44_online_farm_commands_matrix.gd (exit=1) ----
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+---- d45_online_room_run_smoke.gd (exit=1) ----
+---- d46_online_client_expedition_smoke.gd (exit=1) ----
+---- d47_world_shell_switch_smoke.gd (exit=1) ----
+ERROR: Cannot open X509CertificateMbedTLS file 'E:/gpt/worktree/55ba/farm/server/secrets/farm_server.crt'.
+---- d50_m4_resilience_matrix.gd (exit=1) ----
+---- d52_visit_smoke.gd (exit=-1) ----
+================ 回归汇总 ================
+d21_defs_smoke.gd                    exit=0   errors=0   ok
+d21_inventory_smoke.gd               exit=0   errors=0   ok
+d21_migration_smoke.gd               exit=0   errors=0   ok
+d21_net_probe.gd                     exit=0   errors=0   ok
+d22_rules_smoke.gd                   exit=0   errors=0   ok
+d22_serialize_smoke.gd               exit=0   errors=0   ok
+d22_worked_example.gd                exit=0   errors=0   ok
+d23_combat_worked.gd                 exit=0   errors=0   ok
+d23_defs_smoke.gd                    exit=0   errors=0   ok
+d23_inventory_worked.gd              exit=0   errors=0   ok
+d23_save_smoke.gd                    exit=0   errors=0   ok
+d24_recovery_sim.gd                  exit=0   errors=0   ok
+d24_run_smoke.gd                     exit=0   errors=0   ok
+d24_settle_smoke.gd                  exit=0   errors=0   ok
+d25_crafting_smoke.gd                exit=0   errors=0   ok
+d25_goals_smoke.gd                   exit=0   errors=0   ok
+d25_plant_smoke.gd                   exit=0   errors=0   ok
+d26_combat_coop_smoke.gd             exit=0   errors=0   ok
+d26_session_smoke.gd                 exit=0   errors=0   ok
+d27_recovery_matrix.gd               exit=0   errors=0   ok
+d28_content_smoke.gd                 exit=1   errors=1   FAIL
+d29_arbitrage_smoke.gd               exit=0   errors=0   ok
+d29_economy_sim.gd                   exit=0   errors=0   ok
+d29_regression_smoke.gd              exit=0   errors=0   ok
+d30_asset_smoke.gd                   exit=0   errors=2   FAIL
+d31_coop_depart_ui_smoke.gd          exit=0   errors=0   ok
+d32_coop_play_ui_smoke.gd            exit=0   errors=0   ok
+d33_scene_integration_smoke.gd       exit=0   errors=0   ok
+d34_relay_smoke.gd                   exit=0   errors=0   ok
+d35_main_menu_smoke.gd               exit=0   errors=0   ok
+d36_pause_menu_smoke.gd              exit=0   errors=0   ok
+d37_settings_store_smoke.gd          exit=0   errors=0   ok
+d38_main_menu_room_entry_smoke.gd    exit=0   errors=0   ok
+d39_loadout_preset_smoke.gd          exit=0   errors=0   ok
+d40_crystal_layer_smoke.gd           exit=0   errors=0   ok
+d41_audio_smoke.gd                   exit=0   errors=1   ok
+d42_online_auth_farm_smoke.gd        exit=1   errors=21  FAIL
+d43_online_client_bridge_smoke.gd    exit=1   errors=27  FAIL
+d44_loot_smoke.gd                    exit=0   errors=0   ok
+d44_online_farm_commands_matrix.gd   exit=1   errors=24  FAIL
+d45_online_room_run_smoke.gd         exit=1   errors=0   FAIL
+d46_online_client_expedition_smoke.gd exit=1   errors=0   FAIL
+d47_world_shell_switch_smoke.gd      exit=1   errors=1   FAIL
+d48_farm_shop_scene_smoke.gd         exit=0   errors=0   ok
+d49_cave_camp_scene_smoke.gd         exit=0   errors=0   ok
+d50_m4_resilience_matrix.gd          exit=1   errors=0   FAIL
+d51_polish_round_smoke.gd            exit=0   errors=0   ok
+d52_visit_smoke.gd                   exit=-1  errors=0   FAIL
+d53_login_panel_lifecycle.gd         exit=0   errors=1   ok
+d54_corpse_loot_smoke.gd             exit=0   errors=0   ok
+scene_workspace_smoke.gd             exit=0   errors=0   ok
+stage1_smoke.gd                      exit=0   errors=0   ok
+stage2_rules_smoke.gd                exit=0   errors=0   ok
+stage2_worked_example.gd             exit=0   errors=0   ok
+stage3_breeding_sim.gd               exit=0   errors=0   ok
+stage3_breeding_smoke.gd             exit=0   errors=0   ok
+stage3_warehouse_smoke.gd            exit=0   errors=0   ok
+stage4_market_smoke.gd               exit=0   errors=0   ok
+stage5_ux_smoke.gd                   exit=0   errors=0   ok
+stage6_economy_sim.gd                exit=0   errors=0   ok
+stage6_regression_smoke.gd           exit=0   errors=2   ok
+world_picking_smoke.gd               exit=0   errors=0   ok
+总计 62 项，失败 10 项

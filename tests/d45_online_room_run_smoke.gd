@@ -174,17 +174,21 @@ func _run() -> void:
 	var finished: Dictionary = _act(a, "finish_battle", {})
 	_check(bool(finished.get("ok", false)) and str(_latest_run(a).get("phase", "")) == "node", "结束战斗进入搜刮")
 
-	# 搜刮：个人二选一 + 公共区
+	# 搜刮：真实 WSS 搜索计时，共享已发现物品，各实例只能拿一次
 	var key := "r1c0"
 	var resolved: Dictionary = _latest_run(a)["resolved"][key]
-	var reward0 := str(resolved["rewards"][0])
-	var claim: Dictionary = _act(a, "claim_reward", {"def_id": reward0, "container": "pack"})
+	_check(resolved["corpses"][0]["regions"][0]["items"].is_empty(), "初始网络快照隐藏未知物品")
+	_search_online(a)
+	resolved = _latest_run(a)["resolved"][key]
+	var reward0 := int(resolved["corpses"][0]["regions"][0]["items"][0]["instance_id"])
+	var reward1 := int(resolved["corpses"][0]["regions"][0]["items"][1]["instance_id"])
+	var claim: Dictionary = _act(a, "claim_corpse", {"instance_id": reward0, "container": "pack"})
 	_check(bool(claim.get("ok", false)), "甲领取候选奖励")
-	var claim_again: Dictionary = _act(a, "claim_reward", {"def_id": reward0, "container": "pack"})
+	var claim_again: Dictionary = _act(a, "claim_corpse", {"instance_id": reward0, "container": "pack"})
 	_check(not bool(claim_again.get("ok", false)), "重复领取同一候选被拒")
-	if (resolved.get("public", []) as Array).size() > 0:
-		var public_claim: Dictionary = _act(b, "claim_public", {"def_id": str(resolved["public"][0])})
-		_check(bool(public_claim.get("ok", false)), "乙领取公共物资")
+	var public_claim: Dictionary = _act(b, "claim_corpse", {"instance_id": reward1})
+	_check(bool(public_claim.get("ok", false)), "乙领取已发现的另一件物品")
+	_check(not _act(b, "claim_corpse", {"instance_id": reward0})["ok"], "另一账户不能复制领取甲的物品")
 
 	# 段6 顺带：去重与冲突（用 signal 动作）
 	var sig: Dictionary = _act(a, "signal", {"text": "集合"})
@@ -258,8 +262,9 @@ func _run() -> void:
 	if solo_outcome != "won":
 		return
 	_act(c, "finish_battle", {})
+	_search_online(c)
 	var solo_resolved: Dictionary = _latest_run(c)["resolved"]["r1c0"]
-	_act(c, "claim_reward", {"def_id": str(solo_resolved["rewards"][0]), "container": "pack"})
+	_act(c, "claim_corpse", {"instance_id": int(solo_resolved["corpses"][0]["regions"][0]["items"][0]["instance_id"]), "container": "pack"})
 	_act(c, "leave_node", {})
 	_act(c, "move_to", {"row": 2, "col": 0})
 	_act(c, "leave_node", {})
@@ -365,6 +370,17 @@ func _rid(label: String) -> String:
 	_last_rid = "%s-%04d" % [label, req_seq]
 	return _last_rid
 
+
+func _search_online(client: WsClient) -> void:
+	_check(_act(client, "search_start", {"source": "e1", "region": "body"})["ok"], "开始在线尸体搜索")
+	_check(not _act(client, "search_step", {})["ok"], "权威端拒绝提前完成搜索")
+	for i in range(32):
+		var session: Dictionary = _latest_run(client).get("loot_searches", {}).get("p1", {})
+		if session.is_empty():
+			return
+		OS.delay_msec(int(session["remaining"]) + 90)
+		_check(_act(client, "search_step", {})["ok"], "在线逐格揭晓")
+	_check(false, "在线搜索超出区域容量")
 
 func _act(client: WsClient, kind: String, args: Dictionary) -> Dictionary:
 	var reply: Dictionary = client.request("run.action", {"kind": kind, "args": args}, _rid("act"))

@@ -29,7 +29,7 @@ func solo_flow() -> void:
 	for row_index in range(1, types.size() + 1):
 		rows[row_index] = [{"type": types[row_index - 1], "risk": "normal", "hint": "专项摆拍", "col": 0}]
 
-	# 第 1 排战斗：二选一领取 + 锁定
+	# 第 1 排战斗：搜索后转移实例，同一物品不能重复拿取
 	expedition.move_to(1, 0)
 	var battle := expedition.start_battle()
 	if not _check(battle["ok"], "战斗：发起成功"):
@@ -42,17 +42,23 @@ func solo_flow() -> void:
 	expedition.finish_battle(combat)
 	var key1 := expedition.node_id(1, 0)
 	var resolved1: Dictionary = expedition.run["resolved"][key1]
-	var pick_a := str(resolved1["rewards"][0])
-	var pick_b := str(resolved1["rewards"][1])
-	var c1: Dictionary = expedition.claim_node_reward("p1", key1, pick_a, "pack")
+	var clock := [1000]
+	expedition.search_clock = func() -> int: return clock[0]
+	expedition.loot_action("p1", "search_start", {"source": "e1", "region": "body"})
+	while not expedition.run.get("loot_searches", {}).get("p1", {}).is_empty():
+		clock[0] += int(expedition.run["loot_searches"]["p1"]["duration"]) + 1
+		expedition.loot_action("p1", "search_step", {})
+	var body: Dictionary = resolved1["corpses"][0]["regions"][0]
+	var pick_a := int(body["items"][0]["instance_id"])
+	var c1: Dictionary = expedition.loot_action("p1", "claim_corpse", {"instance_id": pick_a, "container": "pack"})
 	if not _check(c1["ok"], "战斗奖励：领取候选 A"):
 		return
 	seen[int(c1["instance_id"])] = true
-	_check(not expedition.claim_node_reward("p1", key1, pick_a, "pack")["ok"], "战斗奖励：A 不能领两次")
-	_check(not expedition.claim_node_reward("p1", key1, pick_b, "pack")["ok"], "战斗奖励：锁定后 B 不能领")
+	_check(not expedition.loot_action("p1", "claim_corpse", {"instance_id": pick_a})["ok"], "战斗奖励：同一实例不能领两次")
 	# 满包/白名单等价路径：非白名单物品放保险箱被拒，候选保留可重领
-	var safe_try: Dictionary = expedition.claim_node_reward("p1", key1, pick_a, "safe")
+	var safe_try: Dictionary = expedition.loot_action("p1", "claim_corpse", {"instance_id": pick_a, "container": "safe"})
 	_check(not safe_try["ok"], "失败路径：非法容器被拒")
+	expedition.search_clock = Callable()
 	expedition.leave_node()
 
 	# 第 2 排采集：每条各一次

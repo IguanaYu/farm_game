@@ -70,7 +70,7 @@ func count_of_def(def_id: String) -> int:
 	return total
 
 
-func add_instance(def_id: String, source := "", quality := 1, demo := false) -> Dictionary:
+func add_instance(def_id: String, source := "", quality := -1, demo := false) -> Dictionary:
 	var def := ItemDefs.get_item(def_id)
 	if def.is_empty():
 		return _fail("未知物品：%s" % def_id)
@@ -81,7 +81,7 @@ func add_instance(def_id: String, source := "", quality := 1, demo := false) -> 
 	var instance := {
 		"instance_id": next_instance_id(),
 		"def_id": def_id,
-		"quality": quality,
+		"quality": clampi(int(def.get("quality", 1)) if quality < 0 else quality, 1, 5),
 		"container": "warehouse",
 		"cell": [0, 0],
 		"rotated": false,
@@ -265,6 +265,23 @@ func claim_reward(def_id: String, container: String, cell := Vector2i(-1, -1), r
 		return _fail(moved["reason"])
 	return {"ok": true, "reason": "", "instance_id": added["instance_id"]}
 
+
+func claim_loot_instance(source: Dictionary, container: String, cell := Vector2i(-1, -1), rotated := false) -> Dictionary:
+	if not container in ExpeditionBaseline.CONTAINERS or is_run_occupied():
+		return _fail("当前不能装入这个容器")
+	var id := int(source.get("instance_id", -1))
+	if id < 0 or not find_instance(id).is_empty():
+		return _fail("物品实例已被领取")
+	var placed := source.duplicate(true)
+	placed.erase("revealed")
+	placed.erase("taken")
+	placed["container"] = "warehouse"
+	_inventory()["warehouse"].append(placed)
+	var result := place_at(id, container, cell, rotated) if cell.x >= 0 else move_to_loadout(id, container)
+	if not bool(result.get("ok", false)):
+		_inventory()["warehouse"].erase(placed)
+		return result
+	return {"ok": true, "instance_id": id}
 
 func clear_loadout() -> Dictionary:
 	## 清空配置：把三容器内全部物品放回仓库（保留保险箱保护选择信息随实例一起离开）。
