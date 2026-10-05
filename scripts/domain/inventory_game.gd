@@ -130,6 +130,7 @@ func move_to_loadout(instance_id: int, container: String) -> Dictionary:
 	instance["container"] = container
 	instance["cell"] = [int(fit[0]), int(fit[1])]
 	instance["rotated"] = bool(fit[2])
+	instance.erase("slot")
 	_inventory()["loadout"][container].append(instance)
 	return {"ok": true, "reason": "", "cell": instance["cell"], "rotated": instance["rotated"]}
 
@@ -236,6 +237,7 @@ func place_at(instance_id: int, container: String, cell: Vector2i, rotated: bool
 	instance["container"] = container
 	instance["cell"] = [cell.x, cell.y]
 	instance["rotated"] = rotated
+	instance.erase("slot")
 	_inventory()["loadout"][container].append(instance)
 	return {"ok": true, "reason": ""}
 

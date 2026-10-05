@@ -10,26 +10,6 @@ signal demo_battle_requested
 signal depart_requested
 
 
-## 拖放支持（2.3 D2.3-02）：仓库行与已放置物品可拖，容器盒为放置目标。
-class DragButton extends Button:
-	var payload: Dictionary = {}
-
-	func _get_drag_data(_pos: Vector2) -> Variant:
-		var preview := Label.new()
-		preview.text = text
-		set_drag_preview(preview)
-		return payload
-
-
-class DropBox extends VBoxContainer:
-	signal dropped(data: Dictionary)
-
-	func _can_drop_data(_pos: Vector2, data: Variant) -> bool:
-		return typeof(data) == TYPE_DICTIONARY and data.has("instance_id")
-
-	func _drop_data(_pos: Vector2, data: Variant) -> void:
-		dropped.emit(data)
-
 const FOREST := Color("#294f3c")
 const CREAM := Color("#fff9ed")
 const TEXT_DARK := Color("#35513d")
@@ -58,11 +38,12 @@ var dirty := false
 var pending_placement := false
 
 var stats_label: Label
-var warehouse_column: VBoxContainer
+var warehouse_header: Label
+var warehouse_grid: BackpackWorkspace.FlowItemGrid
+var workspace: BackpackWorkspace
 var detail_column: VBoxContainer
 var deck_column: VBoxContainer
 var check_column: VBoxContainer
-var container_boxes: Dictionary = {}
 var status_label: Label
 var put_back_button: Button
 var rotate_button: Button
@@ -131,32 +112,43 @@ func _build() -> void:
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation",14)
 	column.add_child(body)
-	var left_scroll := ScrollContainer.new()
-	left_scroll.custom_minimum_size.x = 290
-	left_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	body.add_child(left_scroll)
-	warehouse_column = VBoxContainer.new()
-	warehouse_column.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	left_scroll.add_child(warehouse_column)
-	var bags := TabContainer.new()
-	bags.custom_minimum_size.x = 390
-	bags.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	body.add_child(bags)
-	for container in ExpeditionBaseline.CONTAINERS:
-		var box := _build_container_box(container)
-		box.name = ExpeditionBaseline.CONTAINER_DISPLAY[container]
-		bags.add_child(box)
-		container_boxes[container] = box
+	# 三栏改版：左＝装备纸娃娃，中＝容器栈（共享组件），右＝仓库大格子+详情/牌组/检查。
+	workspace = BackpackWorkspace.new()
+	workspace.name = "BackpackWorkspace"
+	workspace.setup(self, {
+		"place": _on_workspace_place,
+		"equip": _on_workspace_equip,
+		"tidy": func(container: String): _on_auto_tidy(container),
+		"select": _on_select_instance,
+	})
+	workspace.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	body.add_child(workspace)
 	var right_scroll := ScrollContainer.new()
-	right_scroll.custom_minimum_size.x = 330
+	right_scroll.custom_minimum_size.x = 340
 	right_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	body.add_child(right_scroll)
 	var right := VBoxContainer.new()
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.add_theme_constant_override("separation", 6)
 	right_scroll.add_child(right)
-	detail_column = _section(right,"物品详情")
-	deck_column = _section(right,"牌组与加入回合")
-	check_column = _section(right,"出发前检查")
+	var filter_row := HFlowContainer.new()
+	filter_row.add_theme_constant_override("separation", 4)
+	right.add_child(filter_row)
+	var filters := [["all", "全部"], ["weapon", "武器"], ["armor", "防具"], ["helmet", "头盔"], ["tool", "工具"], ["supply", "补给"], ["material", "材料"], ["cargo", "货物"]]
+	for entry in filters:
+		var filter_button := _small_button(entry[1], Color("#fff5df") if filter != entry[0] else Color("#e8f0d8"), Color("#d5b87d"))
+		filter_button.pressed.connect(_on_filter.bind(entry[0]))
+		filter_row.add_child(filter_button)
+	warehouse_header = _label("装备／材料仓库", 15, FOREST)
+	right.add_child(warehouse_header)
+	warehouse_grid = BackpackWorkspace.FlowItemGrid.new()
+	warehouse_grid.workspace = workspace
+	warehouse_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	warehouse_grid.entry_selected.connect(_on_select_instance)
+	right.add_child(warehouse_grid)
+	detail_column = _section(right,"物品详情", false)
+	deck_column = _section(right,"牌组与加入回合", false)
+	check_column = _section(right,"出发前检查", false)
 	var presets := HBoxContainer.new()
 	column.add_child(presets)
 	preset_option = OptionButton.new()
@@ -199,44 +191,16 @@ func _build() -> void:
 	bottom.add_child(depart)
 
 
-func _build_container_box(container: String) -> VBoxContainer:
-	var box := VBoxContainer.new()
-	box.add_theme_constant_override("separation",12)
-	var dims: Vector2i = ExpeditionBaseline.CONTAINER_SIZE[container]
-	var round_id: int = ExpeditionBaseline.JOIN_ROUND[container]
-	var caption := _label("%d × %d 格 · 第 %d 回合加入牌库" % [dims.x,dims.y,round_id],18,FOREST)
-	box.add_child(caption)
-	box.set_meta("caption",caption)
-	var grid := EquipmentGrid.new()
-	grid.name = "EquipmentGrid_"+container
-	grid.container = container
-	grid.loadout_owner = self
-	grid.loot_owner = self
-	grid.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	grid.item_selected.connect(_on_select_instance)
-	box.add_child(grid)
-	box.set_meta("grid",grid)
-	var tidy := _small_button("自动整理这个容器",Color("#e8efdb"),Color("#b2bd9d"))
-	tidy.pressed.connect(_on_auto_tidy.bind(container))
-	box.add_child(tidy)
-	return box
-
-
-func _on_drop_into_container(data: Dictionary, container: String) -> void:
-	var result: Dictionary
-	if _is_online():
-		var reply: Dictionary = await online_request.call("inv.move_to_loadout", {"instance_id": int(data["instance_id"]), "container": container})
-		result = _online_result(reply)
-		if result.is_empty():
-			return
-	else:
-		result = inventory.move_to_loadout(int(data["instance_id"]), container)
-	if result["ok"]:
-		dirty = true
-		_flash("已放入%s（拖放）。" % ExpeditionBaseline.CONTAINER_DISPLAY[container])
-	else:
-		_flash(result["reason"])
-	_refresh()
+func _section(parent: VBoxContainer, title: String, expand := true) -> VBoxContainer:
+	var box := _panel(Color("#f7f1de"), Color("#e2e4d4"), 10)
+	if expand:
+		box.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	parent.add_child(box)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 3)
+	box.add_child(column)
+	column.add_child(_label(title, 16, FOREST))
+	return column
 
 
 func _on_auto_tidy(container: String) -> void:
@@ -256,15 +220,31 @@ func _on_auto_tidy(container: String) -> void:
 	_refresh()
 
 
-func _section(parent: VBoxContainer, title: String) -> VBoxContainer:
-	var box := _panel(Color("#f7f1de"), Color("#e2e4d4"), 10)
-	box.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	parent.add_child(box)
-	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 3)
-	box.add_child(column)
-	column.add_child(_label(title, 16, FOREST))
-	return column
+# —— 工作台意图（BackpackWorkspace 经 Callable 回调到这里）—————————————————
+
+
+func _on_workspace_place(payload: Dictionary, container: String, cell: Vector2i) -> void:
+	place_item(payload, container, cell)
+
+
+func _on_workspace_equip(payload: Dictionary, slot: String) -> void:
+	## 拖入装备槽＝装备意图；旧占用由规则层自动换回仓库。
+	workspace.busy = true
+	var result: Dictionary
+	if _is_online():
+		var reply: Dictionary = await online_request.call("inv.equip", {"instance_id": int(payload["instance_id"]), "slot": slot})
+		result = _online_result(reply)
+	else:
+		result = inventory.equip(int(payload["instance_id"]), slot)
+	workspace.busy = false
+	if result.is_empty():
+		return
+	if result["ok"]:
+		dirty = true
+		_flash("已装备到%s槽（牌第 1 回合入堆）。" % ExpeditionBaseline.SLOT_DISPLAY[slot])
+	else:
+		_flash(str(result.get("reason", "装备失败")))
+	_refresh()
 
 
 # —— 交互 ————————————————————————————————————————————————————————
@@ -421,7 +401,7 @@ func preset_names() -> Array:
 
 
 func save_preset(raw_name: String) -> Dictionary:
-	## 把当前三容器快照存为预设；同名覆盖。预设文件独立于农场档，立即落盘。
+	## 把当前装备槽+三容器快照存为预设；同名覆盖。预设文件独立于农场档，立即落盘。
 	var presets: Array = presets_data.get("presets", [])
 	var name := LoadoutPresets.normalize_name(raw_name, presets.size() + 1)
 	var captured := LoadoutPresets.capture(inventory)
@@ -429,6 +409,7 @@ func save_preset(raw_name: String) -> Dictionary:
 	for preset in presets:
 		if str(preset.get("name", "")) == name:
 			preset["items"] = captured["items"]
+			preset["equipment"] = captured.get("equipment", [])
 			preset["updated_at"] = int(Time.get_unix_time_from_system())
 			replaced = true
 			break
@@ -436,16 +417,17 @@ func save_preset(raw_name: String) -> Dictionary:
 		if presets.size() >= LoadoutPresets.MAX_PRESETS:
 			_flash("预设已满（最多 %d 套）：先删除再保存。" % LoadoutPresets.MAX_PRESETS)
 			return {"ok": false, "reason": "预设已满"}
-		presets.append({"name": name, "items": captured["items"],
+		presets.append({"name": name, "items": captured["items"], "equipment": captured.get("equipment", []),
 				"created_at": int(Time.get_unix_time_from_system())})
 	presets_data["presets"] = presets
 	if not PresetStore.save_presets(presets_data):
 		_flash("预设文件写入失败：本次未保存。")
 		return {"ok": false, "reason": "写入失败"}
+	var count: int = (captured["items"] as Array).size() + (captured.get("equipment", []) as Array).size()
 	_refresh_presets(name)
 	preset_name_edit.text = ""
-	_flash("已%s预设「%s」（%d 件）。" % ["覆盖" if replaced else "保存", name, (captured["items"] as Array).size()])
-	return {"ok": true, "reason": "", "name": name, "count": (captured["items"] as Array).size()}
+	_flash("已%s预设「%s」（%d 件）。" % ["覆盖" if replaced else "保存", name, count])
+	return {"ok": true, "reason": "", "name": name, "count": count}
 
 
 func apply_selected() -> Dictionary:
@@ -501,7 +483,8 @@ func _refresh_presets(select_name: String = "") -> void:
 	for index in range(presets.size()):
 		var preset: Dictionary = presets[index]
 		var item_name := str(preset.get("name", ""))
-		preset_option.add_item("%s（%d 件）" % [item_name, (preset.get("items", []) as Array).size()])
+		var count: int = (preset.get("items", []) as Array).size() + (preset.get("equipment", []) as Array).size()
+		preset_option.add_item("%s（%d 件）" % [item_name, count])
 		if item_name == select_name:
 			select_index = index
 	preset_option.selected = select_index
@@ -513,10 +496,11 @@ func _refresh_presets(select_name: String = "") -> void:
 func _refresh() -> void:
 	## 快照会整体替换 game.state，长持有的 expedition 绑定会变悬空：每次刷新先重绑。
 	inventory.bind(game.state["expedition"])
+	workspace.bind_inventory(func() -> InventoryGame: return inventory)
+	workspace.busy = pending_placement
 	_refresh_stats()
+	workspace.refresh(inventory, selected_instance_id)
 	_refresh_warehouse()
-	for container in ExpeditionBaseline.CONTAINERS:
-		_refresh_container(container)
 	_refresh_detail()
 	_refresh_deck()
 	_refresh_check()
@@ -535,7 +519,7 @@ func _refresh_stats() -> void:
 	var value_text := str(inventory.carry_sell_value()) + " 金币"
 	if inventory.has_basic_in_loadout():
 		value_text += "（基础装备不计可售价值）"
-	stats_label.text = "生命上限 %d ｜ 已用格数 %d/%d ｜ 首回合牌 %d 张 ｜ 后续加入牌 %d 张 ｜ 携带可售价值 %s ｜ 失败保护价值 %d 金币" % [
+	stats_label.text = "生命上限 %d ｜ 容器已用格 %d/%d ｜ 第 1 回合牌（装备槽）%d 张 ｜ 胸挂/背包后续加入 %d 张 ｜ 携带可售价值 %s ｜ 保险箱保护 %d 金币" % [
 		ExpeditionBaseline.MAX_HP, used, total,
 		int(preview["totals"][1]), int(preview["totals"][2]) + int(preview["totals"][3]),
 		value_text, inventory.protected_value(),
@@ -543,59 +527,25 @@ func _refresh_stats() -> void:
 
 
 func _refresh_warehouse() -> void:
-	for child in warehouse_column.get_children():
-		warehouse_column.remove_child(child)
-		child.queue_free()
-	var filter_row := HFlowContainer.new()
-	filter_row.add_theme_constant_override("separation", 4)
-	warehouse_column.add_child(filter_row)
-	var filters := [["all", "全部"], ["weapon", "武器"], ["armor", "防具"], ["tool", "工具"], ["supply", "补给"], ["material", "材料"], ["cargo", "货物"]]
-	for entry in filters:
-		var button := _small_button(entry[1], Color("#fff5df") if filter != entry[0] else Color("#e8f0d8"), Color("#d5b87d"))
-		button.pressed.connect(_on_filter.bind(entry[0]))
-		filter_row.add_child(button)
-	var list_title := _label("装备／材料仓库", 15, FOREST)
-	warehouse_column.add_child(list_title)
 	var items: Array = inventory.warehouse_list()
-	var shown := 0
+	var entries: Array = []
 	for instance in items:
 		var def := ItemDefs.get_item(str(instance["def_id"]))
 		if filter != "all" and str(def["category"]) != filter:
 			continue
-		shown += 1
-		var row := DragButton.new()
-		row.payload = {"instance_id":int(instance["instance_id"]),"def_id":instance["def_id"],"rotated":instance.get("rotated",false),"loadout_owner":get_instance_id()}
-		var demo_mark := "［演示］" if bool(instance.get("demo", false)) else ""
-		row.text = "%s%s  %d×%d → %d 张牌" % [demo_mark, def["name"], def["size"].x, def["size"].y, def["cards"].size()]
-		row.add_theme_font_size_override("font_size", 18)
-		row.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
-		row.clip_text = true
-		row.custom_minimum_size = Vector2(250,54)
-		row.tooltip_text = row.text
-		row.add_theme_color_override("font_color", Color("#35513d"))
-		row.add_theme_color_override("font_hover_color", Color("#1f3327"))
-		row.add_theme_color_override("font_pressed_color", Color("#1f3327"))
-		var fill := Color("#fffbea") if int(instance["instance_id"]) != selected_instance_id else Color("#e8f0d8")
-		var style := _style(fill, ItemDefs.quality_color(ItemDefs.quality_of(instance)), 8)
-		row.add_theme_stylebox_override("normal", style)
-		row.add_theme_stylebox_override("hover", style)
-		row.add_theme_stylebox_override("pressed", style)
-		row.pressed.connect(_on_select_instance.bind(int(instance["instance_id"])))
-		warehouse_column.add_child(row)
-	if shown == 0:
-		warehouse_column.add_child(_label("（仓库是空的：先领取基础装备，或载入演示物品看看）", 13, TEXT_MUTED))
-
-
-func _refresh_container(container: String) -> void:
-	var grid: EquipmentGrid = container_boxes[container].get_meta("grid")
-	var instances: Array = inventory.loadout_list(container).duplicate(true)
-	for instance in instances:
-		instance["loot_art"] = ExpeditionLootPanel.item_art(str(instance["def_id"]))
-		instance["loot_tint"] = ItemDefs.quality_color(ItemDefs.quality_of(instance))
-	var dims := ExpeditionBaseline.size_for(game.state["expedition"],container)
-	var caption: Label = container_boxes[container].get_meta("caption")
-	caption.text = "%d × %d 格 · 第 %d 回合加入牌库" % [dims.x,dims.y,ExpeditionBaseline.JOIN_ROUND[container]]
-	grid.display(instances,dims,selected_instance_id)
+		entries.append({
+			"instance_id": int(instance["instance_id"]),
+			"def_id": str(instance["def_id"]),
+			"name": ("［演示］" if bool(instance.get("demo", false)) else "") + str(def["name"]),
+			"dims": def["size"],
+			"art": ExpeditionLootPanel.item_art(str(instance["def_id"])),
+			"tint": ItemDefs.quality_color(ItemDefs.quality_of(instance)),
+			"tooltip": "%s · %s · %d×%d 格 · %d 张牌\n点选查看，拖到装备槽或容器格。" % [
+				def["name"], ItemDefs.quality_name(ItemDefs.quality_of(instance)),
+				def["size"].x, def["size"].y, def["cards"].size()],
+		})
+	warehouse_header.text = "装备／材料仓库 · %d 件" % entries.size()
+	warehouse_grid.set_items(entries)
 
 
 func _refresh_detail() -> void:
@@ -630,13 +580,14 @@ func _refresh_detail() -> void:
 	else:
 		detail_column.add_child(_label("可售价值：%d 金币 ｜ %s" % [int(def.get("base_value", 0)),
 			"可放保险箱（失败时保留）" if bool(def.get("safe_allowed", false)) else "不可放保险箱"], 14, TEXT_DARK))
-	detail_column.add_child(_label("当前归属：%s" % _owner_display(str(instance["container"])), 14, TEXT_DARK))
+	detail_column.add_child(_label("当前归属：%s" % _owner_display(str(instance["container"]), instance), 14, TEXT_DARK))
 	var desc := _label(str(def.get("desc", "")), 13, TEXT_MUTED)
 	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	desc.custom_minimum_size = Vector2(330, 0)
 	detail_column.add_child(desc)
 	if ExpeditionBaseline.JOIN_ROUND.has(str(instance["container"])):
 		put_back_button.visible = true
+	if ExpeditionBaseline.CONTAINER_SIZE.has(str(instance["container"])):
 		rotate_button.visible = true
 
 
@@ -646,10 +597,10 @@ func _refresh_deck() -> void:
 		child.queue_free()
 	var preview := inventory.deck_preview()
 	if int(preview["totals"][1]) + int(preview["totals"][2]) + int(preview["totals"][3]) == 0:
-		deck_column.add_child(_label("（三个容器都是空的：放入物品后这里显示会抽到什么牌）", 13, TEXT_MUTED))
+		deck_column.add_child(_label("（装备槽与容器都是空的：放入物品后这里显示会抽到什么牌）", 13, TEXT_MUTED))
 		return
 	for join_round in [1, 2, 3]:
-		var source: String = {"1": "胸挂", "2": "背包", "3": "保险箱"}[str(join_round)]
+		var source: String = {"1": "装备槽", "2": "胸挂", "3": "背包"}[str(join_round)]
 		var text := "第 %d 回合（%s，共 %d 张）：" % [join_round, source, int(preview["totals"][join_round])]
 		var parts: Array = []
 		var order: Array = preview["rounds"][join_round].map(func(entry): return str(entry["card_id"]))
@@ -665,7 +616,7 @@ func _refresh_deck() -> void:
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.custom_minimum_size = Vector2(330, 0)
 		deck_column.add_child(label)
-	deck_column.add_child(_label("战斗开始时按当前布局构建牌库；战斗中不会把新战利品塞进手牌。", 12, TEXT_MUTED))
+	deck_column.add_child(_label("装备槽牌第 1 回合、胸挂第 2、背包第 3；保险箱的牌永不入堆（死亡时保留）。", 12, TEXT_MUTED))
 
 
 func _refresh_check() -> void:
@@ -688,9 +639,11 @@ func _refresh_check() -> void:
 		check_column.add_child(label)
 
 
-func _owner_display(owner: String) -> String:
+func _owner_display(owner: String, instance := {}) -> String:
 	if owner == "warehouse":
 		return "装备／材料仓库"
+	if owner == "equipped":
+		return "%s槽（装备中）" % ExpeditionBaseline.SLOT_DISPLAY.get(str(instance.get("slot", "")), "装备")
 	if ExpeditionBaseline.CONTAINER_DISPLAY.has(owner):
 		return ExpeditionBaseline.CONTAINER_DISPLAY[owner]
 	return owner
@@ -760,6 +713,7 @@ func place_item(payload: Dictionary, container: String, cell: Vector2i) -> void:
 	if pending_placement:
 		return
 	pending_placement = true
+	workspace.busy = true
 	var result: Dictionary
 	if _is_online():
 		var reply: Dictionary = await online_request.call("inv.place_at",{"instance_id":int(payload["instance_id"]),"container":container,"cell":{"x":cell.x,"y":cell.y},"rotated":bool(payload.get("rotated",false))})
@@ -767,6 +721,7 @@ func place_item(payload: Dictionary, container: String, cell: Vector2i) -> void:
 	else:
 		result = inventory.place_at(int(payload["instance_id"]),container,cell,bool(payload.get("rotated",false)))
 	pending_placement = false
+	workspace.busy = false
 	if result.is_empty():
 		return
 	if bool(result.get("ok",false)):

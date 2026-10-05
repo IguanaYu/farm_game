@@ -99,7 +99,7 @@ func _run() -> void:
 		inv.move_to_loadout(int(item["instance_id"]),"chest")
 	world.hud.loadout_panel._refresh()
 	await _frames(4)
-	var grid: EquipmentGrid = world.hud.loadout_panel.container_boxes["chest"].get_meta("grid")
+	var grid: ExpeditionLootGrid = world.hud.loadout_panel.workspace.container_grids["chest"]
 	var instance: Dictionary = inv.loadout_list("chest")[0]
 	var id := int(instance["instance_id"])
 	await _drag(grid.global_position+grid._item_rect(instance).get_center(),grid.global_position+grid.origin+Vector2(1.5,2.5)*grid.cell_size)

@@ -55,7 +55,8 @@ func _domain_capture_and_apply() -> void:
 	_check(int(expected.size()) == 3, "领域：布置后三容器共 3 件真实物品")
 
 	var captured := LoadoutPresets.capture(inventory)
-	_check(int(captured["fmt"]) == 1, "领域：快照格式版本为 1")
+	_check(int(captured["fmt"]) == 2, "领域：快照格式版本为 2（三栏改版含装备槽）")
+	_check(captured.get("equipment") is Array, "领域：快照含 equipment 装备槽段")
 	_check((captured["items"] as Array).size() == 3, "领域：快照 3 件（排除演示实例）")
 	var snapshot_ok := true
 	for entry in captured["items"]:

@@ -967,7 +967,7 @@ static func item_art(id: String) -> String:
 		return "crystal"
 	if id == "bandage" or id == "rescue_kit":
 		return "bandage"
-	return {"weapon": "attack", "armor": "shield", "tool": "tools", "supply": "heal", "rare_seed": "seed", "cargo": "relic", "material": "fiber" if id == "fiber_clump" else "ore"}.get(category, "crystal")
+	return {"weapon": "attack", "armor": "shield", "helmet": "helmet", "tool": "tools", "supply": "heal", "rare_seed": "seed", "cargo": "relic", "material": "fiber" if id == "fiber_clump" else "ore"}.get(category, "crystal")
 
 func _entry_quality(entry: Dictionary) -> int:
 	return ItemDefs.quality_of(entry.get("instance", {"def_id": entry.get("def_id", "")}))

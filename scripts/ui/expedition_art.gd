@@ -117,6 +117,37 @@ func _draw() -> void:
 			draw_rect(Rect2(91, 96, 18, 28), light)
 			for x in [56, 138]:
 				draw_line(Vector2(x, 70), Vector2(x, 160), Color("#dfb67a"), 6)
+		"helmet":
+			# 帽子／头盔：宽帽檐＋圆顶＋帽带（草帽与铁盔共用剪影，颜色随 tint 区分）。
+			draw_style_box(ExpeditionUI.style(tint, light, 26, 0), Rect2(30, 86, 140, 18))
+			draw_circle(Vector2(100, 88), 42, tint)
+			draw_circle(Vector2(100, 84), 40, light)
+			draw_arc(Vector2(100, 96), 34, 0.15, PI - 0.15, 20, shadow.darkened(0.15), 5, true)
+			draw_line(Vector2(78, 82), Vector2(122, 82), shadow.darkened(0.2), 4)
+		"rig_chest":
+			# 胸挂：战术背心＋三条挂袋。
+			draw_style_box(ExpeditionUI.style(tint.darkened(0.1), light, 12, 0), Rect2(52, 46, 96, 118))
+			draw_line(Vector2(52, 62), Vector2(148, 62), light, 5)
+			for x in [68, 100, 132]:
+				draw_style_box(ExpeditionUI.style(Color("#5d4a33"), Color("#8a7350"), 6, 0), Rect2(x - 13, 78, 26, 40))
+			draw_line(Vector2(60, 132), Vector2(140, 132), shadow, 4)
+			draw_line(Vector2(100, 46), Vector2(100, 66), shadow, 4)
+		"rig_pack":
+			# 背包：圆筒主包＋顶盖＋侧袋。
+			draw_style_box(ExpeditionUI.style(tint, light, 14, 0), Rect2(56, 52, 88, 112))
+			draw_style_box(ExpeditionUI.style(light.lightened(0.12), tint, 8, 0), Rect2(48, 66, 20, 46))
+			draw_style_box(ExpeditionUI.style(light.lightened(0.12), tint, 8, 0), Rect2(132, 66, 20, 46))
+			draw_style_box(ExpeditionUI.style(tint.darkened(0.18), light, 9, 0), Rect2(64, 38, 72, 26))
+			for y in [96, 116, 136]:
+				draw_line(Vector2(64, y), Vector2(136, y), shadow, 3)
+		"rig_safe":
+			# 保险箱：矮铁箱＋锁扣＋提手。
+			draw_style_box(ExpeditionUI.style(tint.darkened(0.15), light, 10, 0), Rect2(44, 74, 112, 78))
+			draw_style_box(ExpeditionUI.style(tint.darkened(0.05), light, 7, 0), Rect2(56, 58, 88, 24))
+			draw_line(Vector2(92, 100), Vector2(108, 100), Color("#e8c987"), 8)
+			draw_line(Vector2(100, 100), Vector2(100, 114), Color("#e8c987"), 8)
+			for x in [56, 144]:
+				draw_circle(Vector2(x, 112), 5, shadow)
 		"exit", "rest", "start":
 			_poly([[100, 24], [128, 49], [157, 163], [43, 163], [72, 49]], Color("#32474c"))
 			_poly([[93, 70], [122, 90], [131, 156], [68, 156]], tint)
