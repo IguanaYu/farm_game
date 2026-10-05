@@ -223,6 +223,8 @@ func _command_table() -> Dictionary:
 		"craft.sell_instance": {"feature": OnlineProtocol.FEATURE_FARM_CRAFT, "run": _cmd_craft_sell_instance},
 		"inv.move_to_loadout": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_move_to_loadout},
 		"inv.move_to_warehouse": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_move_to_warehouse},
+		"inv.equip": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_equip},
+		"inv.unequip": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_unequip},
 		"inv.place_at": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_place_at},
 		"inv.rotate": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_rotate},
 		"inv.auto_tidy": {"feature": OnlineProtocol.FEATURE_FARM_INVENTORY, "run": _cmd_inv_auto_tidy},
@@ -420,6 +422,17 @@ func _cmd_inv_move_to_loadout(candidate: _Runtime, args: Dictionary, _now_s: int
 
 func _cmd_inv_move_to_warehouse(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
 	var result: Dictionary = candidate.inventory.move_to_warehouse(_arg_int(args, "instance_id"))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_inv_equip(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	## 三栏改版：装备槽操作（主/副武器、头盔、护甲）。
+	var result: Dictionary = candidate.inventory.equip(_arg_int(args, "instance_id"), str(args.get("slot", "")))
+	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
+
+
+func _cmd_inv_unequip(candidate: _Runtime, args: Dictionary, _now_s: int) -> Dictionary:
+	var result: Dictionary = candidate.inventory.unequip(_arg_int(args, "instance_id"))
 	return {"ok": bool(result.get("ok", false)), "reason": str(result.get("reason", "")), "result": result}
 
 

@@ -16,14 +16,24 @@ const CONTAINER_SIZE := {
 	"pack": Vector2i(4, 4),
 	"safe": Vector2i(1, 2),
 }
-## 容器内物品牌从第几回合加入抽牌堆（设计 §2"可用时机"）。
-const JOIN_ROUND := {"chest": 1, "pack": 2, "safe": 3}
+## 装备槽（三栏改版）：实例挂在 loadout["equipped"]，slot 字段指定槽位，不占容器格。
+## 顺序同时是人形尸体掉落装备的扫描顺序（主武→副武→头盔→护甲），与右栏行序一致。
+const EQUIP_SLOTS := ["main_weapon", "off_weapon", "helmet", "armor"]
+const SLOT_DISPLAY := {"main_weapon": "主武器", "off_weapon": "副武器", "helmet": "头盔", "armor": "护甲"}
+const SLOT_CATEGORY := {"main_weapon": "weapon", "off_weapon": "weapon", "helmet": "helmet", "armor": "armor"}
+## 全部随身位置（携带/结算/去重口径）：装备槽在前，三容器在后。
+const LOADOUT_SLOTS := ["equipped", "chest", "pack", "safe"]
+## 容器内物品牌从第几回合加入抽牌堆（三栏改版口径）：
+## 装备槽第 1 回合、胸挂第 2、背包第 3；保险箱永不入堆（纯保险仓，死亡保留、不给牌）。
+const JOIN_ROUND := {"equipped": 1, "chest": 2, "pack": 3}
+const DECK_CONTAINERS := ["equipped", "chest", "pack"]
 
 const FIRST_INSTANCE_ID := 1000
 
 const CATEGORY_DISPLAY := {
 	"weapon": "武器",
 	"armor": "防具",
+	"helmet": "帽子／头盔",
 	"tool": "工具／饰品",
 	"supply": "补给",
 	"material": "矿石／材料",
@@ -62,15 +72,25 @@ static func warehouse_capacity(expedition_block: Dictionary) -> int:
 	return int(WAREHOUSE_CAPACITY_BY_STORAGE.get(int(crafting.get("upgrade_levels", {}).get("storage", 1)), 40))
 
 
-## 物品归属的仓库分区：装备区（武器/防具/工具）与资源区（补给/材料/货物）。
+## 物品归属的仓库分区：装备区（武器/头盔/防具/工具）与资源区（补给/材料/货物）。
 static func warehouse_zone(def_id: String) -> String:
 	var def := ItemDefs.get_item(def_id)
 	var category := str(def.get("category", "material"))
-	return "equipment" if category in ["weapon", "armor", "tool"] else "resource"
+	return "equipment" if category in ["weapon", "armor", "helmet", "tool"] else "resource"
 
 
 static func is_container(container: String) -> bool:
-	return container == "warehouse" or JOIN_ROUND.has(container)
+	return container == "warehouse" or CONTAINERS.has(container) or container == "equipped"
+
+
+## 装备槽接受性：槽位类别与物品类别一致才可装备（武器进主/副武器槽等）。
+static func slot_accepts(slot: String, def_id: String) -> bool:
+	if not SLOT_CATEGORY.has(slot):
+		return false
+	var def := ItemDefs.get_item(def_id)
+	if def.is_empty():
+		return false
+	return str(def.get("category", "")) == SLOT_CATEGORY[slot]
 
 
 static func container_cells(container: String) -> int:

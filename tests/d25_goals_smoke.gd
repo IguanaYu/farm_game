@@ -11,6 +11,12 @@ func _initialize() -> void:
 	var inventory := InventoryGame.new()
 	inventory.bind(game.state["expedition"])
 	inventory.grant_basic_kit()
+	# 三栏改版：武器与草帽先上装备槽（保证第 1 回合有牌），其余基础件入胸挂。
+	for instance in inventory.warehouse_list().duplicate():
+		if str(instance["def_id"]) == "old_shortsword":
+			inventory.equip(int(instance["instance_id"]), "main_weapon")
+		elif str(instance["def_id"]) == "straw_hat":
+			inventory.equip(int(instance["instance_id"]), "helmet")
 	for instance in inventory.warehouse_list().duplicate():
 		inventory.move_to_loadout(int(instance["instance_id"]), "chest")
 	var crafting := CraftingGame.new()

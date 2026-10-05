@@ -8,7 +8,7 @@ var failed := false
 
 func _initialize() -> void:
 	# —— 内容预算核对（总计划 §10-2.8 ＋ 内容扩展轮）——
-	_check(ItemDefs.ITEMS.size() - 3 == 24, "预算：正式物品 24 种（20＋扩展轮 4）")
+	_check(ItemDefs.ITEMS.size() - 3 == 26, "预算：正式物品 26 种（20＋扩展轮 4＋三栏改版 2）")
 	_check(CardDefs.CARDS.size() == 19, "预算：牌效果模板 %d 个（17＋扩展轮 2）" % CardDefs.CARDS.size())
 	var enemy_count := 0
 	for def_id in CombatGame.ENEMIES:
@@ -166,6 +166,12 @@ func _fresh_game() -> FarmGame:
 	var inventory := InventoryGame.new()
 	inventory.bind(game.state["expedition"])
 	inventory.grant_basic_kit()
+	# 三栏改版：武器与草帽先上装备槽（保证第 1 回合有牌），其余基础件入胸挂。
+	for instance in inventory.warehouse_list().duplicate():
+		if str(instance["def_id"]) == "old_shortsword":
+			inventory.equip(int(instance["instance_id"]), "main_weapon")
+		elif str(instance["def_id"]) == "straw_hat":
+			inventory.equip(int(instance["instance_id"]), "helmet")
 	for instance in inventory.warehouse_list().duplicate():
 		inventory.move_to_loadout(int(instance["instance_id"]), "chest")
 	return game

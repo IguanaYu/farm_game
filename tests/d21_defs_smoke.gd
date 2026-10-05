@@ -13,7 +13,10 @@ func _initialize() -> void:
 	_check(ExpeditionBaseline.CONTAINER_SIZE["chest"] == Vector2i(3, 4), "基线：胸挂 3×4")
 	_check(ExpeditionBaseline.CONTAINER_SIZE["pack"] == Vector2i(4, 4), "基线：背包 4×4")
 	_check(ExpeditionBaseline.CONTAINER_SIZE["safe"] == Vector2i(1, 2), "基线：保险箱 1×2")
-	_check(ExpeditionBaseline.JOIN_ROUND["chest"] == 1 and ExpeditionBaseline.JOIN_ROUND["pack"] == 2 and ExpeditionBaseline.JOIN_ROUND["safe"] == 3, "基线：容器加入回合 1/2/3")
+	_check(ExpeditionBaseline.JOIN_ROUND["equipped"] == 1 and ExpeditionBaseline.JOIN_ROUND["chest"] == 2 and ExpeditionBaseline.JOIN_ROUND["pack"] == 3, "基线：装备槽/胸挂/背包加入回合 1/2/3")
+	_check(not ExpeditionBaseline.JOIN_ROUND.has("safe"), "基线：保险箱永不入牌堆（纯保险仓）")
+	_check(ExpeditionBaseline.EQUIP_SLOTS == ["main_weapon", "off_weapon", "helmet", "armor"], "基线：装备槽四槽及扫描顺序")
+	_check(ExpeditionBaseline.is_container("safe") and ExpeditionBaseline.is_container("equipped"), "基线：safe/equipped 仍是合法归属")
 	_check(ExpeditionBaseline.PROTO_RULES_VERSION.begins_with("d2-baseline-"), "基线：规则版本锚点存在")
 
 	var plain: Array = ExpeditionBaseline.cells_of(Vector2i(2, 2), Vector2i(0, 0), false)
@@ -29,7 +32,7 @@ func _initialize() -> void:
 
 	_check(ItemDefs.validate_definitions().is_empty(), "定义表：占格数=牌数、牌引用全部有效")
 	var kit: Array = ItemDefs.basic_kit_ids()
-	_check(kit.size() == 3, "基础套装：共 3 件")
+	_check(kit.size() == 4, "基础套装：共 4 件（三栏改版加草帽）")
 	var total_cards := 0
 	var total_cells := 0
 	for def_id in kit:
@@ -38,7 +41,7 @@ func _initialize() -> void:
 		_check(not bool(def["safe_allowed"]), "基础套装：%s 不可放保险箱" % def_id)
 		total_cards += def["cards"].size()
 		total_cells += def["size"].x * def["size"].y
-	_check(total_cards == 8 and total_cells == 8, "基础套装：合计 8 格／8 张牌")
+	_check(total_cards == 12 and total_cells == 12, "基础套装：合计 12 格／12 张牌（含草帽 4）")
 	var demo_count := 0
 	for def_id in ItemDefs.ITEMS:
 		if bool(ItemDefs.ITEMS[def_id]["demo"]):

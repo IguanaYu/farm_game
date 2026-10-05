@@ -23,6 +23,12 @@ const ITEMS := {
 		"safe_allowed": false, "cards": ["deep_breath", "observe"],
 		"desc": "基础装备：占 2 格，提供 调整呼吸／观察。不能出售或分享。",
 	},
+	"straw_hat": {
+		"name": "草帽", "category": "helmet", "size": Vector2i(2, 2), "quality": 1,
+		"base_value": 0, "sellable": false, "basic_kit": true, "demo": false,
+		"safe_allowed": false, "cards": ["brace", "cover", "deep_breath", "observe"],
+		"desc": "基础装备：装备在头盔槽，第 1 回合就提供 稳住／掩护／调整呼吸／观察。不能出售或分享。",
+	},
 	# —— 演示物品（2.1 设计 §5）：只在战备预览中使用，不写入正式库存。
 	"demo_iron_sword": {
 		"name": "铁剑（演示）", "category": "weapon", "size": Vector2i(1, 3), "quality": 2,
@@ -164,6 +170,12 @@ const ITEMS := {
 		"base_value": 100, "sellable": true, "basic_kit": false, "demo": false,
 		"safe_allowed": false, "cards": ["shield_up", "shield_up", "cover", "brace"],
 		"desc": "第三层品质防具：牌构成与加固盾相同，价值更高。",
+	},
+	"iron_helm": {
+		"name": "铁盔", "category": "helmet", "size": Vector2i(2, 2), "quality": 2,
+		"base_value": 110, "sellable": true, "basic_kit": false, "demo": false,
+		"safe_allowed": false, "cards": ["shield_up", "shield_up", "cover", "brace"],
+		"desc": "第三层头盔：装备在头盔槽即生效，第 1 回合提供 架盾×2／掩护／稳住。",
 	},
 	"star_bloom_seed": {
 		"name": "星瓣花种子", "category": "rare_seed", "size": Vector2i(1, 1), "quality": 1,

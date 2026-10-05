@@ -67,8 +67,14 @@ func _run() -> void:
 	if not _check(str(kit.get("t", "")) == "req_ok", "桥 A 基础套装"):
 		return
 	var warehouse: Array = kit["snapshot"]["farm"]["expedition"]["inventory"]["warehouse"]
+	# 三栏改版：武器/草帽上装备槽（第 1 回合有牌），其余入胸挂。
 	for instance in warehouse.duplicate():
-		await bridge.request("inv.move_to_loadout", {"instance_id": int(instance["instance_id"]), "container": "chest"})
+		if str(instance["def_id"]) == "old_shortsword":
+			await bridge.request("inv.equip", {"instance_id": int(instance["instance_id"]), "slot": "main_weapon"})
+		elif str(instance["def_id"]) == "straw_hat":
+			await bridge.request("inv.equip", {"instance_id": int(instance["instance_id"]), "slot": "helmet"})
+		else:
+			await bridge.request("inv.move_to_loadout", {"instance_id": int(instance["instance_id"]), "container": "chest"})
 
 	var run_events: Array = []
 	bridge.run_snapshot.connect(func(run, version): run_events.append([run, version]))
@@ -205,9 +211,15 @@ func _activate(bridge: OnlineFarmBridge, invite: String, nick: String) -> Dictio
 
 
 func _move_all_to_chest(bridge: OnlineFarmBridge, kit: Dictionary) -> void:
+	## 三栏改版：武器/草帽先上装备槽（第 1 回合有牌），其余入胸挂。
 	var warehouse: Array = kit.get("snapshot", {}).get("farm", {}).get("expedition", {}).get("inventory", {}).get("warehouse", [])
 	for instance in warehouse.duplicate():
-		await bridge.request("inv.move_to_loadout", {"instance_id": int(instance["instance_id"]), "container": "chest"})
+		if str(instance["def_id"]) == "old_shortsword":
+			await bridge.request("inv.equip", {"instance_id": int(instance["instance_id"]), "slot": "main_weapon"})
+		elif str(instance["def_id"]) == "straw_hat":
+			await bridge.request("inv.equip", {"instance_id": int(instance["instance_id"]), "slot": "helmet"})
+		else:
+			await bridge.request("inv.move_to_loadout", {"instance_id": int(instance["instance_id"]), "container": "chest"})
 
 
 func _wait_until(predicate: Callable, timeout_ms: int) -> bool:

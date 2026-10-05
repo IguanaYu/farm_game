@@ -132,8 +132,8 @@ const L3_BATTLE_POOL := ["radiant_cluster", "iron_ore", "glow_crystal", "small_p
 const L3_PUBLIC_POOL := ["radiant_cluster", "iron_ore", "bandage"]
 const L3_ELITE_POOL := ["crystal_blade", "glow_crystal", "antique_ornament", "rescue_kit"]
 const L3_GATHER_POOL := ["radiant_cluster", "radiant_cluster", "iron_ore"]
-const L3_CHEST_POOL := ["crystal_blade", "glow_crystal", "radiant_cluster", "antique_ornament"]
-const L3_GATE_REWARDS := ["star_bloom_seed", "crystal_blade"]
+const L3_CHEST_POOL := ["crystal_blade", "glow_crystal", "radiant_cluster", "antique_ornament", "iron_helm"]
+const L3_GATE_REWARDS := ["star_bloom_seed", "crystal_blade", "iron_helm"]
 ## 深层事件表（2.8 四个＋内容扩展轮两个）。
 const DEEP_EVENTS := {
 	"collapsed_shaft": {

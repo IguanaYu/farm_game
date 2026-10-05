@@ -5,10 +5,11 @@ extends RefCounted
 
 
 ## 返回 {entries: [{card_id, source_instance_id, source_seq, join_round}…], totals: {1: n, 2: n, 3: n}}
+## 三栏改版口径：装备槽牌第 1 回合、胸挂第 2、背包第 3；保险箱的牌永不入堆（纯保险仓）。
 static func build(inventory: InventoryGame) -> Dictionary:
 	var entries: Array = []
 	var totals := {1: 0, 2: 0, 3: 0}
-	for container in ExpeditionBaseline.CONTAINERS:
+	for container in ExpeditionBaseline.DECK_CONTAINERS:
 		var join_round: int = ExpeditionBaseline.JOIN_ROUND[container]
 		for instance in inventory.loadout_list(container):
 			if int(instance.get("uses_remaining", 1)) <= 0:
@@ -37,4 +38,6 @@ static func source_summary(inventory: InventoryGame, instance_id: int) -> String
 	var def := ItemDefs.get_item(str(instance["def_id"]))
 	var owner := str(instance.get("container", ""))
 	var display: String = ExpeditionBaseline.CONTAINER_DISPLAY.get(owner, owner)
+	if owner == "equipped":
+		display = ExpeditionBaseline.SLOT_DISPLAY.get(str(instance.get("slot", "")), "装备")
 	return "来源：%s（%s）" % [def["name"], display]

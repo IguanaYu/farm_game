@@ -11,12 +11,8 @@ static func build(run: Dictionary, node: Dictionary, encounter: String, rewards:
 	for i in range(enemies.size()):
 		var enemy := str(enemies[i])
 		var regions: Array = []
-		if enemy == "skeleton_scout":
-			regions = [_region("weapon", "武器", Vector2i(1, 3)), _region("armor", "护具", Vector2i(2, 2)), _region("pouch", "腰包", Vector2i(2, 2)), _region("pack", "背包", Vector2i(3, 4))]
-			_put(run, regions[0], str(CombatGame.ENEMIES[enemy]["equipment"]["weapon"]))
-			_put(run, regions[1], str(CombatGame.ENEMIES[enemy]["equipment"]["armor"]))
-			_put(run, regions[2], "bandage")
-			_put(run, regions[3], "copper_scrap")
+		if CombatGame.ENEMIES[enemy].has("equipment"):
+			regions = _humanoid_regions(run, enemy, rng)
 		else:
 			regions = [_region("body", "遗骸", Vector2i(3, 4) if enemies.size() == 1 and str(node.get("type", "")) == "gate" else Vector2i(2, 3))]
 		result.append({"id": "e%d" % (i + 1), "enemy_id": enemy, "name": str(CombatGame.ENEMIES[enemy]["name"]), "regions": regions})
@@ -37,25 +33,69 @@ static func build(run: Dictionary, node: Dictionary, encounter: String, rewards:
 	for i in range(drops.size()):
 		var source: Dictionary = result[i % result.size()]
 		var regions: Array = source["regions"]
-		var region: Dictionary = regions.back()
+		# 个人战利品进最后一个非“地上”区域（人形=背包，野兽=遗骸），“地上”永远垫底最后扫。
+		var region: Dictionary = _loot_target_region(regions)
 		var id := str(drops[i])
 		if not _put(run, region, id):
-			# 大型物品扩大遗骸区域，仍用真实格子检验，不丢弃已裁定掉落。
+			# 大型物品扩大目标区域，仍用真实格子检验，不丢弃已裁定掉落。
 			region["size"] = [4, 4]
 			if not _put(run, region, id):
 				var overflow := _region("cache_%d" % i, "遗骸物资", ItemDefs.get_item(id)["size"])
 				_put(run, overflow, id)
-				regions.append(overflow)
+				_insert_before_ground(regions, overflow)
 	# 掉落品质只在生成尸体时裁定一次；搜查、重开面板、拿取都保留同一实例。
 	for source in result:
 		for region in source["regions"]:
 			for item in region["items"]:
 				var def := ItemDefs.get_item(str(item["def_id"]))
-				if str(def.get("category", "")) in ["weapon", "armor", "tool"]:
+				if str(def.get("category", "")) in ["weapon", "armor", "helmet", "tool"]:
 					var roll := rng.randi_range(1, 100)
 					var tier := 1 if roll <= 50 else (2 if roll <= 77 else (3 if roll <= 91 else (4 if roll <= 98 else 5)))
 					item["quality"] = maxi(ItemDefs.quality_of(item), tier)
 	return result
+
+
+## 人形敌人尸体：顶部掉落装备槽（主武→副武→头盔→护甲；空槽/未掉落不建区，扫不到）
+## → 胸挂 → 背包 → 地上（默认空区，承接特殊情况物品；搜索接续顺序＝数组顺序，地上最后）。
+static func _humanoid_regions(run: Dictionary, enemy: String, rng: RandomNumberGenerator) -> Array:
+	var regions: Array = []
+	var equipment: Dictionary = CombatGame.ENEMIES[enemy].get("equipment", {})
+	var odds: Dictionary = CombatGame.ENEMIES[enemy].get("drop_odds", {})
+	var source_keys := {"main_weapon": "weapon", "off_weapon": "offhand", "helmet": "helmet", "armor": "armor"}
+	for slot in ExpeditionBaseline.EQUIP_SLOTS:
+		var def_id := str(equipment.get(str(source_keys[slot]), ""))
+		if def_id == "" or not ItemDefs.is_known_item(def_id):
+			continue
+		if rng.randf() > float(odds.get(str(source_keys[slot]), 1.0)):
+			continue
+		var region := _region(slot, ExpeditionBaseline.SLOT_DISPLAY[slot], ItemDefs.get_item(def_id)["size"])
+		if _put(run, region, def_id):
+			regions.append(region)
+	var chest := _region("chest", "胸挂", Vector2i(3, 4))
+	_put(run, chest, "bandage")
+	regions.append(chest)
+	var pack := _region("pack", "背包", Vector2i(3, 4))
+	_put(run, pack, "copper_scrap")
+	regions.append(pack)
+	regions.append(_region("ground", "地上", Vector2i(4, 1)))
+	return regions
+
+
+## 个人战利品的目标区域：最后一个非“地上”区域。
+static func _loot_target_region(regions: Array) -> Dictionary:
+	for i in range(regions.size() - 1, -1, -1):
+		if str(regions[i].get("id", "")) != "ground":
+			return regions[i]
+	return regions.back() if not regions.is_empty() else {}
+
+
+## 溢出区插在“地上”之前，保持地上永远最后扫的顺序语义。
+static func _insert_before_ground(regions: Array, region: Dictionary) -> void:
+	for i in range(regions.size() - 1, -1, -1):
+		if str(regions[i].get("id", "")) == "ground":
+			regions.insert(i, region)
+			return
+	regions.append(region)
 
 static func _region(id: String, title: String, size: Vector2i) -> Dictionary:
 	return {"id": id, "name": title, "size": [size.x, size.y], "items": [], "searched": []}

@@ -35,7 +35,7 @@ func _initialize() -> void:
 	var inv2 := InventoryGame.new()
 	inv2.bind(game2.state["expedition"])
 	inv2.grant_basic_kit()
-	inv2.move_to_loadout(_id(inv2, "old_shortsword"), "chest")
+	inv2.equip(_id(inv2, "old_shortsword"), "main_weapon")
 	var check := inv2.loadout_check()
 	_check(check["hard_blocks"].is_empty(), "套利：只带刀可以出发（不强制唯一配装）")
 	_check(_has_text(check["advises"], "防御"), "套利：无防御手段有明确建议")

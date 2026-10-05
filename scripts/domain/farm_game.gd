@@ -98,7 +98,7 @@ func _default_expedition(now: int) -> Dictionary:
 		"next_instance_id": ExpeditionBaseline.FIRST_INSTANCE_ID,
 		"inventory": {
 			"warehouse": [],
-			"loadout": {"chest": [], "pack": [], "safe": []},
+			"loadout": {"equipped": [], "chest": [], "pack": [], "safe": []},
 			"occupied_by_run": "",
 		},
 		"loadouts": [],
@@ -199,6 +199,9 @@ func load_state(saved: Dictionary) -> bool:
 	for container in ExpeditionBaseline.CONTAINERS:
 		if not loadout_state.get(container) is Array:
 			return false
+	# 三栏改版（2026-10-06）：旧档补装备槽空位，纯增量不动存档版本。
+	if not loadout_state.get("equipped") is Array:
+		loadout_state["equipped"] = []
 	for seed in source["seeds"]:
 		if not seed is Dictionary or not _is_number(seed.get("id")) or not PlantDefs.is_known_plant(str(seed.get("kind", ""))):
 			return false

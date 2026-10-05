@@ -348,13 +348,20 @@ func _prepare_loadout(client: WsClient, label: String) -> bool:
 	var warehouse: Array = kit["snapshot"]["farm"]["expedition"]["inventory"]["warehouse"]
 	var moved := 0
 	for instance in warehouse.duplicate():
-		var reply: Dictionary = client.request(
-			"inv.move_to_loadout", {"instance_id": int(instance["instance_id"]), "container": "chest"}, _rid(label)
-		)
+		# 三栏改版：武器/草帽上装备槽（第 1 回合有牌），其余入胸挂。
+		var op := "inv.move_to_loadout"
+		var extra := {"instance_id": int(instance["instance_id"]), "container": "chest"}
+		if str(instance["def_id"]) == "old_shortsword":
+			op = "inv.equip"
+			extra = {"instance_id": int(instance["instance_id"]), "slot": "main_weapon"}
+		elif str(instance["def_id"]) == "straw_hat":
+			op = "inv.equip"
+			extra = {"instance_id": int(instance["instance_id"]), "slot": "helmet"}
+		var reply: Dictionary = client.request(op, extra, _rid(label))
 		if str(reply.get("t", "")) == "req_ok":
 			moved += 1
-	if moved < 3:
-		_check(false, "%s 战备迁移不足（%d/3）" % [label, moved])
+	if moved < 4:
+		_check(false, "%s 战备迁移不足（%d/4）" % [label, moved])
 		return false
 	return true
 

@@ -16,10 +16,10 @@ func _initialize() -> void:
 
 	_check(str(game.state["expedition"]["player_id"]).begins_with("p-"), "新档：生成稳定玩家标识")
 	_check(int(game.state["expedition"]["next_instance_id"]) == ExpeditionBaseline.FIRST_INSTANCE_ID, "新档：实例 ID 发号器从 1000 起")
-	_check(inv.basic_kit_missing().size() == 3, "初始：缺全部 3 件基础装备")
+	_check(inv.basic_kit_missing().size() == 4, "初始：缺全部 4 件基础装备（含草帽）")
 
 	var grant := inv.grant_basic_kit()
-	_check(grant["granted"].size() == 3, "发放：首次全赠 3 件")
+	_check(grant["granted"].size() == 4, "发放：首次全赠 4 件")
 	_check(inv.basic_kit_missing().is_empty(), "发放：补齐后无缺失")
 	_check(inv.grant_basic_kit()["granted"].is_empty(), "发放：重复领取不增发")
 	_check(inv.add_instance("old_shortsword")["ok"] == false, "发放：基础部件每种只能一件")
@@ -35,15 +35,18 @@ func _initialize() -> void:
 	_check(inv.basic_kit_missing().is_empty(), "归属：活动配置中的基础装备也计入拥有")
 
 	var preview := inv.deck_preview()
-	_check(int(preview["totals"][1]) == 4, "牌组：首回合（胸挂）4 张")
-	_check(int(preview["totals"][2]) == 4, "牌组：第 2 回合（背包）4 张")
-	_check(int(preview["totals"][3]) == 0, "牌组：保险箱为空")
-	_check(int(preview["counts"][1]["slash"]) == 2, "牌组：重复牌按张计数（切击×2）")
+	_check(int(preview["totals"][1]) == 0, "牌组：未装备时第 1 回合无牌（装备槽口径）")
+	_check(int(preview["totals"][2]) == 4, "牌组：第 2 回合（胸挂）4 张")
+	_check(int(preview["totals"][3]) == 4, "牌组：第 3 回合（背包）4 张")
+	_check(int(preview["counts"][2]["slash"]) == 2, "牌组：重复牌按张计数（切击×2）")
+	_check(inv.equip(int(sword["instance_id"]), "main_weapon")["ok"], "装备：短刀上主武器槽")
+	_check(inv.equip(int(_find_by_def("straw_hat")["instance_id"]), "helmet")["ok"], "装备：草帽上头盔槽")
+	_check(int(inv.deck_preview()["totals"][1]) == 6, "装备：装备槽牌第 1 回合入堆（短刀 2＋草帽 4）")
 
 	_check(inv.move_to_warehouse(int(shield["instance_id"]))["ok"], "场景：木盾放回仓库")
 	_check(inv.move_to_loadout(int(shield["instance_id"]), "chest")["ok"], "场景：木盾改入胸挂")
 	preview = inv.deck_preview()
-	_check(int(preview["totals"][1]) == 8, "场景（设计 §9）：全部入胸挂后首回合 8 张")
+	_check(int(preview["totals"][2]) == 6, "场景（设计 §9）：容器内物品集中胸挂后第 2 回合 6 张（短刀在装备槽）")
 
 	var occupied_problems: Array = ExpeditionBaseline.layout_integrity(game.state["expedition"]["inventory"]["loadout"])
 	_check(occupied_problems.is_empty(), "布局：合法布局无越界／重叠")
@@ -86,7 +89,7 @@ func _initialize() -> void:
 	inv.strip_demo_instances()
 	for instance in inv.all_instances():
 		_check(not bool(instance.get("demo", false)), "演示：剔除后无演示实例残留")
-	_check(inv.owner_of(int(sword["instance_id"])) == "chest", "演示：剔除只影响演示实例")
+	_check(inv.owner_of(int(sword["instance_id"])) == "equipped", "演示：剔除只影响演示实例")
 
 	var save_path := "user://d21_inventory_save.json"
 	inv.strip_demo_instances()
@@ -95,8 +98,9 @@ func _initialize() -> void:
 	_check(reloaded.load_state(SaveStore.load_state(save_path)), "存档：战备状态可读回")
 	var reloaded_inv := InventoryGame.new()
 	reloaded_inv.bind(reloaded.state["expedition"])
-	_check(reloaded_inv.owner_of(int(sword["instance_id"])) == "chest", "存档：读回后布局与归属保持")
-	_check(int(reloaded_inv.deck_preview()["totals"][1]) == 8, "存档：读回后牌组预览一致")
+	_check(reloaded_inv.owner_of(int(sword["instance_id"])) == "equipped", "存档：读回后装备归属保持")
+	_check(str(reloaded_inv.equipped_in("helmet").get("def_id", "")) == "straw_hat", "存档：装备槽位随实例持久化")
+	_check(int(reloaded_inv.deck_preview()["totals"][1]) == 6, "存档：读回后牌组预览一致")
 	DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path))
 
 	if failed:

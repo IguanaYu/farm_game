@@ -41,7 +41,7 @@ static func depart_check(farm_game: FarmGame) -> String:
 		return "已有活动局"
 	var preview := inventory.deck_preview()
 	if int(preview["totals"][1]) <= 0:
-		return "首回合牌库为空，先在胸挂放入装备"
+		return "首回合牌库为空，先装备武器/头盔/护甲或把物品放进胸挂"
 	return ""
 
 
@@ -106,8 +106,10 @@ static func depart(farm_game: FarmGame, now: int) -> Dictionary:
 
 
 static func _snapshot_loadout(farm_game: FarmGame) -> Dictionary:
-	## 局内背包＝农场战备三容器深拷贝＋空仓库；实例 ID 与农场一致（结算时按 ID 对账）。
+	## 局内背包＝农场战备（装备槽+三容器）深拷贝＋空仓库；实例 ID 与农场一致（结算时按 ID 对账）。
 	var loadout: Dictionary = farm_game.state["expedition"]["inventory"]["loadout"]
+	if not loadout.get("equipped") is Array:
+		loadout["equipped"] = []
 	return {
 		"warehouse": [],
 		"loadout": loadout.duplicate(true),
@@ -119,7 +121,7 @@ static func _snapshot_loadout(farm_game: FarmGame) -> Dictionary:
 static func _carried_ids(farm_game: FarmGame) -> Array:
 	var ids: Array = []
 	var loadout: Dictionary = farm_game.state["expedition"]["inventory"]["loadout"]
-	for container in ExpeditionBaseline.CONTAINERS:
+	for container in ExpeditionBaseline.LOADOUT_SLOTS:
 		for instance in loadout.get(container, []):
 			ids.append(int(instance["instance_id"]))
 	return ids
@@ -810,6 +812,8 @@ func loot_action(member_key: String, kind: String, args: Dictionary) -> Dictiona
 				match operation:
 					"move": result = inventory.place_at(id, container, cell, rotated) if cell.x >= 0 else inventory.move_to_loadout(id, container)
 					"rotate": result = inventory.rotate_instance(id)
+					"equip": result = inventory.equip(id, str(args.get("slot", "")))
+					"unequip": result = inventory.unequip(id)
 					"drop":
 						result = inventory.discard_instance(id)
 						if bool(result["ok"]):
@@ -843,8 +847,8 @@ func _record_consumed() -> void:
 	var consumed: Dictionary = {}
 	for id in run["consumed"]:
 		consumed[int(id)] = true
-	for container in ExpeditionBaseline.CONTAINERS:
-		for instance in run["inventory"]["loadout"][container]:
+	for container in ExpeditionBaseline.LOADOUT_SLOTS:
+		for instance in run["inventory"]["loadout"].get(container, []):
 			if int(instance.get("uses_remaining", 1)) == 0 and int(instance["instance_id"]) > 0:
 				if not consumed.has(int(instance["instance_id"])):
 					consumed[int(instance["instance_id"])] = true
@@ -1081,8 +1085,8 @@ static func apply_settlement(farm_game: FarmGame, settlement: Dictionary) -> Dic
 		for entry in settlement.get(group, []):
 			var instance_id := int(entry.get("instance_id", 0))
 			var already := false
-			for container in ExpeditionBaseline.CONTAINERS:
-				for existing in expedition["inventory"]["loadout"][container]:
+			for container in ExpeditionBaseline.LOADOUT_SLOTS:
+				for existing in expedition["inventory"]["loadout"].get(container, []):
 					if int(existing["instance_id"]) == instance_id:
 						already = true
 				if already:
@@ -1115,8 +1119,8 @@ static func apply_settlement(farm_game: FarmGame, settlement: Dictionary) -> Dic
 	for entry in settlement.get("lost", []):
 		var instance_id := int(entry.get("instance_id", 0))
 		var target := {}
-		for container in ExpeditionBaseline.CONTAINERS:
-			for existing in expedition["inventory"]["loadout"][container]:
+		for container in ExpeditionBaseline.LOADOUT_SLOTS:
+			for existing in expedition["inventory"]["loadout"].get(container, []):
 				if int(existing["instance_id"]) == instance_id:
 					target = existing
 		if target.is_empty():
@@ -1125,21 +1129,21 @@ static func apply_settlement(farm_game: FarmGame, settlement: Dictionary) -> Dic
 					target = existing
 		if not target.is_empty():
 			expedition["inventory"]["warehouse"].erase(target)
-			for container in ExpeditionBaseline.CONTAINERS:
-				expedition["inventory"]["loadout"][container].erase(target)
+			for container in ExpeditionBaseline.LOADOUT_SLOTS:
+				expedition["inventory"]["loadout"].get(container, []).erase(target)
 			removed += 1
 	expedition["next_instance_id"] = maxi(int(expedition.get("next_instance_id", 1000)), int(settlement.get("next_instance_id", 0)))
 	## 已消耗的带入补给：实体不存在，农场侧移除（含数值型 consumed 记录）。
 	for entry in settlement.get("consumed", []):
 		var consumed_id := int(entry) if typeof(entry) != TYPE_DICTIONARY else int(entry.get("instance_id", 0))
 		var target := {}
-		for container in ExpeditionBaseline.CONTAINERS:
-			for existing in expedition["inventory"]["loadout"][container]:
+		for container in ExpeditionBaseline.LOADOUT_SLOTS:
+			for existing in expedition["inventory"]["loadout"].get(container, []):
 				if int(existing["instance_id"]) == consumed_id:
 					target = existing
 		if not target.is_empty():
-			for container in ExpeditionBaseline.CONTAINERS:
-				expedition["inventory"]["loadout"][container].erase(target)
+			for container in ExpeditionBaseline.LOADOUT_SLOTS:
+				expedition["inventory"]["loadout"].get(container, []).erase(target)
 			expedition["inventory"]["warehouse"].erase(target)
 			removed += 1
 	## 稀有种子进入原种子体系（2.5 设计 §6）：物品实例转为农场种子（保留实例上的词条）。
@@ -1183,7 +1187,7 @@ static func apply_settlement(farm_game: FarmGame, settlement: Dictionary) -> Dic
 
 static func _carried_ids_of(expedition: Dictionary) -> Array:
 	var ids: Array = []
-	for container in ExpeditionBaseline.CONTAINERS:
+	for container in ExpeditionBaseline.LOADOUT_SLOTS:
 		for instance in expedition["inventory"]["loadout"].get(container, []):
 			ids.append(int(instance["instance_id"]))
 	return ids

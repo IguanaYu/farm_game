@@ -115,7 +115,8 @@ func _initialize() -> void:
 
 	# —— 出发装备不重复发放：返还的是原实例 ——
 	var chest_after: Array = game.state["expedition"]["inventory"]["loadout"]["chest"]
-	_check(chest_after.size() == 3, "返还：带入装备仍在原容器（释放占用而非再发一份）")
+	_check(chest_after.size() == 2, "返还：带入物品仍在原容器（释放占用而非再发一份）")
+	_check(game.state["expedition"]["inventory"]["loadout"].get("equipped", []).size() == 2, "返还：装备槽配装随撤离延续")
 
 	_finish()
 
@@ -127,6 +128,11 @@ func _fresh_game() -> FarmGame:
 	var inventory := InventoryGame.new()
 	inventory.bind(game.state["expedition"])
 	inventory.grant_basic_kit()
+	# 三栏改版口径：武器/草帽上装备槽（第 1 回合牌），其余基础件入胸挂。
+	for def_id in ["old_shortsword", "straw_hat"]:
+		for instance in inventory.warehouse_list().duplicate():
+			if str(instance["def_id"]) == def_id:
+				inventory.equip(int(instance["instance_id"]), "main_weapon" if def_id == "old_shortsword" else "helmet")
 	for instance in inventory.warehouse_list().duplicate():
 		inventory.move_to_loadout(int(instance["instance_id"]), "chest")
 	return game

@@ -13,16 +13,17 @@ func _initialize() -> void:
 	inv = InventoryGame.new()
 	inv.bind(game.state["expedition"])
 	inv.grant_basic_kit()
-	# 胸挂：短刀＋工具；背包：木盾＋1 瓶药水（设计 §9 的变体）。
-	for def_id in ["old_shortsword", "pack_tools"]:
-		inv.move_to_loadout(_id_of(def_id), "chest")
+	# 三栏改版口径：装备槽=短刀＋草帽（第 1 回合）；胸挂=工具（第 2 回合）；背包=木盾＋1 瓶药水（第 3 回合）。
+	inv.equip(_id_of("old_shortsword"), "main_weapon")
+	inv.equip(_id_of("straw_hat"), "helmet")
+	inv.move_to_loadout(_id_of("pack_tools"), "chest")
 	inv.move_to_loadout(_id_of("wooden_shield"), "pack")
 	var potion := inv.add_instance("small_potion", "test")
 	inv.move_to_loadout(int(potion["instance_id"]), "pack")
 	var potion_id := int(potion["instance_id"])
 
 	var build := DeckBuilder.build(inv)
-	_check(int(build["totals"][1]) == 4 and int(build["totals"][2]) == 5, "布局：首回合 4 张（刀＋工具），第 2 回合 5 张（盾 4＋药 1）")
+	_check(int(build["totals"][1]) == 6 and int(build["totals"][2]) == 2 and int(build["totals"][3]) == 5, "布局：第 1 回合 6 张（装备），第 2 回合 2 张（工具），第 3 回合 5 张（盾 4＋药 1）")
 
 	# —— 第一场：固定牌序注入，验证容器加入时点 ——
 	var fixed: Array = []
@@ -32,15 +33,21 @@ func _initialize() -> void:
 	var combat := CombatGame.create([_player()], "tutorial", 41, inv, fixed)
 	combat.start()
 	var player: Dictionary = combat.state["players"]["p1"]
-	_check(player["hand"].size() == 4, "第 1 回合抽满首回合牌库（4 张，抽不满 5 是合法状态）")
+	_check(player["hand"].size() == 5, "第 1 回合抽 5 张（装备槽 6 张池）")
 	for card in player["hand"]:
-		_check(_in_chest(int(card["source_instance_id"])), "首日手牌全部来自胸挂（%s）" % _source_name(int(card["source_instance_id"])))
+		_check(_in_equipped(int(card["source_instance_id"])), "首日手牌全部来自装备槽（%s）" % _source_name(int(card["source_instance_id"])))
+	combat.end_turn("p1")
+	var saw_chest := false
+	for card in player["hand"]:
+		if _in_container(int(card["source_instance_id"]), "chest"):
+			saw_chest = true
+	_check(saw_chest, "第 2 回合：手牌里出现胸挂来源牌（工具）")
 	combat.end_turn("p1")
 	var saw_pack := false
 	for card in player["hand"]:
-		if not _in_chest(int(card["source_instance_id"])):
+		if _in_container(int(card["source_instance_id"]), "pack"):
 			saw_pack = true
-	_check(saw_pack, "第 2 回合：手牌里出现背包来源牌（盾/药水）")
+	_check(saw_pack, "第 3 回合：手牌里出现背包来源牌（盾）")
 
 	# —— 药水：使用一次→实体耗尽→关联牌全部清除 ——
 	player["hand"].append({"uid": 9001, "card_id": "drink_potion", "source_instance_id": potion_id, "source_seq": 0, "owner": "p1"})
@@ -87,7 +94,7 @@ func _initialize() -> void:
 	second.start()
 	var p2: Dictionary = second.state["players"]["p1"]
 	_check(int(p2["hp"]) == carried, "第二场：生命延续（%d）" % carried)
-	_check(int(p2["block"]) == 0 and p2["hand"].size() == 4, "第二场：格挡清零、手牌按新布局重建（药水已耗尽不生成）")
+	_check(int(p2["block"]) == 0 and p2["hand"].size() == 5, "第二场：格挡清零、手牌按新布局重建（药水已耗尽不生成）")
 	_check(int(second.state["enemies"][0]["hp"]) == 18, "第二场：敌人重新生成")
 
 	_finish()
@@ -118,9 +125,16 @@ func _id_of(def_id: String) -> int:
 	return -1
 
 
-func _in_chest(instance_id: int) -> bool:
+func _in_equipped(instance_id: int) -> bool:
 	var instance := inv.find_instance(instance_id)
-	return str(instance.get("container", "")) == "chest" or instance_id == 0
+	return str(instance.get("container", "")) == "equipped" or instance_id == 0
+
+
+func _in_container(instance_id: int, container: String) -> bool:
+	if instance_id == 0:
+		return true
+	var instance := inv.find_instance(instance_id)
+	return str(instance.get("container", "")) == container
 
 
 func _source_name(instance_id: int) -> String:

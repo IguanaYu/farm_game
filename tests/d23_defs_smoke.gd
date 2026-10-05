@@ -14,7 +14,7 @@ func _initialize() -> void:
 			demo_count += 1
 		else:
 			real_count += 1
-	_check(real_count == 24, "物品池：正式物品 24 种（2.3 的 15＋2.5 的 4＋2.8 的 1＋扩展轮 4）")
+	_check(real_count == 26, "物品池：正式物品 26 种（2.3 的 15＋2.5 的 4＋2.8 的 1＋扩展轮 4＋三栏改版 2）")
 	_check(demo_count == 3, "物品池：演示物品 3 种隔离")
 
 	var cargo_value := 0
@@ -45,7 +45,7 @@ func _initialize() -> void:
 	for instance in inv.warehouse_list().duplicate():
 		inv.move_to_loadout(int(instance["instance_id"]), "chest")
 	var build := DeckBuilder.build(inv)
-	_check(int(build["totals"][1]) == 8 and int(build["totals"][2]) == 0, "牌组：基础套装入胸挂 → 首回合 8 张")
+	_check(int(build["totals"][1]) == 0 and int(build["totals"][2]) == 12, "牌组：基础套装入胸挂 → 第 2 回合 12 张（装备槽空则第 1 回合无牌）")
 	for instance in inv.loadout_list("chest").duplicate():
 		if str(instance["def_id"]) == "wooden_shield":
 			inv.move_to_warehouse(int(instance["instance_id"]))
@@ -54,12 +54,12 @@ func _initialize() -> void:
 	for instance in inv.loadout_list("pack"):
 		shield_id = int(instance["instance_id"])
 	build = DeckBuilder.build(inv)
-	_check(int(build["totals"][1]) == 4 and int(build["totals"][2]) == 4, "牌组：木盾挪背包 → 1/2 回合各 4 张（设计 §9 场景）")
+	_check(int(build["totals"][2]) == 8 and int(build["totals"][3]) == 4, "牌组：木盾挪背包 → 2/3 回合各 8/4 张（设计 §9 场景）")
 	var join_of_shield := 0
 	for entry in build["entries"]:
 		if int(entry["source_instance_id"]) == shield_id:
 			join_of_shield = int(entry["join_round"])
-	_check(join_of_shield == 2, "牌组：来源牌记录加入回合")
+	_check(join_of_shield == 3, "牌组：来源牌记录加入回合")
 
 	var potion := inv.add_instance("small_potion", "test")
 	inv.move_to_loadout(int(potion["instance_id"]), "pack")

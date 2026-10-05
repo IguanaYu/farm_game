@@ -1,7 +1,8 @@
 class_name InventoryGame
 extends RefCounted
-## 物品实例、归属与占用规则（2.1 设计 D2.1-02/05/06）。
-## 归属唯一：任何时刻一个实例只出现在 warehouse／chest／pack／safe 之一（owner_of 为断言口径）。
+## 物品实例、归属与占用规则（2.1 设计 D2.1-02/05/06；三栏改版加装备槽）。
+## 归属唯一：任何时刻一个实例只出现在 warehouse／equipped／chest／pack／safe 之一
+## （owner_of 为断言口径）；装备槽实例带 slot 字段、不占容器格。
 ## 演示实例（demo=true）只在内存，保存前由 strip_demo_instances 清除。
 
 
@@ -34,7 +35,7 @@ func loadout_list(container: String) -> Array:
 func all_instances() -> Array:
 	var result: Array = []
 	result.append_array(_inventory().get("warehouse", []))
-	for container in ExpeditionBaseline.CONTAINERS:
+	for container in ExpeditionBaseline.LOADOUT_SLOTS:
 		result.append_array(_inventory()["loadout"].get(container, []))
 	return result
 
@@ -113,7 +114,9 @@ func move_to_loadout(instance_id: int, container: String) -> Dictionary:
 		return _fail("物品不存在")
 	if is_run_occupied():
 		return _fail("物品正在探险中，不能调整战备")
-	if not ExpeditionBaseline.JOIN_ROUND.has(container):
+	if container == "equipped":
+		return _fail("装备槽请用装备操作（选择槽位），不能当容器放置")
+	if not ExpeditionBaseline.CONTAINER_SIZE.has(container):
 		return _fail("未知容器：%s" % container)
 	var def := ItemDefs.get_item(str(instance["def_id"]))
 	if container == "safe" and not bool(def.get("safe_allowed", false)):
@@ -141,8 +144,67 @@ func move_to_warehouse(instance_id: int) -> Dictionary:
 	instance["container"] = "warehouse"
 	instance["cell"] = [0, 0]
 	instance["rotated"] = false
+	instance.erase("slot")
 	_inventory()["warehouse"].append(instance)
 	return {"ok": true, "reason": ""}
+
+
+## —— 装备槽（三栏改版：主/副武器、头盔、护甲）———————————————————————
+
+
+func equipped_list() -> Array:
+	return _inventory()["loadout"].get("equipped", [])
+
+
+func equipped_in(slot: String) -> Dictionary:
+	for instance in equipped_list():
+		if str(instance.get("slot", "")) == slot:
+			return instance
+	return {}
+
+
+func slot_accepts(slot: String, def_id: String) -> bool:
+	return ExpeditionBaseline.slot_accepts(slot, def_id)
+
+
+## 装备到槽位：槽位已占用时旧装备自动回仓库；装备不占容器格，物品牌第 1 回合入堆。
+func equip(instance_id: int, slot: String) -> Dictionary:
+	var instance := find_instance(instance_id)
+	if instance.is_empty():
+		return _fail("物品不存在")
+	if is_run_occupied():
+		return _fail("物品正在探险中，不能调整战备")
+	if not ExpeditionBaseline.EQUIP_SLOTS.has(slot):
+		return _fail("未知装备槽：%s" % slot)
+	var def := ItemDefs.get_item(str(instance["def_id"]))
+	if not ExpeditionBaseline.slot_accepts(slot, str(instance["def_id"])):
+		return _fail("%s 不是%s槽能装备的物品" % [str(def.get("name", "?")), ExpeditionBaseline.SLOT_DISPLAY[slot]])
+	var current := equipped_in(slot)
+	if not current.is_empty():
+		if int(current["instance_id"]) == instance_id:
+			return _fail("这件物品已经装备在这个槽位")
+		var swap := move_to_warehouse(int(current["instance_id"]))
+		if not swap["ok"]:
+			return swap
+	_remove_from_current(instance)
+	instance["container"] = "equipped"
+	instance["slot"] = slot
+	instance["cell"] = [0, 0]
+	instance["rotated"] = false
+	var equipped: Array = (_inventory()["loadout"] as Dictionary).get("equipped", [])
+	equipped.append(instance)
+	(_inventory()["loadout"] as Dictionary)["equipped"] = equipped
+	return {"ok": true, "reason": "", "slot": slot}
+
+
+## 卸下装备：回到仓库（不再占槽；牌堆口径随之变化）。
+func unequip(instance_id: int) -> Dictionary:
+	var instance := find_instance(instance_id)
+	if instance.is_empty():
+		return _fail("物品不存在")
+	if str(instance.get("container", "")) != "equipped":
+		return _fail("这件物品不在装备槽里")
+	return move_to_warehouse(instance_id)
 
 
 ## —— 格子交互（2.3 D2.3-02/03）———————————————————————————————
@@ -155,7 +217,9 @@ func place_at(instance_id: int, container: String, cell: Vector2i, rotated: bool
 		return _fail("物品不存在")
 	if is_run_occupied():
 		return _fail("物品正在探险中，不能调整战备")
-	if not ExpeditionBaseline.JOIN_ROUND.has(container):
+	if container == "equipped":
+		return _fail("装备槽请用装备操作（选择槽位），不能当容器放置")
+	if not ExpeditionBaseline.CONTAINER_SIZE.has(container):
 		return _fail("未知容器：%s" % container)
 	var def := ItemDefs.get_item(str(instance["def_id"]))
 	if container == "safe" and not bool(def.get("safe_allowed", false)):
@@ -181,8 +245,8 @@ func rotate_instance(instance_id: int) -> Dictionary:
 	var instance := find_instance(instance_id)
 	if instance.is_empty():
 		return _fail("物品不存在")
-	if not ExpeditionBaseline.JOIN_ROUND.has(str(instance.get("container", ""))):
-		return _fail("仓库中的物品放入容器时再旋转")
+	if not ExpeditionBaseline.CONTAINER_SIZE.has(str(instance.get("container", ""))):
+		return _fail("仓库或装备槽中的物品放入容器时再旋转")
 	if is_run_occupied():
 		return _fail("物品正在探险中，不能调整战备")
 	var cell := Vector2i(int(instance["cell"][0]), int(instance["cell"][1]))
@@ -284,9 +348,9 @@ func claim_loot_instance(source: Dictionary, container: String, cell := Vector2i
 	return {"ok": true, "instance_id": id}
 
 func clear_loadout() -> Dictionary:
-	## 清空配置：把三容器内全部物品放回仓库（保留保险箱保护选择信息随实例一起离开）。
+	## 清空配置：卸下全部装备、把三容器内全部物品放回仓库（保留保险箱保护选择信息随实例一起离开）。
 	var moved := 0
-	for container in ExpeditionBaseline.CONTAINERS:
+	for container in ExpeditionBaseline.LOADOUT_SLOTS:
 		for instance in _inventory()["loadout"].get(container, []).duplicate():
 			if move_to_warehouse(int(instance["instance_id"]))["ok"]:
 				moved += 1
@@ -359,9 +423,10 @@ func is_run_occupied() -> bool:
 
 func deck_preview() -> Dictionary:
 	## 按加入回合分组的牌实例快照；同时给出每回合的叠卡计数。
+	## 三栏改版口径：装备槽第 1 回合、胸挂第 2、背包第 3；保险箱的牌永不入堆。
 	var rounds := {1: [], 2: [], 3: []}
 	var counts := {1: {}, 2: {}, 3: {}}
-	for container in ExpeditionBaseline.CONTAINERS:
+	for container in ExpeditionBaseline.DECK_CONTAINERS:
 		var join_round: int = ExpeditionBaseline.JOIN_ROUND[container]
 		for instance in _inventory()["loadout"].get(container, []):
 			var def := ItemDefs.get_item(str(instance["def_id"]))
@@ -388,7 +453,7 @@ func loadout_check() -> Dictionary:
 	hard_blocks.append_array(ExpeditionBaseline.layout_integrity(_inventory()["loadout"], expedition))
 	var preview := deck_preview()
 	if preview["rounds"][1].is_empty():
-		hard_blocks.append("首回合牌库为空：把装备放进胸挂（背包牌第 2 回合、保险箱牌第 3 回合才加入）")
+		hard_blocks.append("首回合牌库为空：先装备武器/头盔/护甲，或把物品放进胸挂（背包牌第 2 回合才加入；保险箱的牌不进牌堆）")
 	var has_attack := false
 	var defense_cards := 0
 	for entry in preview["rounds"][1]:
@@ -403,7 +468,7 @@ func loadout_check() -> Dictionary:
 	if defense_cards < 2:
 		advises.append("缺少可重复使用的防御手段（格挡牌少于 2 张）")
 	if preview["rounds"][1].size() in range(1, 5):
-		advises.append("首回合牌只有 %d 张，第一回合抽不满 5 张（背包／保险箱的牌第 2／3 回合才加入）" % int(preview["totals"][1]))
+		advises.append("首回合牌只有 %d 张，第一回合抽不满 5 张（装备与胸挂的牌第 1/2 回合加入，背包第 3 回合）" % int(preview["totals"][1]))
 	return {"hard_blocks": hard_blocks, "advises": advises}
 
 
@@ -411,9 +476,9 @@ func loadout_check() -> Dictionary:
 
 
 func carry_sell_value() -> int:
-	## 携带可售价值：只算可出售物品（基础装备不计）。
+	## 携带可售价值：装备槽与三容器都算随身（只算可出售物品，基础装备不计）。
 	var total := 0
-	for container in ExpeditionBaseline.CONTAINERS:
+	for container in ExpeditionBaseline.LOADOUT_SLOTS:
 		for instance in _inventory()["loadout"].get(container, []):
 			var def := ItemDefs.get_item(str(instance["def_id"]))
 			if bool(def.get("sellable", false)):
@@ -430,7 +495,7 @@ func protected_value() -> int:
 
 
 func has_basic_in_loadout() -> bool:
-	for container in ExpeditionBaseline.CONTAINERS:
+	for container in ExpeditionBaseline.LOADOUT_SLOTS:
 		for instance in _inventory()["loadout"].get(container, []):
 			if ItemDefs.is_basic(str(instance["def_id"])):
 				return true
@@ -455,8 +520,9 @@ func inject_demo_items() -> Dictionary:
 
 func strip_demo_instances() -> void:
 	_inventory()["warehouse"] = _inventory()["warehouse"].filter(func(instance): return not bool(instance.get("demo", false)))
-	for container in ExpeditionBaseline.CONTAINERS:
-		_inventory()["loadout"][container] = _inventory()["loadout"][container].filter(func(instance): return not bool(instance.get("demo", false)))
+	for container in ExpeditionBaseline.LOADOUT_SLOTS:
+		var kept: Array = _inventory()["loadout"].get(container, []).filter(func(instance): return not bool(instance.get("demo", false)))
+		(_inventory()["loadout"] as Dictionary)[container] = kept
 
 
 ## —— 消耗品实体（2.2 起用；2.3 扩展"耗尽清理关联牌"）————————————————

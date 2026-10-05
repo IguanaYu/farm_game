@@ -7,6 +7,9 @@ extends RefCounted
 
 
 const ENEMIES := {
+	# 人形敌人带 equipment：尸体顶部生成掉落装备槽区（主武→副武→头盔→护甲）。
+	# equipment 键：weapon→主武器槽、offhand→副武器槽、helmet→头盔槽、armor→护甲槽。
+	# 可选 drop_odds：按键独立掷掉落概率（默认 1.0 必掉；当前内容先必掉，概率留接口）。
 	"skeleton_scout": {
 		"name": "骷髅巡逻兵", "hp": 26,
 		"equipment": {"weapon": "copper_shortsword", "armor": "leather_bracer"},

@@ -66,6 +66,12 @@ func _run() -> void:
 		var inv := InventoryGame.new()
 		inv.bind(seed_farm.state["expedition"])
 		inv.grant_basic_kit()
+		# 三栏改版：武器与草帽先上装备槽（保证第 1 回合有牌），其余基础件入胸挂。
+		for instance in seed_farm.state["expedition"]["inventory"]["warehouse"].duplicate():
+			if str(instance["def_id"]) == "old_shortsword":
+				inv.equip(int(instance["instance_id"]), "main_weapon")
+			elif str(instance["def_id"]) == "straw_hat":
+				inv.equip(int(instance["instance_id"]), "helmet")
 		for instance in seed_farm.state["expedition"]["inventory"]["warehouse"].duplicate():
 			inv.move_to_loadout(int(instance["instance_id"]), "chest")
 		var created: Dictionary = auth.activate(str(pair[1]), str(pair[2]), JSON.stringify(seed_farm.state))
