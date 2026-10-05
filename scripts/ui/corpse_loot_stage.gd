@@ -34,7 +34,7 @@ func display(run: Dictionary, sources: Array) -> void:
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(titles)
 	titles.add_child(ExpeditionUI.label("战斗胜利 · 清理战场", 32, ExpeditionUI.PAPER))
-	titles.add_child(ExpeditionUI.label("点击倒下的敌人，搜索它身上的物品", 18, ExpeditionUI.MUTED))
+	titles.add_child(ExpeditionUI.label("点击倒下的敌人，自动按顺序搜索它身上的物品", 18, ExpeditionUI.MUTED))
 	var menu := ExpeditionUI.button("☰ 菜单")
 	menu.pressed.connect(func() -> void: menu_requested.emit())
 	header.add_child(menu)

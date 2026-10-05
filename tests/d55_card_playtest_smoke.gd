@@ -110,11 +110,13 @@ func _run() -> void:
 	await _click(playtest.loot.battlefield.find_child("Corpse_e1", true, false) as Control)
 	await create_timer(float(playtest.expedition.visible_run().get("loot_searches", {}).get("p1", {}).get("remaining", 0)) / 1000.0 + 0.25).timeout
 	_check(not playtest.loot.scene_mode and not playtest.loot.entries.is_empty(), "actual corpse click searches and reveals weapon")
+	_check(str(playtest.expedition.run["loot_searches"].get("p1", {}).get("region", "")) == "armor", "finished weapon auto chains into the next package")
 	var instance: Dictionary = playtest.expedition.run["resolved"]["r3c1"]["corpses"][0]["regions"][0]["items"][0]
 	var id := int(instance["instance_id"])
 	_check(playtest._loot_action("claim_corpse", {"instance_id": id, "container": "pack"})["ok"], "revealed equipment can be packed")
 	_check(playtest.expedition.run_inventory().find_instance(id)["container"] == "pack", "original loot instance carried")
 	await _shot("04_search_and_pack")
+	playtest._loot_action("search_cancel", {})
 	playtest.loot._confirm_leave()
 	_check(playtest.loot.modal.visible, "unsearched bags still prompt before continuing")
 	await _frames()

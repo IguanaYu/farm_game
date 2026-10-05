@@ -99,6 +99,7 @@ func _domain() -> void:
 	clock_ms += ItemDefs.search_ms(ItemDefs.quality_of(weapon)) + 1
 	_check(game.loot_action("p1", "search_step", {})["ok"], "reveal weapon")
 	_check(bool(weapon["revealed"]) and resolved["corpses"][0]["regions"][0]["searched"].size() == 3, "multi cell weapon revealed together")
+	_check(str(game.run["loot_searches"].get("p1", {}).get("region", "")) == "armor", "finished region auto chains to the next package")
 	_check(game.visible_run()["resolved"]["r3c1"]["corpses"][0]["regions"][0]["items"].size() == 1, "revealed item shared")
 	var inv := game.member_inventory("p1")
 	for y in range(4):
@@ -145,12 +146,14 @@ func _domain() -> void:
 	_check(visible_shield["unknown"][0].size() == 2 and visible_shield["unknown"][0].has("cell") and visible_shield["unknown"][0].has("size"), "unknown outline exposes geometry only")
 	_check(not shield_region.has("unknown"), "visible outline does not mutate authoritative contents")
 	_check(shield_game.loot_action("p1", "search_start", shield_source)["ok"], "start whole shield search")
+	var gate_cells := int(shield_region["size"][0]) * int(shield_region["size"][1])
+	_check(shield_region["searched"].size() == gate_cells - 4, "empty cells resolve instantly without a search timer")
 	_check(shield_game.visible_run()["loot_searches"]["p1"]["footprint"]["size"] == [2, 2], "active search broadcasts whole 2x2 footprint")
 	_check(not shield_game.loot_action("p1", "claim_corpse", {"instance_id": shield_source["item"]["instance_id"]})["ok"], "outline cannot be claimed before reveal")
 	clock_ms += ItemDefs.search_ms(ItemDefs.quality_of(shield_source["item"])) + 1
 	_check(shield_game.loot_action("p1", "search_step", {})["ok"], "one timer reveals the shield")
 	visible_shield = CorpseLootGame.region_of(shield_game.visible_run()["resolved"]["r8c0"], shield_source["source"], shield_source["region"])
-	_check(shield_region["searched"].size() == 4 and visible_shield["unknown"].is_empty() and visible_shield["items"].size() == 1, "four shield cells become one revealed item together")
+	_check(shield_region["searched"].size() == gate_cells and visible_shield["unknown"].is_empty() and visible_shield["items"].size() == 1, "one timer reveals the shield and empties stay resolved")
 	# 旋转后的长条物品也按实际朝向公开几何。
 	var rotated_game := _fresh()
 	var rotated_region: Dictionary = _resolved(rotated_game)["corpses"][0]["regions"][0]
@@ -159,15 +162,17 @@ func _domain() -> void:
 	rotated_game.loot_action("p1", "search_start", {"source": "e1", "region": "weapon"})
 	_check(rotated_game.visible_run()["loot_searches"]["p1"]["footprint"]["size"] == [3, 1], "rotated source searches its actual 3x1 footprint")
 	# 真实局档恢复清除未完成搜索，保留固定掉落与已揭晓/已取走标记。
-	game.loot_action("p1", "search_start", {"source": "e1", "region": "armor"})
+	var recovery_game := _fresh()
+	recovery_game.search_clock = func() -> int: return clock_ms
+	_check(recovery_game.loot_action("p1", "search_start", {"source": "e1", "region": "armor"})["ok"] and not recovery_game.run.get("loot_searches", {}).get("p1", {}).is_empty(), "fresh fixture holds an unfinished session")
 	var recovery_id := "d54-corpse-recovery-%d" % Time.get_ticks_usec()
-	var saved := game.run.duplicate(true)
+	var saved := recovery_game.run.duplicate(true)
 	saved["run_id"] = recovery_id
-	game.game.state["expedition"]["active_run_ref"] = recovery_id
+	recovery_game.game.state["expedition"]["active_run_ref"] = recovery_id
 	_check(ExpeditionStore.save_run(recovery_id, saved), "save isolated recovery fixture")
-	var resumed: Dictionary = ExpeditionGame.resume(game.game)
-	_check(resumed["ok"] and resumed["run"].get("loot_searches", {}).is_empty(), "resume interrupts unfinished search")
-	_check(_resolved(resumed["game"])["corpses"] == JSON.parse_string(JSON.stringify(_resolved(game)["corpses"])), "resume does not reroll or duplicate loot")
+	var resumed: Dictionary = ExpeditionGame.resume(recovery_game.game)
+	_check(resumed["ok"] and resumed["run"].get("loot_searches").is_empty(), "resume interrupts unfinished search")
+	_check(_resolved(resumed["game"])["corpses"] == JSON.parse_string(JSON.stringify(_resolved(recovery_game)["corpses"])), "resume does not reroll or duplicate loot")
 	DirAccess.remove_absolute(ExpeditionStore.run_path(recovery_id))
 	# 本地主机广播与线上裁定入口共用同一权威规则。
 	var host := SessionHost.new()

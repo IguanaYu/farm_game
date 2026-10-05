@@ -298,7 +298,7 @@ func display(snapshot: Dictionary, member_key := "p1", serial := -1) -> void:
 	summary_label.text = "生命 %d / %d     深度 %02d\n携带售价 %d 金币  ·  已保护 %d 件" % [int(player.get("hp", 0)), int(player.get("max_hp", 40)), int(run["current"]["row"]), inventory.carry_sell_value(), inventory.loadout_list("safe").size()]
 	rule_label.text = ("个人战利品任选一件，装入成功才锁定选择。" if _choose_one() else "这里的个人物资都可领取，能带多少取决于你的空间。") + ("公共物资全队一份，先领取者获得。" if bool(run.get("coop", false)) else "公共物资不占个人选择次数。")
 	if searchable:
-		rule_label.text = "所有包裹同时展开，点击各区域开始搜索。品质越高，搜索越久；已发现的物品可直接装包。" + ("尸体物资全队一份。" if bool(run.get("coop", false)) else "")
+		rule_label.text = "打开尸体后自动按顺序搜索全部区域；空格无需搜索，品质越高搜索越久。已发现的物品可直接装包。" + ("尸体物资全队一份。" if bool(run.get("coop", false)) else "")
 	if get_viewport().gui_is_dragging():
 		render_after_drag = true
 		return
@@ -908,8 +908,11 @@ func _process(_delta: float) -> void:
 		return
 	var session: Dictionary = run.get("loot_searches", {}).get(player_key, {})
 	if not session.is_empty():
-		if str(session["source"]) != search_source or str(session["region"]) != search_region:
+		if str(session["source"]) != search_source:
 			_request("search_cancel", {}, "旧区域的搜索已暂停。")
+		elif str(session["region"]) != search_region:
+			# 权威按顺序自动接续到下一区域，视图跟随而不是取消。
+			search_region = str(session["region"])
 		elif Time.get_ticks_msec() >= search_deadline:
 			_request("search_step", {}, "搜索继续 · 已发现物品可装包。")
 

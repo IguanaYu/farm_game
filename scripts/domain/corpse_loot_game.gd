@@ -2,7 +2,6 @@ class_name CorpseLootGame
 extends RefCounted
 ## 固定尸体物资与搜索状态；隐藏物品仅存在权威局档，客户端得到可见投影。
 
-const EMPTY_MS := 110
 const LEASE_MS := 10000
 static var runtime_epoch := str(Time.get_unix_time_from_system()) + ":" + str(Time.get_ticks_usec())
 
@@ -87,12 +86,45 @@ static func region_of(resolved: Dictionary, source_id: String, region_id: String
 					return region
 	return {}
 
-static func _next_cell(region: Dictionary) -> int:
+static func _source_of(resolved: Dictionary, source_id: String) -> Dictionary:
+	for source in resolved.get("corpses", []):
+		if str(source["id"]) == source_id:
+			return source
+	return {}
+
+static func _held_by_other(run: Dictionary, member: String, source_id: String, region_id: String) -> bool:
+	for other in run.get("loot_searches", {}):
+		if other != member:
+			var active: Dictionary = run["loot_searches"][other]
+			if str(active["source"]) == source_id and str(active["region"]) == region_id:
+				return true
+	return false
+
+static func _flush_empty(region: Dictionary) -> void:
+	## 空格不进搜索计时：进入区域时直接判为已检查，只留真正藏物品的占格排队。
+	var occupied := {}
+	for item in region["items"]:
+		if bool(item.get("taken", false)):
+			continue
+		for cell in ExpeditionBaseline.cells_of(ItemDefs.get_item(str(item["def_id"]))["size"], Vector2i(item["cell"][0], item["cell"][1]), bool(item["rotated"])):
+			occupied[ExpeditionBaseline.cell_key(cell)] = true
 	var searched: Array = region["searched"]
 	for i in range(int(region["size"][0]) * int(region["size"][1])):
-		if not searched.any(func(value): return int(value) == i):
-			return i
-	return -1
+		var cell := Vector2i(i % int(region["size"][0]), i / int(region["size"][0]))
+		if not occupied.has(ExpeditionBaseline.cell_key(cell)) and not searched.any(func(value): return int(value) == i):
+			searched.append(i)
+
+static func _next_item_cell(region: Dictionary) -> int:
+	var width := int(region["size"][0])
+	var best := -1
+	for item in region["items"]:
+		if bool(item.get("revealed", false)) or bool(item.get("taken", false)):
+			continue
+		for cell in ExpeditionBaseline.cells_of(ItemDefs.get_item(str(item["def_id"]))["size"], Vector2i(item["cell"][0], item["cell"][1]), bool(item["rotated"])):
+			var index: int = cell.y * width + cell.x
+			if best < 0 or index < best:
+				best = index
+	return best
 
 static func _item_at(region: Dictionary, index: int) -> Dictionary:
 	var cell := Vector2i(index % int(region["size"][0]), index / int(region["size"][0]))
@@ -122,24 +154,39 @@ static func cancel(run: Dictionary, member := "") -> void:
 	else:
 		(run.get("loot_searches", {}) as Dictionary).erase(member)
 
+static func _begin_cell(run: Dictionary, region: Dictionary, member: String, key: String, source_id: String, region_id: String, now: int) -> bool:
+	_flush_empty(region)
+	var next := _next_item_cell(region)
+	if next < 0:
+		return false
+	var item := _item_at(region, next)
+	var sessions: Dictionary = run.get("loot_searches", {})
+	sessions[member] = {"node": key, "source": source_id, "region": region_id, "cell": next, "started": now, "duration": ItemDefs.search_ms(ItemDefs.quality_of(item)), "epoch": runtime_epoch}
+	run["loot_searches"] = sessions
+	return true
+
+static func _chain(run: Dictionary, resolved: Dictionary, key: String, member: String, source_id: String, now: int) -> Dictionary:
+	## 区域搜完自动按顺序接续同尸体的下一个有待揭晓物品的区域；队友占用的跳过。
+	for region in _source_of(resolved, source_id).get("regions", []):
+		var id := str(region["id"])
+		if _held_by_other(run, member, source_id, id):
+			continue
+		if _begin_cell(run, region, member, key, source_id, id, now):
+			return {"ok": true}
+	return {"ok": true, "complete": true}
+
 static func start(run: Dictionary, resolved: Dictionary, key: String, member: String, source_id: String, region_id: String, now: int) -> Dictionary:
 	expire(run, now)
 	var region := region_of(resolved, source_id, region_id)
 	if region.is_empty():
 		return {"ok": false, "reason": "搜索区域不存在"}
-	var sessions: Dictionary = run.get("loot_searches", {})
-	for other in sessions:
-		var active: Dictionary = sessions[other]
-		if other != member and str(active["source"]) == source_id and str(active["region"]) == region_id:
-			return {"ok": false, "reason": "队友正在搜索这个区域"}
-	var next := _next_cell(region)
-	if next < 0:
-		cancel(run, member)
-		return {"ok": true, "complete": true}
-	var item := _item_at(region, next)
-	sessions[member] = {"node": key, "source": source_id, "region": region_id, "cell": next, "started": now, "duration": ItemDefs.search_ms(ItemDefs.quality_of(item)) if not item.is_empty() else EMPTY_MS, "epoch": runtime_epoch}
-	run["loot_searches"] = sessions
-	return {"ok": true}
+	if _held_by_other(run, member, source_id, region_id):
+		return {"ok": false, "reason": "队友正在搜索这个区域"}
+	if _begin_cell(run, region, member, key, source_id, region_id, now):
+		return {"ok": true}
+	# 指定区域已无待揭晓物品（空格已直接判完）：接续下一个区域，不再要求手点。
+	cancel(run, member)
+	return _chain(run, resolved, key, member, source_id, now)
 
 static func step(run: Dictionary, resolved: Dictionary, member: String, now: int) -> Dictionary:
 	expire(run, now)
@@ -160,7 +207,10 @@ static func step(run: Dictionary, resolved: Dictionary, member: String, now: int
 			var index: int = cell.y * int(region["size"][0]) + cell.x
 			if not (region["searched"] as Array).any(func(value): return int(value) == index):
 				region["searched"].append(index)
-	return start(run, resolved, str(session["node"]), member, str(session["source"]), str(session["region"]), now)
+	if _begin_cell(run, region, member, str(session["node"]), str(session["source"]), str(session["region"]), now):
+		return {"ok": true}
+	cancel(run, member)
+	return _chain(run, resolved, str(session["node"]), member, str(session["source"]), now)
 
 static func view(run: Dictionary, now: int) -> Dictionary:
 	var visible := run.duplicate(true)
