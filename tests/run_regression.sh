@@ -14,12 +14,14 @@ cd "$(dirname "$0")/.."
 # - stage6：主档/备档主动损坏注入的 3 条 JSON 解析故障；
 # - d41：无头 dummy 音频驱动退出期的"resources still in use"提示（成功播放过的流在
 #   ResourceCache 清理后仍被驱动侧持有，脚本侧无法回收，实机无声卡问题）；
-# - d53：装载真实 main_menu/world 场景，退出期资源缓存同类提示 1 条。
+# - d53：装载真实 main_menu/world 场景，退出期资源缓存同类提示 1 条；
+# - d54：真实输入链路装载 main_menu/world 场景并播过 BGM，退出期同类提示 2 条（场景资源+音频流）。
 whitelist_for() {
   case "$1" in
     stage6_regression_smoke.gd)     echo "Parse_JSON_failed=3" ;;
     d41_audio_smoke.gd)             echo "resources_still_in_use_at_exit=1" ;;
     d53_login_panel_lifecycle.gd)   echo "resources_still_in_use_at_exit=1" ;;
+    d54_menu_live_input_smoke.gd)   echo "resources_still_in_use_at_exit=2" ;;
     *)                              echo "" ;;
   esac
 }
