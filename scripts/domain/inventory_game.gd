@@ -311,7 +311,8 @@ func discard_instance(instance_id: int) -> Dictionary:
 
 
 ## 战后奖励领取事务：奖励区 → 指定容器（只找合法空位，不替玩家丢装备、不自动占保险箱）。
-func claim_reward(def_id: String, container: String, cell := Vector2i(-1, -1), rotated := false) -> Dictionary:
+## slot 非空且 container=="equipped"：领取后直接装备到该槽（三栏改版局内换装路径）。
+func claim_reward(def_id: String, container: String, cell := Vector2i(-1, -1), rotated := false, slot := "") -> Dictionary:
 	if is_run_occupied():
 		return _fail("物品正在探险中")
 	var def := ItemDefs.get_item(def_id)
@@ -319,10 +320,18 @@ func claim_reward(def_id: String, container: String, cell := Vector2i(-1, -1), r
 		return _fail("未知物品：%s" % def_id)
 	if container == "safe" and not bool(def.get("safe_allowed", false)):
 		return _fail("%s 不在保险箱白名单内" % def["name"])
+	if container == "equipped" and not ExpeditionBaseline.slot_accepts(slot, def_id):
+		return _fail("%s 不能装备到%s槽" % [def["name"], ExpeditionBaseline.SLOT_DISPLAY.get(slot, slot)])
 	var added := add_instance(def_id, "loot", int(def.get("quality", 1)))
 	if not added["ok"]:
 		return added
-	var moved := place_at(int(added["instance_id"]), container, cell, rotated) if cell.x >= 0 else move_to_loadout(int(added["instance_id"]), container)
+	var moved: Dictionary
+	if container == "equipped":
+		moved = equip(int(added["instance_id"]), slot)
+	elif cell.x >= 0:
+		moved = place_at(int(added["instance_id"]), container, cell, rotated)
+	else:
+		moved = move_to_loadout(int(added["instance_id"]), container)
 	if not moved["ok"]:
 		# 放不下就退回：奖励留在奖励区，不产生半领取状态（ID 作废不复用，无害）。
 		var stale := find_instance(int(added["instance_id"]))
@@ -332,18 +341,26 @@ func claim_reward(def_id: String, container: String, cell := Vector2i(-1, -1), r
 	return {"ok": true, "reason": "", "instance_id": added["instance_id"]}
 
 
-func claim_loot_instance(source: Dictionary, container: String, cell := Vector2i(-1, -1), rotated := false) -> Dictionary:
-	if not container in ExpeditionBaseline.CONTAINERS or is_run_occupied():
+func claim_loot_instance(source: Dictionary, container: String, cell := Vector2i(-1, -1), rotated := false, slot := "") -> Dictionary:
+	if not (container in ExpeditionBaseline.CONTAINERS or container == "equipped") or is_run_occupied():
 		return _fail("当前不能装入这个容器")
 	var id := int(source.get("instance_id", -1))
 	if id < 0 or not find_instance(id).is_empty():
 		return _fail("物品实例已被领取")
+	if container == "equipped" and not ExpeditionBaseline.slot_accepts(slot, str(source.get("def_id", ""))):
+		return _fail("%s 不能装备到%s槽" % [ItemDefs.get_item(str(source.get("def_id", ""))).get("name", "?"), ExpeditionBaseline.SLOT_DISPLAY.get(slot, slot)])
 	var placed := source.duplicate(true)
 	placed.erase("revealed")
 	placed.erase("taken")
 	placed["container"] = "warehouse"
 	_inventory()["warehouse"].append(placed)
-	var result := place_at(id, container, cell, rotated) if cell.x >= 0 else move_to_loadout(id, container)
+	var result: Dictionary
+	if container == "equipped":
+		result = equip(id, slot)
+	elif cell.x >= 0:
+		result = place_at(id, container, cell, rotated)
+	else:
+		result = move_to_loadout(id, container)
 	if not bool(result.get("ok", false)):
 		_inventory()["warehouse"].erase(placed)
 		return result

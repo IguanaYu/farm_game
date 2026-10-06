@@ -114,6 +114,11 @@ func _run() -> void:
 	_check(world.hud.loadout_panel != null and world.hud.loadout_panel.visible, "真实点击战备台打开配装面板")
 	world.hud.loadout_panel._on_grant_kit()
 	var inv: InventoryGame = world.hud.loadout_panel.inventory
+	# 三栏改版：武器/草帽上装备槽（第 1 回合牌），其余入胸挂。
+	for def_id in ["old_shortsword", "straw_hat"]:
+		for item in inv.warehouse_list().duplicate():
+			if str(item["def_id"]) == def_id:
+				inv.equip(int(item["instance_id"]), "main_weapon" if def_id == "old_shortsword" else "helmet")
 	for item in inv.warehouse_list().duplicate():
 		inv.move_to_loadout(int(item["instance_id"]), "chest")
 	world.hud.loadout_panel._refresh()
@@ -219,8 +224,12 @@ func _battle_round() -> void:
 		await _click_button(screen.target_controls["e1"], "目标·第一个敌人")
 		_check(int(combat.state["enemies"][0]["hp"]) == hp_before - 2, "真实点击目标结算预览伤害（生命 -2）")
 		await _shot("live_13_strike_by_target_click", "出手后（真实点卡+真实点目标）")
-	await _press_key(KEY_1)
-	_check(screen.selected_uid >= 0, "数字键 1 选中首张手牌")
+	# 数字键选中：用需指定目标的手牌验证（自指卡会即按即出、选中态复位，不适合此断言）。
+	var key_card := _hand_index(combat, "heavy_strike")
+	if key_card < 0:
+		key_card = _hand_index(combat, "slash")
+	await _press_key(KEY_1 + key_card)
+	_check(screen.selected_uid >= 0, "数字键选中需指定目标的手牌")
 	await _press_key(KEY_ESCAPE)
 	_check(screen.selected_uid < 0, "真实 ESC 取消选卡不离开战斗")
 	var shield_index := _hand_index(combat, "shield_up")

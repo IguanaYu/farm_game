@@ -132,7 +132,12 @@ func _reset_equipment() -> void:
 	inventory.grant_basic_kit()
 	inventory.add_instance("copper_shortsword", "playtest")
 	inventory.add_instance("small_potion", "playtest")
-	for def_id in ["copper_shortsword", "wooden_shield", "small_potion"]:
+	# 三栏改版：武器/盾/草帽上装备槽（第 1 回合即可抽到），药水入胸挂。
+	inventory.equip(_first_id(inventory, "old_shortsword"), "main_weapon")
+	inventory.equip(_first_id(inventory, "copper_shortsword"), "off_weapon")
+	inventory.equip(_first_id(inventory, "wooden_shield"), "armor")
+	inventory.equip(_first_id(inventory, "straw_hat"), "helmet")
+	for def_id in ["small_potion", "pack_tools"]:
 		for item in inventory.warehouse_list():
 			if str(item["def_id"]) == def_id:
 				inventory.move_to_loadout(int(item["instance_id"]), "chest")
@@ -201,3 +206,10 @@ func _loot_action(kind: String, args: Dictionary) -> Dictionary:
 func _go_home() -> void:
 	_stop_search()
 	get_tree().change_scene_to_file("res://scenes/main_menu.tscn")
+
+
+func _first_id(inventory: InventoryGame, def_id: String) -> int:
+	for item in inventory.warehouse_list():
+		if str(item["def_id"]) == def_id:
+			return int(item["instance_id"])
+	return -1

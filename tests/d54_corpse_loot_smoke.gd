@@ -84,21 +84,25 @@ func _domain() -> void:
 	var game := _fresh(true)
 	var resolved := _resolved(game)
 	_check(resolved["rewards"].is_empty() and not bool(resolved["choose_one"]), "new corpses replace choose one")
-	_check(resolved["corpses"][0]["regions"].size() == 4, "equipment and two bags")
+	var region_ids: Array = []
+	for region in resolved["corpses"][0]["regions"]:
+		region_ids.append(str(region["id"]))
+	_check(region_ids == ["main_weapon", "armor", "chest", "pack", "ground"], "humanoid corpse: equip slots first, containers, ground last")
 	var weapon: Dictionary = resolved["corpses"][0]["regions"][0]["items"][0]
 	var id := int(weapon["instance_id"])
 	_check(not game.loot_action("p1", "claim_corpse", {"instance_id": id})["ok"], "cannot take unknown")
 	var view := game.visible_run()
 	var public_region: Dictionary = view["resolved"]["r3c1"]["corpses"][0]["regions"][0]
 	_check(public_region["items"].is_empty() and not view.has("rng_seed"), "projection does not disclose hidden item or generator")
-	_check(game.loot_action("p1", "search_start", {"source": "e1", "region": "weapon"})["ok"], "start owner")
+	_check(game.loot_action("p1", "search_start", {"source": "e1", "region": "main_weapon"})["ok"], "start owner")
 	_check(not game.loot_action("p1", "search_step", {"now": 999999999})["ok"], "client cannot fast forward clock")
-	_check(not game.loot_action("p2", "search_start", {"source": "e1", "region": "weapon"})["ok"], "same region locked")
-	_check(game.loot_action("p2", "search_start", {"source": "e1", "region": "pouch"})["ok"], "different regions parallel")
+	_check(not game.loot_action("p2", "search_start", {"source": "e1", "region": "main_weapon"})["ok"], "same region locked")
+	_check(game.loot_action("p2", "search_start", {"source": "e1", "region": "chest"})["ok"], "different regions parallel")
 	_check(not game.leave_node()["ok"], "cannot leave while teammate searches")
 	clock_ms += ItemDefs.search_ms(ItemDefs.quality_of(weapon)) + 1
 	_check(game.loot_action("p1", "search_step", {})["ok"], "reveal weapon")
 	_check(bool(weapon["revealed"]) and resolved["corpses"][0]["regions"][0]["searched"].size() == 3, "multi cell weapon revealed together")
+	_check(str(resolved["corpses"][0]["regions"][4]["id"]) == "ground" and resolved["corpses"][0]["regions"][4]["items"].is_empty(), "ground strip empty and last")
 	_check(str(game.run["loot_searches"].get("p1", {}).get("region", "")) == "armor", "finished region auto chains to the next package")
 	_check(game.visible_run()["resolved"]["r3c1"]["corpses"][0]["regions"][0]["items"].size() == 1, "revealed item shared")
 	var inv := game.member_inventory("p1")
@@ -159,7 +163,7 @@ func _domain() -> void:
 	var rotated_region: Dictionary = _resolved(rotated_game)["corpses"][0]["regions"][0]
 	rotated_region["size"] = [3, 1]
 	rotated_region["items"][0]["rotated"] = true
-	rotated_game.loot_action("p1", "search_start", {"source": "e1", "region": "weapon"})
+	rotated_game.loot_action("p1", "search_start", {"source": "e1", "region": "main_weapon"})
 	_check(rotated_game.visible_run()["loot_searches"]["p1"]["footprint"]["size"] == [3, 1], "rotated source searches its actual 3x1 footprint")
 	# 真实局档恢复清除未完成搜索，保留固定掉落与已揭晓/已取走标记。
 	var recovery_game := _fresh()
@@ -239,7 +243,8 @@ func _drag_item(game: ExpeditionGame, item: Dictionary) -> void:
 	await process_frame
 	var payload: Dictionary = root.gui_get_drag_data().duplicate(true) if root.gui_is_dragging() else {}
 	_check(bool(payload.get("rotated", false)), "source drag rotates with R")
-	var destination := panel.grid.global_position + panel.grid.origin + Vector2(0.5, 1.5) * panel.grid.cell_size
+	var pack_grid: ExpeditionLootGrid = panel.workspace.container_grids["pack"]
+	var destination := pack_grid.global_position + pack_grid.origin + Vector2(0.5, 1.5) * pack_grid.cell_size
 	motion = InputEventMouseMotion.new()
 	motion.position = destination
 	motion.global_position = destination
@@ -253,8 +258,8 @@ func _drag_item(game: ExpeditionGame, item: Dictionary) -> void:
 	await process_frame
 	await process_frame
 	if DisplayServer.get_name() == "headless" and not payload.is_empty():
-		_check(panel.grid._can_drop_data(destination - panel.grid.global_position, payload), "headless corpse drag fits destination")
-		panel.grid._drop_data(destination - panel.grid.global_position, payload)
+		_check(pack_grid._can_drop_data(destination - pack_grid.global_position, payload), "headless corpse drag fits destination")
+		pack_grid._drop_data(destination - pack_grid.global_position, payload)
 		await process_frame
 	var carried := game.run_inventory().find_instance(int(item["instance_id"]))
 	_check(bool(item["taken"]) and not carried.is_empty(), "real release transfers original corpse instance")

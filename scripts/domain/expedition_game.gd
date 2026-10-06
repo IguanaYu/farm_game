@@ -677,7 +677,7 @@ func _add_run_reward(def_id: String) -> void:
 # 多件节点（gather/chest）：每个成员每条候选各可领一次。合作局两位成员各自计领（2.6 语义）。
 
 
-func claim_node_reward(member_key: String, key: String, def_id: String, container: String, cell := Vector2i(-1, -1), rotated := false) -> Dictionary:
+func claim_node_reward(member_key: String, key: String, def_id: String, container: String, cell := Vector2i(-1, -1), rotated := false, slot := "") -> Dictionary:
 	if not member_keys().has(member_key):
 		return _fail("未知成员")
 	var resolved: Dictionary = run["resolved"].get(key, {})
@@ -693,7 +693,7 @@ func claim_node_reward(member_key: String, key: String, def_id: String, containe
 	if mine.has(def_id):
 		return _fail("已领取过「%s」" % str(ItemDefs.get_item(def_id).get("name", def_id)))
 	var inventory := member_inventory(member_key)
-	var result := inventory.claim_reward(def_id, container, cell, rotated)
+	var result := inventory.claim_reward(def_id, container, cell, rotated, slot)
 	if not result["ok"]:
 		## 满包/白名单拒绝：候选保留，腾出空间后可重试（不产生半领取状态）。
 		return result
@@ -707,7 +707,7 @@ func claim_node_reward(member_key: String, key: String, def_id: String, containe
 	return {"ok": true, "reason": "", "instance_id": int(result["instance_id"])}
 
 
-func claim_node_public(member_key: String, key: String, def_id: String, container := "pack", cell := Vector2i(-1, -1), rotated := false) -> Dictionary:
+func claim_node_public(member_key: String, key: String, def_id: String, container := "pack", cell := Vector2i(-1, -1), rotated := false, slot := "") -> Dictionary:
 	## 公共物资：全队一份、先到先得（领取成功即从列表移除，与修复前语义一致）。
 	if not member_keys().has(member_key):
 		return _fail("未知成员")
@@ -716,7 +716,7 @@ func claim_node_public(member_key: String, key: String, def_id: String, containe
 	if not public_items.has(def_id):
 		return _fail("公共物资不在列表或已被领走")
 	var inventory := member_inventory(member_key)
-	var result := inventory.claim_reward(def_id, container, cell, rotated)
+	var result := inventory.claim_reward(def_id, container, cell, rotated, slot)
 	if not result["ok"]:
 		return result
 	public_items.erase(def_id)
@@ -732,7 +732,7 @@ func _reward_choose_one(resolved: Dictionary) -> bool:
 
 
 ## 从节点公共丢弃区捡回一件（F-04：规则层事务，客机经主机裁定复用同一路径）。
-func pick_node_drop(member_key: String, instance_id: int, container := "pack", cell := Vector2i(-1, -1), rotated := false) -> Dictionary:
+func pick_node_drop(member_key: String, instance_id: int, container := "pack", cell := Vector2i(-1, -1), rotated := false, slot := "") -> Dictionary:
 	if not member_keys().has(member_key):
 		return _fail("未知成员")
 	for instance in run["node_drops"]:
@@ -745,7 +745,13 @@ func pick_node_drop(member_key: String, instance_id: int, container := "pack", c
 			var placed: Dictionary = instance.duplicate(true)
 			placed["container"] = "warehouse"
 			inventory.restore_to_warehouse(placed)
-			var result := inventory.place_at(instance_id, container, cell, rotated) if cell.x >= 0 else inventory.move_to_loadout(instance_id, container)
+			var result: Dictionary
+			if container == "equipped":
+				result = inventory.equip(instance_id, slot)
+			elif cell.x >= 0:
+				result = inventory.place_at(instance_id, container, cell, rotated)
+			else:
+				result = inventory.move_to_loadout(instance_id, container)
 			if not bool(result["ok"]):
 				inventory.expedition["inventory"]["warehouse"].erase(placed)
 				return result
@@ -776,6 +782,7 @@ func loot_action(member_key: String, kind: String, args: Dictionary) -> Dictiona
 		cell = Vector2i(input[0], input[1])
 	var container := str(args.get("container", "pack"))
 	var rotated := bool(args.get("rotated", false))
+	var slot := str(args.get("slot", ""))
 	var key := node_id(int(run["current"]["row"]), int(run["current"]["col"]))
 	match kind:
 		"search_start", "search_step", "search_cancel", "claim_corpse":
@@ -789,13 +796,13 @@ func loot_action(member_key: String, kind: String, args: Dictionary) -> Dictiona
 				"search_cancel":
 					CorpseLootGame.cancel(run, member_key)
 					result = {"ok": true}
-				"claim_corpse": result = _claim_corpse(member_key, resolved, int(args.get("instance_id", -1)), container, cell, rotated)
+				"claim_corpse": result = _claim_corpse(member_key, resolved, int(args.get("instance_id", -1)), container, cell, rotated, slot)
 			if bool(result.get("ok", false)):
 				save()
 			return result
-		"claim_reward": return claim_node_reward(member_key, key, str(args.get("def_id", "")), container, cell, rotated)
-		"claim_public": return claim_node_public(member_key, key, str(args.get("def_id", "")), container, cell, rotated)
-		"pick_drop": return pick_node_drop(member_key, int(args.get("instance_id", -1)), container, cell, rotated)
+		"claim_reward": return claim_node_reward(member_key, key, str(args.get("def_id", "")), container, cell, rotated, slot)
+		"claim_public": return claim_node_public(member_key, key, str(args.get("def_id", "")), container, cell, rotated, slot)
+		"pick_drop": return pick_node_drop(member_key, int(args.get("instance_id", -1)), container, cell, rotated, slot)
 		"loot_manage":
 			var inventory := member_inventory(member_key)
 			var operation := str(args.get("operation", ""))
@@ -826,7 +833,7 @@ func loot_action(member_key: String, kind: String, args: Dictionary) -> Dictiona
 			return result
 	return _fail("未知的搜刮操作")
 
-func _claim_corpse(member_key: String, resolved: Dictionary, instance_id: int, container: String, cell: Vector2i, rotated: bool) -> Dictionary:
+func _claim_corpse(member_key: String, resolved: Dictionary, instance_id: int, container: String, cell: Vector2i, rotated: bool, slot := "") -> Dictionary:
 	for source in resolved.get("corpses", []):
 		for region in source["regions"]:
 			for item in region["items"]:
@@ -834,7 +841,7 @@ func _claim_corpse(member_key: String, resolved: Dictionary, instance_id: int, c
 					continue
 				if not bool(item.get("revealed", false)) or bool(item.get("taken", false)):
 					return _fail("物品尚未发现或已被拿走")
-				var result := member_inventory(member_key).claim_loot_instance(item, container, cell, rotated)
+				var result := member_inventory(member_key).claim_loot_instance(item, container, cell, rotated, slot)
 				if bool(result.get("ok", false)):
 					item["taken"] = true
 				return result

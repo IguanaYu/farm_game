@@ -93,7 +93,7 @@ func _run() -> void:
 		return
 	_check(playtest.battle.visible and playtest.battle.combat != null, "entry immediately starts battle")
 	_check(playtest.battle.combat.state["enemies"][0]["def_id"] == "skeleton_scout", "default battle tests equipment skeleton")
-	_check(playtest.expedition.run_inventory().loadout_list("chest").size() == 3, "attack, defense and supply automatically equipped")
+	_check(playtest.expedition.run_inventory().loadout_list("chest").size() == 2 and playtest.expedition.run_inventory().equipped_list().size() == 4, "attack, defense and supply automatically equipped")
 	_check(playtest.expedition.run_inventory().loadout_list("pack").is_empty(), "pack starts empty for loot tests")
 	await _shot("02_immediate_battle")
 	await _fight(playtest.battle)

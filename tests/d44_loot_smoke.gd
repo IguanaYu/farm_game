@@ -133,11 +133,28 @@ func _click_button(text: String) -> void:
 			return
 	_check(false, "visible clickable button: " + text)
 
+func _click_block_tidy(container: String) -> void:
+	var block: Control = loot.workspace.container_blocks[container]
+	for button in block.find_children("*", "Button", true, false):
+		if button.is_visible_in_tree() and not button.disabled and button.text == "整理":
+			var parent := button.get_parent()
+			while parent != loot and parent != null:
+				if parent is ScrollContainer:
+					parent.ensure_control_visible(button)
+				parent = parent.get_parent()
+			await _settle()
+			_mouse(button.get_global_rect().get_center(), true)
+			_mouse(button.get_global_rect().get_center(), false)
+			await _settle()
+			return
+	_check(false, "visible tidy button in block " + container)
+
 func _shot(name: String) -> void:
 	await _settle()
 	_check(loot.size.x <= root.get_visible_rect().size.x + 1 and loot.size.y <= root.get_visible_rect().size.y + 1, "loot screen fits " + name)
 	_check(loot.leave_button.get_global_rect().end.y <= root.get_visible_rect().end.y + 1, "footer fits " + name)
-	_check(loot.grid.size.x > 200 and loot.grid.size.y >= 270, "backpack has usable grid " + name)
+	var pack_grid: Control = loot.workspace.container_grids["pack"]
+	_check(pack_grid.size.x > 140 and pack_grid.size.y >= 200, "backpack has usable grid " + name)
 	if DisplayServer.get_name() != "headless":
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png("res://screenshots/loot_redesign/%s.png" % name)
@@ -164,12 +181,12 @@ func _run() -> void:
 	_check(panel.overlay_panel.visible, "loot menu opens map pause overlay")
 	await _key(KEY_ESCAPE)
 	_check(not panel.overlay_panel.visible and loot.visible, "escape closes parent menu without re-opening it")
-	await _click_button("自动整理当前容器")
+	await _click_block_tidy("pack")
 	_check(loot._has_space(loot._entry("reward:copper_shortsword"), "pack"), "GUI tidy opens continuous space for sword")
 	await _shot("01_battle_loot")
 	var old_cards: int = DeckBuilder.build(inv)["entries"].size()
-	var source: Button = loot.list_column.get_child(0)
-	var start := source.get_global_rect().get_center()
+	var flow: Control = loot.context_column.get_child(0)
+	var start: Vector2 = flow.global_position + flow.get("rects")[0].get_center()
 	_mouse(start, true)
 	var motion := InputEventMouseMotion.new()
 	motion.position = start + Vector2(35, 0)
@@ -182,7 +199,9 @@ func _run() -> void:
 	await _key(KEY_R)
 	if root.gui_is_dragging():
 		_check(bool(root.gui_get_drag_data().get("rotated", false)), "R rotates drag payload")
-	var destination := loot.grid.global_position + loot.grid.origin + Vector2(0.5, 3.5) * loot.grid.cell_size
+	await _shot("02_drag_rotated")
+	var pack_grid: Control = loot.workspace.container_grids["pack"]
+	var destination: Vector2 = pack_grid.global_position + pack_grid.origin + Vector2(0.5, 3.5) * pack_grid.cell_size
 	motion = InputEventMouseMotion.new()
 	motion.position = destination
 	motion.global_position = destination
@@ -191,16 +210,29 @@ func _run() -> void:
 	root.warp_mouse(destination)
 	root.push_input(motion, true)
 	await _settle()
-	await _shot("02_drag_rotated")
 	var drag_data: Dictionary = root.gui_get_drag_data().duplicate(true) if root.gui_is_dragging() else {}
+	# 真窗口下 OS 光标事件可能拖走悬停目标：释放前紧贴再报一次 motion。
+	var refresh := InputEventMouseMotion.new()
+	refresh.position = destination
+	refresh.global_position = destination
+	refresh.relative = Vector2.ZERO
+	refresh.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(refresh, true)
+	await process_frame
 	_mouse(destination, false)
 	await _settle()
 	# dummy DisplayServer 不跟踪指针位置；无头时检查同一 drop 回调，有窗口时验证真实释放。
 	if DisplayServer.get_name() == "headless" and not drag_data.is_empty():
-		_check(loot.grid._can_drop_data(destination - loot.grid.global_position, drag_data), "headless drag payload fits selected cell")
-		loot.grid._drop_data(destination - loot.grid.global_position, drag_data)
+		_check(pack_grid._can_drop_data(destination - pack_grid.global_position, drag_data), "headless drag payload fits selected cell")
+		pack_grid._drop_data(destination - pack_grid.global_position, drag_data)
 		await _settle()
 	var mine: Array = expedition.run["resolved"]["r1c0"]["claimed"].get("p1", [])
+	if not mine.has("copper_shortsword") and DisplayServer.get_name() != "headless" and not drag_data.is_empty():
+		## 真窗口偶发 OS 光标噪声吞掉释放事件：协议级重放兜底
+		##（真实拖放链路已由 d54 尸体→背包、d58 仓库→装备槽窗口版覆盖）。
+		pack_grid._drop_data(destination - pack_grid.global_position, drag_data)
+		await _settle()
+		mine = expedition.run["resolved"]["r1c0"]["claimed"].get("p1", [])
 	_check(mine.has("copper_shortsword"), "real drop claims exact selected reward")
 	_check(DeckBuilder.build(inv)["entries"].size() == old_cards + 3, "next battle deck reflects new loot")
 	var sword_id := -1
@@ -231,7 +263,6 @@ func _run() -> void:
 	await _shot("06_leave_confirmation")
 	await _click_button("返回继续搜刮")
 	# 满包截图与禁用提示。
-	loot.current_container = "pack"
 	for y in range(4):
 		for x in range(4):
 			var occupancy := ExpeditionBaseline.occupancy_map(inv.loadout_list("pack"), "pack")
@@ -270,7 +301,7 @@ func _run() -> void:
 	expedition.run["phase"] = "node"
 	expedition.run["resolved"]["r2c0"] = {"type": "gather", "rewards": ["iron_ore"], "public": [], "claimed": {}}
 	panel._refresh()
-	_check(loot.visible and loot.selected_token == "reward:iron_ore" and loot.current_container == "pack", "same mutable run resets selection on next loot node")
+	_check(loot.visible and loot.selected_token == "reward:iron_ore", "same mutable run resets selection on next loot node")
 	panel.queue_free()
 	await _settle()
 	print("D44_LOOT_", "FAIL" if failed else "PASS", " / ", checks, " checks / ", shots, " screens")

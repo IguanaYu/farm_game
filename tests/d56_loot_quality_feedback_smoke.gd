@@ -110,18 +110,18 @@ func _run() -> void:
 	playtest.loot._open_corpse("e1")
 	await _frames()
 	var loot := playtest.loot
-	_check(loot.source_grids.size() == 4, "weapon, armor, pouch, pack all exist on same page")
+	_check(loot.source_grids.size() == 5, "equip slots, chest, pack, ground all exist on one column")
 	for grid in loot.source_grids.values():
-		_check(grid.is_visible_in_tree() and loot.list_column.get_parent().get_global_rect().encloses(grid.get_global_rect()), "each package fully visible without tab or scroll")
-	var stable_grid: CorpseSearchGrid = loot.source_grids["weapon"]
+		_check(grid.is_visible_in_tree(), "each package visible without tabs (column scrolls by design)")
+	var stable_grid: CorpseSearchGrid = loot.source_grids["main_weapon"]
 	_check(stable_grid.region["items"].is_empty() and not stable_grid.region["unknown"][0].has("quality"), "unknown grid has no tier or identity")
 	await _shot("02_all_packages_searching")
-	loot._search_region("pouch")
-	_check(playtest.expedition.run["loot_searches"]["p1"]["region"] == "pouch", "individual package button prioritizes that package")
-	_check(loot.source_grids["weapon"] == stable_grid and loot.source_grids.size() == 4, "snapshots retain all grid controls")
-	loot._search_region("pouch")
+	loot._search_region("chest")
+	_check(playtest.expedition.run["loot_searches"]["p1"]["region"] == "chest", "individual package button prioritizes that package")
+	_check(loot.source_grids["main_weapon"] == stable_grid and loot.source_grids.size() == 5, "snapshots retain all grid controls")
+	loot._search_region("chest")
 	_check(playtest.expedition.run["loot_searches"].is_empty(), "same button pauses search")
-	for region in ["weapon", "armor", "pouch", "pack"]:
+	for region in ["main_weapon", "armor", "chest", "pack"]:
 		loot._search_region(region)
 		for i in range(30):
 			var session: Dictionary = playtest.expedition.run.get("loot_searches", {}).get("p1", {})
@@ -129,7 +129,7 @@ func _run() -> void:
 				break
 			now += int(session["duration"]) + 1
 			_check(playtest._loot_action("search_step", {})["ok"], "complete region through authority")
-	var weapon: Dictionary = loot.source_grids["weapon"].region["items"][0]
+	var weapon: Dictionary = loot.source_grids["main_weapon"].region["items"][0]
 	_check(ItemDefs.quality_of(weapon) == 5, "chosen red tier persists after reveal")
 	var id := int(weapon["instance_id"])
 	_check(playtest._loot_action("claim_corpse", {"instance_id": id, "container": "pack"})["ok"], "take exact revealed instance")
@@ -139,15 +139,20 @@ func _run() -> void:
 	await _shot("03_revealed_and_packed")
 	root.size = Vector2i(1024, 640)
 	await _frames()
-	for grid in loot.source_grids.values():
-		_check(loot.list_column.get_parent().get_global_rect().encloses(grid.get_global_rect()), "all packages also fit small window")
+	_check(loot.source_grids.size() == 5 and loot.workspace.container_grids.size() == 3, "small window keeps corpse packages and workspace grids")
 	await _shot("04_small_window_packages")
 	root.size = Vector2i(1280, 800)
 	playtest.loot.visible = false
 	var deck := entries.duplicate(true)
-	var order := [{"card_id": "shield_up"}, {"card_id": "slash"}, {"card_id": "cover"}, {"card_id": "drink_potion"}, {"card_id": "brace"}, {"card_id": "heavy_strike"}, {"card_id": "slash"}, {"card_id": "shield_up"}]
+	var order := [{"card_id": "shield_up"}, {"card_id": "slash"}, {"card_id": "cover"}, {"card_id": "brace"}, {"card_id": "heavy_strike"}, {"card_id": "slash"}, {"card_id": "shield_up"}]
 	var battle := CombatGame.create([{"key": "p1", "name": "农夫", "max_hp": 40, "hp": 25, "deck": deck}], "skeleton_patrol", 56, inventory, order)
 	battle.start()
+	# 三栏改版：药水在胸挂＝第 2 回合入堆，第 1 回合手牌按规则没有它；直接注入验证治愈链路。
+	var potion_id := -1
+	for item in inventory.all_instances():
+		if str(item["def_id"]) == "small_potion":
+			potion_id = int(item["instance_id"])
+	battle.state["players"]["p1"]["hand"].append({"uid": 9101, "card_id": "drink_potion", "source_instance_id": potion_id, "source_seq": 0, "source_def_id": "small_potion", "source_quality": ItemDefs.quality_of(inventory.find_instance(potion_id)), "owner": "p1"})
 	var screen := playtest.battle
 	screen.open_run(battle)
 	await _frames()

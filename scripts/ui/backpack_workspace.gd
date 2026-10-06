@@ -26,6 +26,18 @@ var doll_column: VBoxContainer
 var stack_scroll: ScrollContainer
 var doll_hint: Label
 
+## 尺寸配置（宿主在 add_child 前按场景覆写；战备=默认，搜刮台=紧凑）。
+var doll_width := 296
+var stack_width := 432
+var slot_min_sizes := {
+	"helmet": Vector2(116, 116),
+	"main_weapon": Vector2(92, 186),
+	"armor": Vector2(116, 116),
+	"off_weapon": Vector2(92, 186),
+}
+var grid_min_height := 280
+var show_hint := true
+
 const SLOT_FRAME := Color("#f2e9d2")
 const SLOT_LINE := Color("#cfc19b")
 const SLOT_ART_SUBJECT := {"main_weapon": "attack", "off_weapon": "attack", "helmet": "helmet", "armor": "shield"}
@@ -159,6 +171,7 @@ class FlowItemGrid extends Control:
 	var rects: Array = []
 	var cell := 40.0
 	signal entry_selected(instance_id: int)
+	signal token_selected(token: String)
 
 	func _ready() -> void:
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -219,6 +232,7 @@ class FlowItemGrid extends Control:
 			var hit := _hit(event.position)
 			if hit >= 0:
 				entry_selected.emit(int(entries[hit].get("instance_id", -1)))
+				token_selected.emit(str(entries[hit].get("payload_extra", {}).get("token", "")))
 				accept_event()
 
 	func _get_drag_data(at_position: Vector2) -> Variant:
@@ -229,7 +243,11 @@ class FlowItemGrid extends Control:
 		entry_selected.emit(int(entry.get("instance_id", -1)))
 		var preview := ExpeditionUI.label(str(entry.get("name", "?")), 20)
 		set_drag_preview(preview)
-		return {"instance_id": int(entry.get("instance_id", -1)), "def_id": str(entry.get("def_id", "")), "rotated": false, "workspace_owner": workspace.owner_id}
+		var payload := {"instance_id": int(entry.get("instance_id", -1)), "def_id": str(entry.get("def_id", "")), "rotated": false, "workspace_owner": workspace.owner_id}
+		var extra: Dictionary = entry.get("payload_extra", {})
+		for key in extra:
+			payload[key] = extra[key]
+		return payload
 
 	func _draw() -> void:
 		for i in range(entries.size()):
@@ -267,33 +285,30 @@ func setup(owner_control: Control, actions: Dictionary) -> void:
 
 
 func _build() -> void:
+	# 外层最小宽度＝实际内容（纸娃娃行宽不小于三槽+间距）+容器栈+间距；
+	# 只按 doll_width 声明会小于内容，SHRINK_BEGIN 场景下溢出遮挡邻栏（d44 排查结论）。
+	var row_min: float = slot_min_sizes["main_weapon"].x + slot_min_sizes["armor"].x + slot_min_sizes["off_weapon"].x + 16.0
+	doll_width = maxi(doll_width, int(row_min))
+	custom_minimum_size = Vector2(doll_width + stack_width + 12, 0)
 	var columns := HBoxContainer.new()
 	columns.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	columns.add_theme_constant_override("separation", 12)
 	add_child(columns)
 	doll_column = VBoxContainer.new()
-	doll_column.custom_minimum_size = Vector2(296, 0)
+	doll_column.custom_minimum_size = Vector2(doll_width, 0)
 	doll_column.add_theme_constant_override("separation", 8)
 	columns.add_child(doll_column)
 	doll_column.add_child(_title_label("装备"))
-	var doll_wrap := HBoxContainer.new()
-	doll_wrap.alignment = BoxContainer.ALIGNMENT_CENTER
-	doll_column.add_child(doll_wrap)
-	doll_wrap.add_child(_make_slot("helmet", Vector2(124, 124)))
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-	row.alignment = BoxContainer.ALIGNMENT_CENTER
-	doll_column.add_child(row)
-	row.add_child(_make_slot("main_weapon", Vector2(100, 190)))
-	row.add_child(_make_slot("armor", Vector2(124, 124)))
-	row.add_child(_make_slot("off_weapon", Vector2(100, 190)))
+	doll_column.add_child(_make_slot("helmet"))
+	doll_column.add_child(_make_slot_row(["main_weapon", "armor", "off_weapon"]))
 	doll_hint = _title_label("装备槽的牌第 1 回合入堆")
 	doll_hint.add_theme_font_size_override("font_size", 12)
 	doll_column.add_child(doll_hint)
+	doll_hint.visible = show_hint
 	doll_column.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 
 	stack_scroll = ScrollContainer.new()
-	stack_scroll.custom_minimum_size = Vector2(432, 0)
+	stack_scroll.custom_minimum_size = Vector2(stack_width, 0)
 	stack_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	stack_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	columns.add_child(stack_scroll)
@@ -307,14 +322,24 @@ func _build() -> void:
 		container_blocks[container] = block
 
 
-func _make_slot(slot: String, min_size: Vector2) -> EquipSlot:
+func _make_slot(slot: String) -> EquipSlot:
 	var control := EquipSlot.new()
 	control.slot = slot
 	control.workspace = self
+	var min_size: Vector2 = slot_min_sizes.get(slot, Vector2(110, 110))
 	control.custom_minimum_size = min_size
 	control.size = min_size
 	slot_controls[slot] = control
 	return control
+
+
+func _make_slot_row(slots: Array) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+	for slot in slots:
+		row.add_child(_make_slot(str(slot)))
+	return row
 
 
 func _build_container_block(container: String) -> PanelContainer:
@@ -331,12 +356,16 @@ func _build_container_block(container: String) -> PanelContainer:
 	caption_row.add_child(name_label)
 	var caption := _title_label("")
 	caption.add_theme_font_size_override("font_size", 12)
+	caption.clip_text = true
+	caption.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	caption_row.add_child(caption)
 	container_captions[container] = caption
 	var tidy := Button.new()
 	tidy.text = "整理"
+	tidy.custom_minimum_size = Vector2(48, 26)
 	tidy.add_theme_font_size_override("font_size", 12)
+	tidy.size_flags_horizontal = Control.SIZE_SHRINK_END
 	tidy.pressed.connect(func():
 		if tidy_action.is_valid():
 			tidy_action.call(container))
@@ -355,7 +384,7 @@ func _build_container_block(container: String) -> PanelContainer:
 	var grid := WorkspaceGrid.new()
 	grid.workspace = self
 	grid.container = container
-	grid.custom_minimum_size = Vector2(0, 280)
+	grid.custom_minimum_size = Vector2(0, grid_min_height)
 	grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	grid.item_selected.connect(func(id): _select(id))
 	body.add_child(grid)
