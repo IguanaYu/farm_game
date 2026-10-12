@@ -734,6 +734,101 @@ func water(plot_id: int, now: int) -> Dictionary:
 	return {"ok": true, "watered": watered, "skipped": skipped}
 
 
+## 好友帮浇水（R8）：门槛与 water() 一致，但水壶档位/3 块地扩散用帮助者的 can_level。
+## 已浇时段只在帮助者档位更高时原位升级（保持每时段至多一条记录，计分不重复计入）；
+## 生效时把好友记入 plot["helpers"]（每好友每轮一次加成，收获时清空）。
+func water_help(plot_id: int, helper_id: int, helper_nick: String, helper_can: int, now: int) -> Dictionary:
+	var plot := get_plot(plot_id)
+	if plot.is_empty():
+		return {"ok": false, "message": "找不到这块地。"}
+	var targets: Array = [plot_id]
+	if helper_can >= 2:
+		for following in owned_plot_ids():
+			if targets.size() >= 3:
+				break
+			if not (following in targets) and following > plot_id:
+				targets.append(following)
+		if targets.size() < 3:
+			for preceding in owned_plot_ids():
+				if targets.size() >= 3:
+					break
+				if not (preceding in targets):
+					targets.append(preceding)
+	var watered: Array = []
+	var upgraded: Array = []
+	var skipped: Array = []
+	for target_id in targets:
+		var target := get_plot(target_id)
+		if target.is_empty() or target["seed_id"] == 0:
+			if target_id == plot_id:
+				return {"ok": false, "message": "空地不需要浇水，播种后再来。"}
+			skipped.append(target_id)
+			continue
+		if now >= target["ready_at"]:
+			if target_id == plot_id:
+				return {"ok": false, "message": "作物已经成熟，浇水已经无效了。"}
+			skipped.append(target_id)
+			continue
+		var segment := current_water_segment(target_id, now)
+		if segment < 0:
+			skipped.append(target_id)
+			continue
+		var existing := _segment_entry(target, segment)
+		if existing.is_empty():
+			target["watered_segments"].append({"segment": segment, "can_level": helper_can, "helper": helper_id, "helper_nick": helper_nick})
+			_append_round_event(target, now, "help", "好友 %s 帮你浇了第 %d 时段的水（水壶 %d 级）。" % [helper_nick, segment + 1, helper_can])
+			watered.append(target_id)
+		elif helper_can > int(existing.get("can_level", 1)):
+			existing["can_level"] = helper_can
+			_append_round_event(target, now, "help", "好友 %s 用 %d 级水壶把第 %d 时段的浇水加成提到了最高档。" % [helper_nick, helper_can, segment + 1])
+			upgraded.append(target_id)
+		else:
+			skipped.append(target_id)
+			continue
+		_record_helper(target, helper_id, helper_nick)
+	if watered.is_empty() and upgraded.is_empty():
+		if not skipped.is_empty() and not (plot_id in skipped):
+			return {"ok": false, "message": "这个时段已经浇过水了，效果只记一次。"}
+		return {"ok": false, "message": "这次浇水没有产生任何效果。"}
+	var effective := watered.duplicate()
+	effective.append_array(upgraded)
+	return {
+		"ok": true,
+		"watered": watered,
+		"upgraded": upgraded,
+		"skipped": skipped,
+		"exp": PlantDefs.HELPER_EXP_PER_ACTION,
+		"plots": _help_result_plots(effective),
+	}
+
+
+func _segment_entry(plot: Dictionary, segment: int) -> Dictionary:
+	## water()/water_help() 保证每时段至多一条记录；此处取该条（无则空字典）。
+	for entry in plot.get("watered_segments", []):
+		if int(entry.get("segment", -1)) == segment:
+			return entry
+	return {}
+
+
+func _record_helper(plot: Dictionary, helper_id: int, helper_nick: String) -> void:
+	var helpers: Array = plot.get("helpers", [])
+	for entry in helpers:
+		if int(entry.get("account_id", 0)) == helper_id:
+			return
+	helpers.append({"account_id": helper_id, "nick": helper_nick})
+	plot["helpers"] = helpers
+
+
+func _help_result_plots(plot_ids: Array) -> Array:
+	## 生效地块的深拷贝：服务端原样回给帮助端，用于就地刷新拜访院子的快照。
+	var plots: Array = []
+	for id in plot_ids:
+		var plot := get_plot(id)
+		if not plot.is_empty():
+			plots.append(plot.duplicate(true))
+	return plots
+
+
 func _segment_water_level(plot: Dictionary, segment: int) -> int:
 	## 该时段已记录的最高水壶档位（0 = 未浇）。
 	var best := 0
@@ -792,6 +887,41 @@ func apply_fertilizer(plot_id: int, kind: String, now: int) -> Dictionary:
 	if plot["seed_id"] != 0:
 		_append_round_event(plot, now, "fertilizer", "施用了%s（对本次生长有效）。" % defn["display_name"])
 	return {"ok": true, "fertilizer": plot["fertilizer"].duplicate(true)}
+
+
+## 好友帮施肥（R8）：门槛与 apply_fertilizer 一致（未知肥料/未到期不可覆盖），但不扣本地
+## 库存——帮助者的肥料在帮助者自己的档上扣（见 spend_fertilizer_for_help）。
+func fertilize_help(plot_id: int, kind: String, helper_id: int, helper_nick: String, now: int) -> Dictionary:
+	var plot := get_plot(plot_id)
+	if plot.is_empty():
+		return {"ok": false, "message": "找不到这块地。"}
+	var defn: Dictionary = PlantDefs.FERTILIZERS.get(kind, {})
+	if defn.is_empty():
+		return {"ok": false, "message": "未知肥料。"}
+	if not plot.get("fertilizer", {}).is_empty() and plot["fertilizer"]["expires_at"] > now:
+		var remaining_minutes := int(ceil(float(plot["fertilizer"]["expires_at"] - now) / 60.0))
+		return {"ok": false, "message": "这块地的%s还有约 %d 分钟才到期，到期后才能换新肥料。" % [PlantDefs.FERTILIZERS[plot["fertilizer"]["kind"]]["display_name"], remaining_minutes]}
+	plot["fertilizer"] = {"kind": kind, "applied_at": now, "expires_at": now + defn["duration_seconds"], "helper": helper_id, "helper_nick": helper_nick}
+	if plot["seed_id"] != 0:
+		_append_round_event(plot, now, "help", "好友 %s 帮你施用了%s。" % [helper_nick, defn["display_name"]])
+	_record_helper(plot, helper_id, helper_nick)
+	return {"ok": true, "fertilizer": plot["fertilizer"].duplicate(true), "exp": PlantDefs.HELPER_EXP_PER_ACTION, "plots": [plot.duplicate(true)]}
+
+
+## 帮助者侧收益：只加通用种地经验（不加植物经验、不加金币）。
+func grant_help_exp(amount: int) -> void:
+	state["farming_exp"] = int(state["farming_exp"]) + amount
+
+
+## 帮助者侧库存：为好友施肥消耗自己的肥料（一次一份），文案与 apply_fertilizer 同口径。
+func spend_fertilizer_for_help(kind: String) -> Dictionary:
+	var defn: Dictionary = PlantDefs.FERTILIZERS.get(kind, {})
+	if defn.is_empty():
+		return {"ok": false, "message": "未知肥料。"}
+	if int(state["fertilizers"].get(kind, 0)) < 1:
+		return {"ok": false, "message": "没有%s了，请先到商店购买。" % defn["display_name"]}
+	state["fertilizers"][kind] = int(state["fertilizers"][kind]) - 1
+	return {"ok": true}
 
 
 func active_fertilizer_for_round(plot: Dictionary) -> String:
@@ -977,6 +1107,7 @@ func harvest(plot_id: int, now: int) -> Dictionary:
 	plot["preroll"] = {}
 	plot["events"] = []
 	plot["parent_traits"] = []
+	plot["helpers"] = []
 	return {
 		"ok": true,
 		"batch": batch.duplicate(true),
@@ -1210,7 +1341,10 @@ func _score_breakdown(plot: Dictionary) -> Dictionary:
 	for entry in plot["preroll"]["encounters"]:
 		encounter_tiers.append(entry["tier"])
 		encounter_bonus += entry["tier"]
-	var per_crop := base + level_bonus + fluctuation_bonus + water_bonus + fertilizer_bonus + encounter_bonus
+	# 好友帮助加成：每位好友每轮一次的基准分百分比，多人可叠加（R8）。
+	var helper_count: int = plot.get("helpers", []).size()
+	var helper_bonus := _percent_of(base, PlantDefs.HELPER_BONUS_PCT_PER_FRIEND * helper_count)
+	var per_crop := base + level_bonus + fluctuation_bonus + water_bonus + fertilizer_bonus + encounter_bonus + helper_bonus
 	return {
 		"base": base,
 		"farming_level_snapshot": snapshot["farming_level"],
@@ -1225,6 +1359,8 @@ func _score_breakdown(plot: Dictionary) -> Dictionary:
 		"fertilizer_bonus": fertilizer_bonus,
 		"encounter_tiers": encounter_tiers,
 		"encounter_bonus": encounter_bonus,
+		"helper_count": helper_count,
+		"helper_bonus": helper_bonus,
 		"per_crop_score": per_crop,
 		"crop_count": defn["crop_count"],
 		"batch_total": per_crop * defn["crop_count"],
@@ -1294,6 +1430,7 @@ func _empty_plot(plot_id: int) -> Dictionary:
 		"fertilizer": {},
 		"preroll": {},
 		"events": [],
+		"helpers": [],
 		"parent_traits": [],
 	}
 

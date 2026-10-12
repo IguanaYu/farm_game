@@ -27,6 +27,7 @@ var features: Array = [
 	OnlineProtocol.FEATURE_FARM_INVENTORY,
 	OnlineProtocol.FEATURE_EXPEDITION,
 	OnlineProtocol.FEATURE_VISIT,
+	OnlineProtocol.FEATURE_VISIT_HELP,
 ]
 var dev_mode := false
 ## M4 运维（O02/O03/O04）：维护文件、错误计数、启动时刻。
@@ -96,6 +97,7 @@ func _ready() -> void:
 	visits.auth = auth
 	visits.features = features
 	visits.visits_open = not _visits_closed
+	visits.farm_service = farms
 	if not _listen_tls():
 		quit_now(4)
 		return

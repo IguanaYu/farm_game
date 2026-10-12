@@ -88,6 +88,11 @@ const LEVEL_BONUS_PER_LEVEL := 5
 ## 水壶 2 级购买在阶段 4 接入，这里只预留数据。
 const WATER_BONUS_BY_CAN := {1: 10, 2: 20}
 
+## 好友互助（R8）：每位好友对同一块地的同一轮最多贡献一次的基准分百分比，多人可叠加。
+const HELPER_BONUS_PCT_PER_FRIEND := 5
+## 每次有效帮助（实际完成浇水/升级水壶档位/施肥成功）给帮助者的通用种地经验。
+const HELPER_EXP_PER_ACTION := 5
+
 const FERTILIZERS: Dictionary = {
 	"basic": {
 		"display_name": "基础肥料",

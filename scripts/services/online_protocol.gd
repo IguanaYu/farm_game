@@ -7,7 +7,8 @@ extends RefCounted
 ## 传输协议版本（信封结构变更时 +1；不兼容旧版直接握手拒绝）。
 ## v3（M3）：新增 expedition 特性组、room.*/run.* 命令与 t="push" 主动推送；welcome 扩展 room/run。
 ## v4（R7）：新增 visit 特性组（只读邻里地址簿与家园快照）。
-const PROTO_VERSION := 4
+## v5（R8）：visit 特性组扩展写命令 visit.water/visit.fertilize（好友互助，跨账户事务）。
+const PROTO_VERSION := 5
 ## 规则/数值版本（PlantDefs/MarketDefs/存档结构等影响线上判定时 +1）。
 const RULES_VERSION := 1
 ## 客户端构建号（发正式试玩包时递增；服务器用它拒绝过旧的包）。
@@ -24,6 +25,7 @@ const FEATURE_FARM_CRAFT := "farm_craft"      # M2：制作/设施/目标
 const FEATURE_FARM_INVENTORY := "farm_inventory"  # M2：装备仓库与战备
 const FEATURE_EXPEDITION := "expedition"          # M3：房间/单人洞窟/局内动作/结算
 const FEATURE_VISIT := "visit"                    # R7：邻里地址簿/只读家园参观
+const FEATURE_VISIT_HELP := "visit_help"          # R8：好友互助（visit.water/visit.fertilize 跨账户写）
 
 ## 默认服务器地址（M0 已部署：腾讯云 + 自签证书直连；设置可覆盖）。
 const DEFAULT_SERVER_URL := "wss://111.229.19.23:31971"
