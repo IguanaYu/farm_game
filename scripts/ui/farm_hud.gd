@@ -136,6 +136,9 @@ var selected_guest_id := 0
 var readonly_title := ""
 var readonly_body := ""
 var readonly_owner := ""
+## R8：拜访照料弹窗的数据快照（主人地块 + 主人概要；库存读访客自己的 current_state）。
+var visit_care_plot: Dictionary = {}
+var visit_care_owner: Dictionary = {}
 var guest_quotes: Array[PanelContainer] = []
 var quote_labels: Array[Label] = []
 var quote_projection: Callable = Callable()
@@ -209,7 +212,7 @@ func update_harvest_entry() -> void:
 
 func show_plot_hint(plot_id: int, plot: Dictionary, now: int) -> void:
 	if plot_id == 0:
-		plot_hint_label.text = {"farm":"点击田地种植 · 建筑与路口可以进入", "shop":"篮子选数量，再找客人成交", "cave_camp":"洞口出发 · 战备台配装 · 篝火组队", "visit_yard":"只读参观 · 房子进屋 · 院门回家", "visit_house":"坐坐喝茶 · 门窗回到院子"}.get(location_id, "")
+		plot_hint_label.text = {"farm":"点击田地种植 · 建筑与路口可以进入", "shop":"篮子选数量，再找客人成交", "cave_camp":"洞口出发 · 战备台配装 · 篝火组队", "visit_yard":"生长中作物可帮浇水施肥 · 院门回家", "visit_house":"坐坐喝茶 · 门窗回到院子"}.get(location_id, "")
 		return
 	if plot.is_empty() or not bool(plot.get("owned",false)):
 		plot_hint_label.text = "待开垦地 · 点击查看开垦条件"
@@ -281,6 +284,9 @@ func set_online_status(text: String, is_online: bool) -> void:
 
 ## R7：拜访入口选中（地址簿回调）。
 signal visit_enter_requested(owner: Dictionary, farm: Dictionary)
+## R8 好友互助：拜访照料弹窗的动作出口（世界层转发 bridge 的 visit.water/visit.fertilize）。
+signal visit_water_requested(owner_id: int, plot_id: int)
+signal visit_fertilize_requested(owner_id: int, plot_id: int, kind: String)
 
 
 func _online_blocked(hint: String) -> bool:
@@ -362,7 +368,7 @@ func open_plot_care(plot_id: int) -> void:
 
 func _apply_modal_height(_half_height: int) -> void:
 	# Light workspaces leave the world visible; only complex expedition work uses a full-screen mode.
-	var compact := active_modal in ["seed_picker","plot_care","harvest","harvest_all","expansion","readonly","guest"]
+	var compact := active_modal in ["seed_picker","plot_care","harvest","harvest_all","expansion","readonly","guest","visit_care"]
 	var width := 430.0 if compact else 530.0
 	var height := minf(490.0 if compact else 640.0,size.y-140.0)
 	var at := Vector2(size.x-width-24,112)
@@ -683,13 +689,16 @@ func _render_modal() -> void:
 			modal_title.text = readonly_title
 			modal_content.add_child(_wrapped(readonly_owner,LEAF))
 			modal_content.add_child(_wrapped(readonly_body))
+		"visit_care":
+			sell_all_button.visible = false
+			_render_visit_care()
 	call_deferred("_fit_workspace")
 
 
 func _fit_workspace() -> void:
 	if not modal_overlay.visible:
 		return
-	var cap := minf(490.0 if active_modal in ["seed_picker","plot_care","harvest","expansion","readonly","guest"] else 640.0,size.y-140.0)
+	var cap := minf(490.0 if active_modal in ["seed_picker","plot_care","harvest","expansion","readonly","guest","visit_care"] else 640.0,size.y-140.0)
 	modal_panel.size.y = minf(cap,maxf(210,modal_content.get_combined_minimum_size().y+146))
 	modal_panel.position.x = maxf(24,minf(modal_panel.position.x,size.x-modal_panel.size.x-24))
 
@@ -766,6 +775,8 @@ func _breakdown_card(breakdown: Dictionary, batch: Dictionary, _compact := false
 	var stack := _card_stack(card)
 	stack.add_child(_label("每个作物的分数", 16, TEXT_DARK))
 	var values := [["基准", breakdown["base"]], ["等级", breakdown["level_bonus"]], ["波动", breakdown["fluctuation_bonus"]], ["浇水", breakdown["water_bonus"]], ["肥料", breakdown["fertilizer_bonus"]], ["遭遇", breakdown["encounter_bonus"]]]
+	if int(breakdown.get("helper_count", 0)) > 0:
+		values.append(["好友帮助 ×%d" % int(breakdown.get("helper_count", 0)), breakdown.get("helper_bonus", 0)])
 	for entry in values:
 		var row := HBoxContainer.new()
 		stack.add_child(row)
@@ -860,6 +871,60 @@ func _render_plot_care() -> void:
 
 func _emit_fertilize(plot_id: int, kind: String) -> void:
 	fertilize_requested.emit(plot_id, kind)
+
+
+## R8：拜访照料弹窗主体。浇水时段/肥料状态读主人地块快照；肥料按钮的次数读访客自己的库存。
+func _render_visit_care() -> void:
+	var plot := visit_care_plot
+	var owner_nick := str(visit_care_owner.get("nick", "好友"))
+	var owner_id := int(visit_care_owner.get("account_id", 0))
+	var plot_id := int(plot.get("id", 0))
+	var kind := str(plot.get("kind", "cabbage"))
+	var defn := PlantDefs.get_plant(kind)
+	modal_title.text = "%s 的%s · 地块 %02d" % [owner_nick, defn["display_name"], plot_id]
+	modal_icon.texture = CROP_ICONS.get(kind, CROP_ICONS["cabbage"])
+	var remaining: int = maxi(0, int(plot.get("ready_at", 0)) - view_now)
+	modal_content.add_child(_label("距成熟 %02d:%02d" % [int(remaining / 60), remaining % 60], 24, LEAF))
+	var chips := HFlowContainer.new()
+	modal_content.add_child(chips)
+	var segment_length := PlantDefs.segment_seconds(kind)
+	var segments_total: int = defn["water_segments"]
+	var elapsed := maxi(0, view_now - int(plot.get("planted_at", 0)))
+	var current_index := clampi(int(elapsed / maxi(1, segment_length)), 0, segments_total - 1) if segment_length > 0 else 0
+	for index in range(segments_total):
+		var watered := false
+		for entry in plot.get("watered_segments", []):
+			if int(entry.get("segment", -1)) == index:
+				watered = true
+		var caption := "已浇水" if watered else ("可浇水" if index == current_index else ("已错过" if index < current_index else "未到时段"))
+		chips.add_child(_tag("%d · %s" % [index + 1, caption], Color("#e9f0e4") if watered else Color("#edf0f3"), LEAF if watered else TEXT_MUTED))
+	var helpers: Array = plot.get("helpers", [])
+	var helper_names := ", ".join(helpers.map(func(entry): return str(entry.get("nick", "好友"))))
+	modal_content.add_child(_wrapped(("已有好友帮助 ×%d（%s）" % [helpers.size(), helper_names]) if not helpers.is_empty() else "还没有好友帮过这块地"))
+	modal_content.add_child(_wrapped("每位好友每轮加 %d%% 基准分；浇水按你的水壶档位取最高，施肥消耗你自己的肥料。" % PlantDefs.HELPER_BONUS_PCT_PER_FRIEND))
+	var water := _solid_button("帮 %s 浇水 · 免费" % owner_nick, Color("#416c87"))
+	water.pressed.connect(func(): visit_water_requested.emit(owner_id, plot_id))
+	modal_content.add_child(water)
+	modal_content.add_child(_section_label("帮施肥（用你自己的肥料）"))
+	var fertilizer: Dictionary = plot.get("fertilizer", {})
+	var blocked: bool = not fertilizer.is_empty() and int(fertilizer.get("expires_at", 0)) > view_now
+	if blocked:
+		modal_content.add_child(_wrapped("%s · 剩余 %d 分钟" % [PlantDefs.FERTILIZERS[str(fertilizer.get("kind", "basic"))]["display_name"], int(ceil(float(fertilizer["expires_at"] - view_now) / 60.0))], LEAF))
+	var owned_any := false
+	var choices := HFlowContainer.new()
+	modal_content.add_child(choices)
+	for fertilizer_kind in PlantDefs.FERTILIZERS:
+		var uses := int(current_state.get("fertilizers", {}).get(fertilizer_kind, 0))
+		if uses <= 0:
+			continue
+		owned_any = true
+		var button := _solid_button("%s · %d 次" % [PlantDefs.FERTILIZERS[fertilizer_kind]["display_name"], uses], Color("#edf2e9"))
+		button.disabled = blocked
+		button.tooltip_text = "肥料未到期，不能替换" if blocked else "施用 1 次，有效 2 小时"
+		button.pressed.connect(func(): visit_fertilize_requested.emit(owner_id, plot_id, fertilizer_kind))
+		choices.add_child(button)
+	if not owned_any:
+		modal_content.add_child(_wrapped("你的仓库里没有肥料，回自家商店可以补货。"))
 
 
 func _render_shop() -> void:
@@ -2249,6 +2314,16 @@ func open_readonly(title: String, content: String, owner: String) -> void:
 	readonly_owner = owner
 	active_modal = "readonly"
 	_apply_modal_height(200)
+	modal_overlay.visible = true
+	_render_modal()
+
+
+## R8：拜访照料（好友互助）——生长中的主人地块才进入；数据是快照，动作经世界层发服务器。
+func open_visit_care(owner: Dictionary, plot: Dictionary) -> void:
+	visit_care_owner = owner
+	visit_care_plot = plot
+	active_modal = "visit_care"
+	_apply_modal_height(285)
 	modal_overlay.visible = true
 	_render_modal()
 

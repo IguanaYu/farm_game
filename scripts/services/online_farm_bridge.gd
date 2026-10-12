@@ -214,6 +214,19 @@ func leave_visit() -> void:
 	visiting = {}
 
 
+# —— R8 好友互助命令面（写路径：主人农场生效 + 自己扣肥料/得经验） ———————————
+
+
+## 帮主人浇水；应答自带自己的农场快照（request 内部自动回灌 game 副本）。
+func visit_water(owner_id: int, plot_id: int) -> Dictionary:
+	return await request("visit.water", {"owner_id": owner_id, "plot_id": plot_id})
+
+
+## 用自己的肥料帮主人施肥（库存扣自己的，效果落主人地块）。
+func visit_fertilize(owner_id: int, plot_id: int, kind: String) -> Dictionary:
+	return await request("visit.fertilize", {"owner_id": owner_id, "plot_id": plot_id, "kind": kind})
+
+
 ## 局内动作（供 map/battle/loot 的 sink 调用）：返回规则结果字典；
 ## 失败/超时返回 {ok:false, reason}。req_ok 附带的 run 已按 version 灌入镜像。
 func run_action(kind: String, args: Dictionary = {}) -> Dictionary:

@@ -389,7 +389,8 @@ func _on_neighbor_entry_input(_camera: Node, event: InputEvent, _position: Vecto
 
 ## —— R7 拜访（稿 §7）—————————————————————————————————————————————
 
-## 拜访入口：地址簿选中后建院子并切换。owner/farm 来自 visit.snapshot（只读）。
+## 拜访入口：地址簿选中后建院子并切换。owner/farm 来自 visit.snapshot。
+## R8：院子里的生长中作物可以帮浇水/施肥（visit_care 弹窗）；其余地块仍只读参观。
 func enter_visit(owner: Dictionary, farm_state: Dictionary) -> void:
 	_clear_visit_locations()
 	visit_yard = _build_visit_yard(owner, farm_state)
@@ -402,7 +403,7 @@ func enter_visit(owner: Dictionary, farm_state: Dictionary) -> void:
 	_register_visit_location("visit_house", visit_house, "VisitHouseCamera")
 	hud.set_visiting(true)
 	router.switch_to("visit_yard", false)
-	hud.show_status("正在拜访 %s 的家园（只读参观）。" % str(owner.get("nick", "邻居")))
+	hud.show_status("正在拜访 %s 的家园，生长中的作物可以帮忙浇水、施肥。" % str(owner.get("nick", "邻居")))
 
 
 func _clear_visit_locations() -> void:
@@ -434,23 +435,7 @@ func _build_visit_yard(owner: Dictionary, farm_state: Dictionary) -> Node3D:
 	SceneArt.landscape(yard,true)
 	var plots: Array = farm_state.get("plots",[])
 	for index in range(mini(plots.size(),FarmGame.MAX_PLOTS)):
-		var plot: Dictionary = plots[index]
-		var slot := _hotspot(yard,"VisitPlot_%02d" % (index+1),Vector3((index%5-2)*2.7,0.08,0.5+int(index/5)*2.7),Vector3(2.35,0.65,2.35),"查看地块 %02d" % (index+1),_on_visit_crop_input.bind(plot.duplicate(true)))
-		if not bool(plot.get("owned",false)):
-			SceneArt.undeveloped(slot)
-			continue
-		var model: PackedScene = PLOT_EMPTY
-		if int(plot.get("seed_id",0)) != 0:
-			var kind := str(plot.get("kind","cabbage"))
-			var stage := "sprout"
-			if _now() >= int(plot.get("ready_at",0)):
-				stage = "mature"
-			elif _now()-int(plot.get("planted_at",0)) >= int(PlantDefs.get_plant(kind)["grow_seconds"])/3:
-				stage = "growing"
-			model = STAGE_MODELS.get(kind,{}).get(stage,PLOT_EMPTY)
-		var appearance := model.instantiate()
-		appearance.name = "VisitCrop"
-		slot.add_child(appearance)
+		_add_visit_plot(yard,index,plots[index])
 	var roof_color := Color(str(owner.get("roof_color","#b9785c")))
 	var house := _add_cottage(yard,"VisitHouse",Vector3(0,0,-6.2),str(owner.get("nick","邻居"))+" 的家",roof_color,false,_on_visit_house_input)
 	house.set_meta("owner_nick",str(owner.get("nick","邻居")))
@@ -471,6 +456,26 @@ func _build_visit_yard(owner: Dictionary, farm_state: Dictionary) -> Node3D:
 	gate.add_child(leaf)
 	SceneArt.box(leaf,"HalfOpenGate",Vector3(0.5,0.65,0),Vector3(1.0,1.1,0.1),SceneArt.WOOD)
 	return yard
+
+
+## 院子单地块热点：绑定主人地块快照并按生长阶段摆模型；互助刷新时逐块重建复用。
+func _add_visit_plot(yard: Node3D, index: int, plot: Dictionary) -> void:
+	var slot := _hotspot(yard,"VisitPlot_%02d" % (index+1),Vector3((index%5-2)*2.7,0.08,0.5+int(index/5)*2.7),Vector3(2.35,0.65,2.35),"查看地块 %02d" % (index+1),_on_visit_crop_input.bind(plot.duplicate(true)))
+	if not bool(plot.get("owned",false)):
+		SceneArt.undeveloped(slot)
+		return
+	var model: PackedScene = PLOT_EMPTY
+	if int(plot.get("seed_id",0)) != 0:
+		var kind := str(plot.get("kind","cabbage"))
+		var stage := "sprout"
+		if _now() >= int(plot.get("ready_at",0)):
+			stage = "mature"
+		elif _now()-int(plot.get("planted_at",0)) >= int(PlantDefs.get_plant(kind)["grow_seconds"])/3:
+			stage = "growing"
+		model = STAGE_MODELS.get(kind,{}).get(stage,PLOT_EMPTY)
+	var appearance := model.instantiate()
+	appearance.name = "VisitCrop"
+	slot.add_child(appearance)
 
 
 func _build_visit_house(owner: Dictionary) -> Node3D:
@@ -711,6 +716,8 @@ func _build_hud() -> void:
 	hud.debug_mature_requested.connect(_debug_mature_all)
 	hud.expedition_save_requested.connect(_on_expedition_save_requested)
 	hud.save_requested.connect(_on_plain_save_requested)
+	hud.visit_water_requested.connect(_on_visit_water_requested)
+	hud.visit_fertilize_requested.connect(_on_visit_fertilize_requested)
 
 
 func _refresh_all() -> void:
@@ -1778,11 +1785,95 @@ func _on_basket_input(_camera: Node, event: InputEvent, _p: Vector3, _n: Vector3
 
 func _on_visit_crop_input(_camera: Node, event: InputEvent, _p: Vector3, _n: Vector3, _i: int, plot: Dictionary) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		AudioKit.play(self, "ui_click")
+		hud.view_now = _now()
+		## R8 分发器：生长中的作物进照料弹窗（帮浇水/施肥）；空地/未开垦/成熟仍只读参观。
+		var growing := bool(plot.get("owned", false)) and int(plot.get("seed_id", 0)) != 0 and _now() < int(plot.get("ready_at", 0))
+		if growing and online != null and not online.visiting.is_empty():
+			hud.open_visit_care(online.visiting.get("owner", {}), plot)
+			return
 		var content := "尚未开垦" if not bool(plot.get("owned",false)) else "空地"
 		if int(plot.get("seed_id",0)) != 0:
 			content = PlantDefs.get_plant(str(plot.get("kind","cabbage")))["display_name"]
 			content += " · 已成熟" if _now() >= int(plot.get("ready_at",0)) else " · 生长中"
 		hud.open_readonly("主人地块",content+"。这是家园快照，可以参观。",_visit_owner_nick())
+
+
+## —— R8 好友互助（visit.water / visit.fertilize 的客户端链路） —————————————————
+
+
+func _on_visit_water_requested(owner_id: int, plot_id: int) -> void:
+	if online == null or online.visiting.is_empty():
+		hud.show_status("连接不可用，稍后再试。")
+		return
+	var reply: Dictionary = await online.visit_water(owner_id, plot_id)
+	if reply.is_empty() or reply.get("t", "") == "req_err":
+		if not reply.is_empty():
+			AudioKit.play(self, "warn")
+			hud.show_status(str(reply.get("msg", "帮助浇水失败")))
+		return
+	_finish_visit_help(reply["result"], "浇水")
+
+
+func _on_visit_fertilize_requested(owner_id: int, plot_id: int, kind: String) -> void:
+	if online == null or online.visiting.is_empty():
+		hud.show_status("连接不可用，稍后再试。")
+		return
+	var reply: Dictionary = await online.visit_fertilize(owner_id, plot_id, kind)
+	if reply.is_empty() or reply.get("t", "") == "req_err":
+		if not reply.is_empty():
+			AudioKit.play(self, "warn")
+			hud.show_status(str(reply.get("msg", "帮助施肥失败")))
+		return
+	_finish_visit_help(reply["result"], "施肥")
+
+
+## 帮助生效后：用应答里的主人地块快照修补 visiting.farm → 重建院子视觉 →
+## 刷新自家计数（应答快照已被 bridge 自动灌进 game）→ 弹窗换新数据。
+func _finish_visit_help(result: Dictionary, action: String) -> void:
+	var updated_plots: Array = result.get("plots", [])
+	var farm_state: Dictionary = online.visiting.get("farm", {})
+	var farm_plots: Array = farm_state.get("plots", [])
+	for updated in updated_plots:
+		var updated_id := int(updated.get("id", 0))
+		for index in range(farm_plots.size()):
+			if int((farm_plots[index] as Dictionary).get("id", index + 1)) == updated_id:
+				farm_plots[index] = updated
+				break
+	AudioKit.play(self, "water")
+	hud.refresh(online.game.state)
+	_refresh_visit_yard()
+	var owner_nick := str(online.visiting.get("owner", {}).get("nick", "好友"))
+	var detail := ""
+	if not (result.get("watered", []) as Array).is_empty():
+		detail = "，第 %s 块地已浇水" % "、".join((result["watered"] as Array).map(func(id): return str(id)))
+	elif not (result.get("upgraded", []) as Array).is_empty():
+		detail = "，第 %s 块地的浇水档位升到了最高" % "、".join((result["upgraded"] as Array).map(func(id): return str(id)))
+	elif not (result.get("fertilizer", {}) as Dictionary).is_empty():
+		detail = "，施肥生效 2 小时"
+	hud.show_status("已帮 %s%s%s（帮助经验 +%d）。" % [owner_nick, action, detail, int(result.get("exp", 0))])
+	## 弹窗还开着且本次影响了它：换新地块数据（时段 chips/施肥状态/好友计数）。
+	if hud.active_modal == "visit_care":
+		var care_id := int(hud.visit_care_plot.get("id", 0))
+		for updated in updated_plots:
+			if int(updated.get("id", 0)) == care_id:
+				hud.open_visit_care(online.visiting.get("owner", {}), updated)
+				break
+
+
+## 只重建院子里的地块热点（相机/房子/院门与路由都不动）：好友互助生效后刷新快照数据用。
+## 旧节点先改名再释放，避免同名新节点在本帧与待释放节点冲突。
+func _refresh_visit_yard() -> void:
+	if online == null or online.visiting.is_empty() or visit_yard == null:
+		return
+	var plots: Array = online.visiting.get("farm", {}).get("plots", [])
+	for index in range(mini(plots.size(), FarmGame.MAX_PLOTS)):
+		var slot: Node = visit_yard.get_node_or_null("VisitPlot_%02d" % (index + 1))
+		if slot != null:
+			slot.name = "_OldVisitPlot_%d" % index
+			slot.queue_free()
+	for index in range(mini(plots.size(), FarmGame.MAX_PLOTS)):
+		_add_visit_plot(visit_yard, index, plots[index])
 
 
 func _on_visit_display_input(_camera: Node, event: InputEvent, _p: Vector3, _n: Vector3, _i: int) -> void:
