@@ -107,7 +107,6 @@ func _build() -> void:
 	var titles := VBoxContainer.new()
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(titles)
-	titles.add_child(ExpeditionUI.label("EXPEDITION  /  FIELD SALVAGE", 12, ExpeditionUI.GOLD))
 	title_label = ExpeditionUI.label("战场搜刮", 30)
 	titles.add_child(title_label)
 	summary_label = ExpeditionUI.label("", 15, ExpeditionUI.TEAL)
@@ -116,7 +115,8 @@ func _build() -> void:
 	return_button = ExpeditionUI.button("← 返回战场")
 	return_button.pressed.connect(_return_to_battlefield)
 	header.add_child(return_button)
-	var menu := ExpeditionUI.button("☰  菜单")
+	var menu := ExpeditionUI.settings_button()
+	menu.name = "LootSettingsButton"
 	menu.pressed.connect(_open_menu)
 	header.add_child(menu)
 	rule_label = _wrapped("", 15, ExpeditionUI.MUTED)
@@ -138,6 +138,7 @@ func _build() -> void:
 	}
 	workspace.grid_min_height = 244
 	workspace.show_hint = false
+	workspace.dark_doll = true
 	workspace.setup(self, {
 		"place": _on_workspace_place,
 		"equip": _on_workspace_equip,
@@ -251,7 +252,7 @@ func _build() -> void:
 	modal_panel.add_child(modal_content)
 
 func _section(parent: Control, ratio: float) -> VBoxContainer:
-	var panel := ExpeditionUI.panel(Color("#1b2d35ed"), ExpeditionUI.LINE, 18)
+	var panel := ExpeditionUI.panel(Color(ExpeditionUI.PANEL, 0.94), ExpeditionUI.LINE, 18)
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	panel.size_flags_stretch_ratio = ratio
 	parent.add_child(panel)
@@ -283,7 +284,7 @@ func display(snapshot: Dictionary, member_key := "p1", serial := -1) -> void:
 		pending_acknowledged = false
 		pending_selected_id = -1
 		_close_modal()
-		feedback_label.text = "点选比较，拖入格子；拖动时按 R 旋转。"
+		feedback_label.text = "拖动装包 · R 旋转"
 		feedback_label.add_theme_color_override("font_color", ExpeditionUI.MUTED)
 	run = snapshot
 	player_key = member_key
@@ -325,13 +326,21 @@ func display(snapshot: Dictionary, member_key := "p1", serial := -1) -> void:
 		if selected_token == "" and not entries.is_empty() and not searchable:
 			selected_token = str(entries[0]["token"])
 	var type := str(_node().get("type", ""))
-	title_label.text = {"chest": "打开宝箱", "gather": "采集与搜刮"}.get(type, "战场搜刮 · 战斗胜利")
+	title_label.text = {"chest": "宝箱", "gather": "采集"}.get(type, "战场搜刮")
 	var player: Dictionary = run.get("guest", {}) if player_key == "p2" else run.get("player", {})
 	var totals: Dictionary = DeckBuilder.build(inventory)["totals"]
-	summary_label.text = "生命 %d / %d     深度 %02d\n携带售价 %d 金币  ·  保险箱保护 %d 件\n下一场牌：装备 %d ｜ 胸挂 %d ｜ 背包 %d（保险箱不入堆）" % [int(player.get("hp", 0)), int(player.get("max_hp", 40)), int(run["current"]["row"]), inventory.carry_sell_value(), inventory.loadout_list("safe").size(), int(totals[1]), int(totals[2]), int(totals[3])]
-	rule_label.text = ("个人战利品任选一件，装入成功才锁定选择。" if _choose_one() else "这里的个人物资都可领取，能带多少取决于你的空间。") + ("公共物资全队一份，先领取者获得。" if bool(run.get("coop", false)) else "公共物资不占个人选择次数。")
+	summary_label.text = "生命 %d/%d · %d 金" % [int(player.get("hp", 0)), int(player.get("max_hp", 40)), inventory.carry_sell_value()]
+	summary_label.mouse_filter = Control.MOUSE_FILTER_PASS
+	summary_label.tooltip_text = "深度 %02d · 保险箱保护 %d 件\n下一场牌：装备 %d · 胸挂 %d · 背包 %d\n保险箱不入牌堆。" % [int(run["current"]["row"]), inventory.loadout_list("safe").size(), int(totals[1]), int(totals[2]), int(totals[3])]
+	rule_label.text = "个人物资任选 1 件" if _choose_one() else ""
+	if bool(run.get("coop", false)):
+		rule_label.text += (" · " if rule_label.text != "" else "") + "物资全队共享"
+	rule_label.tooltip_text = "装入成功才锁定选择。公共物资全队一份，先领取者获得。" if _choose_one() else "已发现物品可直接装包，领取数量取决于空间。"
 	if searchable:
-		rule_label.text = "打开尸体后自动按顺序搜索全部区域；空格无需搜索，品质越高搜索越久。已发现的物品可直接装包。" + ("尸体物资全队一份。" if bool(run.get("coop", false)) else "")
+		rule_label.text = "物资全队共享" if bool(run.get("coop", false)) else ""
+		rule_label.tooltip_text = "自动依次搜索；品质越高搜索越久。已发现物品可直接装包。"
+	rule_label.visible = rule_label.text != ""
+	rule_label.mouse_filter = Control.MOUSE_FILTER_PASS
 	if get_viewport().gui_is_dragging():
 		render_after_drag = true
 		return
@@ -413,7 +422,7 @@ func _render_context() -> void:
 	ExpeditionUI.clear(context_column)
 	for i in range(filter_buttons.size()):
 		ExpeditionUI.decorate_button(filter_buttons[i], i == filter_index)
-	loot_heading.text = "现场物资 · 像一个巨大的背包"
+	loot_heading.text = "现场物资"
 	var visible_entries: Array = []
 	for entry in entries:
 		if str(entry["kind"]) == "loot_manage":
@@ -476,7 +485,7 @@ func _render_detail() -> void:
 	var def := ItemDefs.get_item(str(entry["def_id"]))
 	var quality := _entry_quality(entry)
 	var tint := ItemDefs.quality_color(quality)
-	var hero := ExpeditionUI.panel(Color("#13272e"), tint.darkened(0.4), 10)
+	var hero := ExpeditionUI.panel(ExpeditionUI.INK, tint.darkened(0.4), 10)
 	_detail_host.add_child(hero)
 	var hero_row := HBoxContainer.new()
 	hero.add_child(hero_row)
@@ -511,14 +520,18 @@ func _render_detail() -> void:
 		_detail_host.add_child(card_panel)
 		var row := HBoxContainer.new()
 		card_panel.add_child(row)
-		var cost := ExpeditionUI.label("%d\n能量" % int(card.get("cost", 0)), 13, ExpeditionUI.GOLD)
+		var cost := ExpeditionUI.label(str(int(card.get("cost", 0))), 18, ExpeditionUI.GOLD)
+		card_panel.tooltip_text = CardPresentation.full_text(card)
 		cost.custom_minimum_size.x = 36
 		row.add_child(cost)
 		var info := VBoxContainer.new()
 		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		row.add_child(info)
 		info.add_child(ExpeditionUI.label("%s ×%d" % [str(card.get("name", id)), int(counts[id])], 15, ExpeditionUI.RED if cargo else ExpeditionUI.TEXT))
-		info.add_child(_wrapped(str(card.get("desc", "")), 12, ExpeditionUI.MUTED))
+		info.add_child(_wrapped(CardPresentation.effect_text(card), 14, ExpeditionUI.MUTED))
+		var special_rule := CardPresentation.special_rule(card)
+		if special_rule != "":
+			info.add_child(_wrapped(special_rule, 12, ExpeditionUI.GOLD))
 	var comparison := _comparison(entry)
 	if comparison != "":
 		_detail_host.add_child(_wrapped(comparison, 13, ExpeditionUI.TEAL))
@@ -861,7 +874,7 @@ func _region_of(source: Dictionary, region_id: String) -> Dictionary:
 
 ## 掉落装备/容器区域的固定框架：标题＋搜索按钮＋CorpseSearchGrid（紧凑小格）。
 func _build_region_frame(region_id: String, title: String, is_slot: bool) -> PanelContainer:
-	var panel := ExpeditionUI.panel(Color("#13262e"), ExpeditionUI.LINE, 6)
+	var panel := ExpeditionUI.panel(ExpeditionUI.INK, ExpeditionUI.LINE, 6)
 	panel.name = "SearchRegion_" + region_id
 	panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	if is_slot:
@@ -995,7 +1008,8 @@ func _render_search() -> void:
 			source_grid = region_grid
 		checked += region["searched"].size()
 		total += int(region["size"][0]) * int(region["size"][1])
-	count_label.text = "已检查 %d / %d 格 · 点击物品查看，拖动装包\n品质：白 → 蓝 → 紫 → 金 → 红" % [checked, total]
+	count_label.text = "已搜索 %d/%d" % [checked, total]
+	count_label.tooltip_text = "点击物品查看，拖动装包。品质：白 → 蓝 → 紫 → 金 → 红。"
 
 func _search_region(id: String) -> void:
 	if pending_action or modal.visible:

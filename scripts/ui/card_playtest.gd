@@ -3,10 +3,10 @@ extends Control
 ## 首页独立单人试玩：真实战斗与搜刮规则，临时配装，不落农场或局档。
 
 const ENCOUNTERS := [
-	{"name": "骷髅 · 武器与双包", "row": 3, "col": 1},
-	{"name": "野怪 · 多具遗骸", "row": 1, "col": 1},
-	{"name": "守门战 · 2×2 盾牌", "row": 8, "col": 0},
-	{"name": "小泥团 · 入门战斗", "row": 1, "col": 0},
+	{"name": "骷髅", "row": 3, "col": 1},
+	{"name": "野怪", "row": 1, "col": 1},
+	{"name": "守门战", "row": 8, "col": 0},
+	{"name": "小泥团", "row": 1, "col": 0},
 ]
 
 class PlaytestExpedition extends ExpeditionGame:
@@ -27,6 +27,9 @@ var quality_picker: OptionButton
 var test_quality := 0
 var session_label: Label
 var pause_view: CenterContainer
+var pause_shade: ColorRect
+var test_options: VBoxContainer
+var battle_info: HBoxContainer
 var encounter_index := 0
 var battle_number := 0
 
@@ -37,84 +40,143 @@ func _ready() -> void:
 	_reset_equipment()
 
 func _build() -> void:
-	var layout := VBoxContainer.new()
-	layout.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	layout.add_theme_constant_override("separation", 0)
-	add_child(layout)
-	var toolbar := ExpeditionUI.panel(ExpeditionUI.INK, ExpeditionUI.LINE, 0)
-	toolbar.get_theme_stylebox("panel").content_margin_left = 12
-	toolbar.get_theme_stylebox("panel").content_margin_right = 12
-	layout.add_child(toolbar)
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 12)
-	toolbar.add_child(row)
-	session_label = ExpeditionUI.label("单人卡牌试玩", 20, ExpeditionUI.GOLD)
+	var stage := Control.new()
+	stage.name = "PlaytestStage"
+	stage.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(stage)
+	battle = BattleScreen.new()
+	battle.defeat_close_text = "重试本场"
+	battle.battle_closed.connect(_battle_closed)
+	battle.settings_requested.connect(_open_settings)
+	battle.input_blocked = func() -> bool: return pause_view != null and pause_view.visible
+	stage.add_child(battle)
+	loot = ExpeditionLootPanel.new()
+	loot.action_sink = _loot_action
+	loot.menu_requested.connect(_open_settings)
+	stage.add_child(loot)
+	loot.leave_button.text = "下一场 →"
+	loot.battlefield.leave_text = "下一场 →"
+	loot.input_blocked = func() -> bool: return pause_view.visible
+	pause_shade = ColorRect.new()
+	pause_shade.name = "PlaytestSettingsShade"
+	pause_shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_shade.color = Color(ExpeditionUI.INK, 0.76)
+	pause_shade.visible = false
+	pause_shade.z_index = 100
+	add_child(pause_shade)
+	pause_view = CenterContainer.new()
+	pause_view.name = "PlaytestSettingsMenu"
+	pause_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	pause_view.visible = false
+	pause_view.z_index = 101
+	add_child(pause_view)
+	var panel := ExpeditionUI.panel(ExpeditionUI.PANEL, ExpeditionUI.LINE, 20)
+	panel.custom_minimum_size.x = 340
+	pause_view.add_child(panel)
+	var choices := VBoxContainer.new()
+	choices.add_theme_constant_override("separation", 10)
+	panel.add_child(choices)
+	var heading := HBoxContainer.new()
+	heading.add_theme_constant_override("separation", 12)
+	choices.add_child(heading)
+	heading.add_child(ExpeditionUI.seal(36))
+	heading.add_child(ExpeditionUI.label("设置", 26, ExpeditionUI.PAPER))
+	session_label = ExpeditionUI.label("", 13, ExpeditionUI.MUTED)
 	session_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(session_label)
+	session_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	session_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	heading.add_child(session_label)
+	var resume := ExpeditionUI.button("继续游戏", true)
+	resume.name = "PlaytestResumeButton"
+	resume.pressed.connect(_close_settings)
+	choices.add_child(resume)
+	var replay := ExpeditionUI.button("重开本场")
+	replay.name = "ReplayBattleButton"
+	replay.tooltip_text = "恢复生命，保留本次装包的装备。"
+	replay.pressed.connect(_begin_battle)
+	choices.add_child(replay)
+	battle_info = HBoxContainer.new()
+	battle_info.add_theme_constant_override("separation", 10)
+	choices.add_child(battle_info)
+	for entry in [["操作说明", "PlaytestHelpButton", "help"], ["战斗记录", "PlaytestHistoryButton", "history"]]:
+		var info := ExpeditionUI.button(str(entry[0]))
+		info.name = str(entry[1])
+		info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		info.pressed.connect(_show_battle_info.bind(str(entry[2])))
+		battle_info.add_child(info)
+	var home := ExpeditionUI.button("返回首页")
+	home.name = "PlaytestHomeButton"
+	home.tooltip_text = "结束试玩，清空本次试玩进度。"
+	home.pressed.connect(_go_home)
+	choices.add_child(home)
+	var advanced := ExpeditionUI.button("试玩选项")
+	advanced.name = "PlaytestOptionsButton"
+	advanced.pressed.connect(func() -> void: test_options.visible = not test_options.visible)
+	choices.add_child(advanced)
+	test_options = VBoxContainer.new()
+	test_options.name = "PlaytestOptions"
+	test_options.visible = false
+	test_options.add_theme_constant_override("separation", 10)
+	choices.add_child(test_options)
+	var encounter_row := HBoxContainer.new()
+	test_options.add_child(encounter_row)
+	var encounter_caption := ExpeditionUI.label("敌人", 15, ExpeditionUI.MUTED)
+	encounter_caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	encounter_row.add_child(encounter_caption)
 	encounter_picker = OptionButton.new()
 	encounter_picker.name = "PlaytestEncounterPicker"
-	encounter_picker.custom_minimum_size = Vector2(225, 40)
+	encounter_picker.custom_minimum_size = Vector2(180, 40)
+	encounter_picker.tooltip_text = "切换敌人并重开本场。"
 	for encounter in ENCOUNTERS:
 		encounter_picker.add_item(encounter["name"])
 	encounter_picker.item_selected.connect(_select_encounter)
-	row.add_child(encounter_picker)
+	encounter_row.add_child(encounter_picker)
+	var quality_row := HBoxContainer.new()
+	test_options.add_child(quality_row)
+	var quality_caption := ExpeditionUI.label("品质", 15, ExpeditionUI.MUTED)
+	quality_caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	quality_row.add_child(quality_caption)
 	quality_picker = OptionButton.new()
 	quality_picker.name = "PlaytestQualityPicker"
-	quality_picker.custom_minimum_size = Vector2(146, 40)
-	quality_picker.add_item("品质 · 随机掉落")
+	quality_picker.custom_minimum_size = Vector2(180, 40)
+	quality_picker.add_item("随机品质")
 	for quality in range(1, 6):
-		quality_picker.add_item("品质 · " + ItemDefs.quality_name(quality).split(" · ")[0])
+		quality_picker.add_item(ItemDefs.quality_name(quality).split(" · ")[0])
 	quality_picker.tooltip_text = "选择后恢复初始装备并重开本场；临时装备与敌人掉落使用该品质，便于测试颜色和搜索速度。"
 	quality_picker.item_selected.connect(func(index: int) -> void:
 		test_quality = index
 		_reset_equipment())
-	row.add_child(quality_picker)
-	var replay := ExpeditionUI.button("重开本场")
-	replay.name = "ReplayBattleButton"
-	replay.tooltip_text = "恢复生命，保留本次试玩装包的装备，重新开打。"
-	replay.pressed.connect(_begin_battle)
-	row.add_child(replay)
-	var reset := ExpeditionUI.button("恢复初始装备")
+	quality_row.add_child(quality_picker)
+	var reset := ExpeditionUI.button("重置装备")
+	reset.tooltip_text = "恢复初始装备并重开本场。"
 	reset.name = "ResetPlaytestButton"
 	reset.pressed.connect(_reset_equipment)
-	row.add_child(reset)
-	var home := ExpeditionUI.button("返回首页")
-	home.name = "PlaytestHomeButton"
-	home.pressed.connect(_go_home)
-	row.add_child(home)
-	var stage := Control.new()
-	stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	layout.add_child(stage)
-	battle = BattleScreen.new()
-	battle.compact_layout = true
-	battle.defeat_close_text = "重试本场"
-	battle.battle_closed.connect(_battle_closed)
-	stage.add_child(battle)
-	loot = ExpeditionLootPanel.new()
-	loot.action_sink = _loot_action
-	loot.menu_requested.connect(func() -> void: pause_view.visible = true)
-	stage.add_child(loot)
-	loot.leave_button.text = "完成搜刮，下一场战斗 →"
-	loot.battlefield.leave_text = "下一场战斗 →"
-	loot.input_blocked = func() -> bool: return pause_view.visible
-	pause_view = CenterContainer.new()
-	pause_view.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	pause_view.visible = false
-	stage.add_child(pause_view)
-	var panel := ExpeditionUI.panel(ExpeditionUI.PANEL, ExpeditionUI.GOLD, 16)
-	pause_view.add_child(panel)
-	var choices := VBoxContainer.new()
-	choices.add_theme_constant_override("separation", 12)
-	panel.add_child(choices)
-	choices.add_child(ExpeditionUI.label("单人卡牌试玩", 26, ExpeditionUI.GOLD))
-	choices.add_child(ExpeditionUI.label("每场回满生命，搜到的装备可以带入下一场。", 18))
-	choices.add_child(ExpeditionUI.label("返回首页后，本次试玩进度清空。", 18, ExpeditionUI.MUTED))
-	var resume := ExpeditionUI.button("继续试玩", true)
-	resume.pressed.connect(func() -> void: pause_view.visible = false)
-	choices.add_child(resume)
-	var back := ExpeditionUI.button("返回首页")
-	back.pressed.connect(_go_home)
-	choices.add_child(back)
+	test_options.add_child(reset)
+
+func _unhandled_key_input(event: InputEvent) -> void:
+	if visible and pause_view.visible and event is InputEventKey and event.pressed and not event.echo and event.is_action_pressed("pause"):
+		_close_settings()
+		get_viewport().set_input_as_handled()
+
+func _open_settings() -> void:
+	battle_info.visible = battle.visible
+	test_options.visible = false
+	pause_shade.show()
+	pause_view.show()
+	(find_child("PlaytestResumeButton", true, false) as Button).grab_focus()
+
+func _close_settings() -> void:
+	pause_view.hide()
+	pause_shade.hide()
+	if battle.combat != null:
+		battle._refresh()
+
+func _show_battle_info(kind: String) -> void:
+	_close_settings()
+	if kind == "help":
+		battle._open_help()
+	else:
+		battle._open_history()
 
 func _stop_search() -> void:
 	if expedition != null:
@@ -153,7 +215,7 @@ func _select_encounter(index: int) -> void:
 
 func _begin_battle() -> void:
 	_stop_search()
-	pause_view.visible = false
+	_close_settings()
 	loot.visible = false
 	var carried: Dictionary = expedition.run["inventory"].duplicate(true) if expedition != null else {}
 	var next_id := int(expedition.run["next_instance_id"]) if expedition != null else 0
@@ -176,8 +238,9 @@ func _begin_battle() -> void:
 	var reply := expedition.start_battle()
 	if bool(reply.get("ok", false)):
 		battle.open_run(reply["combat"])
-		session_label.text = "单人卡牌试玩 · 第 %d 场" % battle_number
-		battle.status_label.text = "装备已配好 · 打赢后搜索尸体，装包后继续下一场。" if battle_number == 1 else "本次装包已带入 · 每场回满生命，返回首页后清空试玩进度。"
+		session_label.text = "试玩 · %02d" % battle_number
+		session_label.tooltip_text = "每场回满生命，装包的装备带入下一场。返回首页后清空试玩进度。"
+		battle.status_label.text = ""
 
 func _battle_closed() -> void:
 	if battle.last_combat == null:

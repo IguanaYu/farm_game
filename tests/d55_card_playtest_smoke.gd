@@ -41,6 +41,16 @@ func _click(control: Control) -> void:
 		await process_frame
 	await _frames()
 
+func _key(code: Key) -> void:
+	for pressed in [true, false]:
+		var event := InputEventKey.new()
+		event.keycode = code
+		event.physical_keycode = code
+		event.pressed = pressed
+		root.push_input(event, true)
+		await process_frame
+	await _frames()
+
 func _shot(name: String) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
@@ -95,6 +105,28 @@ func _run() -> void:
 	_check(playtest.battle.combat.state["enemies"][0]["def_id"] == "skeleton_scout", "default battle tests equipment skeleton")
 	_check(playtest.expedition.run_inventory().loadout_list("chest").size() == 2 and playtest.expedition.run_inventory().equipped_list().size() == 4, "attack, defense and supply automatically equipped")
 	_check(playtest.expedition.run_inventory().loadout_list("pack").is_empty(), "pack starts empty for loot tests")
+	var settings_button := playtest.battle.find_child("BattleSettingsButton", true, false) as Button
+	_check(settings_button != null and settings_button.is_visible_in_tree(), "battle exposes one settings entrance")
+	_check(not (playtest.find_child("ReplayBattleButton", true, false) as Control).is_visible_in_tree() and not playtest.encounter_picker.is_visible_in_tree(), "restart and test options stay hidden during play")
+	await _click(settings_button)
+	_check(playtest.pause_view.visible and playtest.pause_shade.visible, "actual settings click opens a modal menu")
+	var menu_state: Dictionary = playtest.battle.combat.state.duplicate(true)
+	await _key(KEY_E)
+	await _key(KEY_1)
+	await _click(playtest.battle.end_button)
+	_check(playtest.battle.combat.state == menu_state, "settings blocks battle hotkeys and clicks behind the menu")
+	await _key(KEY_ESCAPE)
+	_check(not playtest.pause_view.visible and not playtest.pause_shade.visible, "Escape closes settings and its shade")
+	await _key(KEY_ESCAPE)
+	_check(playtest.pause_view.visible, "Escape opens settings when no card or inspector is active")
+	await _click(playtest.find_child("PlaytestResumeButton", true, false) as Control)
+	_check(not playtest.pause_view.visible and playtest.battle._can_act(), "resume restores battle input")
+	for card in playtest.battle.combat.state["players"]["p1"]["hand"]:
+		if CardDefs.is_attack_card(str(card["card_id"])):
+			playtest.battle._on_card_clicked(int(card["uid"]))
+			await _key(KEY_ESCAPE)
+			_check(playtest.battle.selected_uid == -1 and not playtest.pause_view.visible, "Escape cancels a selected card before opening settings")
+			break
 	await _shot("02_immediate_battle")
 	await _fight(playtest.battle)
 	_check(str(playtest.battle.combat.state.get("outcome", "")) == "won", "default equipped deck wins real skeleton battle")
@@ -107,6 +139,9 @@ func _run() -> void:
 		quit(1)
 		return
 	await _shot("03_corpse_loot")
+	await _click(playtest.loot.battlefield.find_child("CorpseSettingsButton", true, false) as Control)
+	_check(playtest.pause_view.visible and not playtest.battle_info.visible, "loot uses the same settings menu without inactive battle actions")
+	await _click(playtest.find_child("PlaytestResumeButton", true, false) as Control)
 	await _click(playtest.loot.battlefield.find_child("Corpse_e1", true, false) as Control)
 	await create_timer(float(playtest.expedition.visible_run().get("loot_searches", {}).get("p1", {}).get("remaining", 0)) / 1000.0 + 0.25).timeout
 	_check(not playtest.loot.scene_mode and not playtest.loot.entries.is_empty(), "actual corpse click searches and reveals weapon")
@@ -140,8 +175,14 @@ func _run() -> void:
 	await _shot("05_gate_battle")
 	playtest._select_encounter(1)
 	_check(playtest.battle.combat.state["enemies"].size() == 2, "normal encounter available directly")
+	var replay_number := playtest.battle_number
+	await _click(settings_button)
 	await _click(playtest.find_child("ReplayBattleButton", true, false) as Control)
+	_check(playtest.battle_number == replay_number + 1 and not playtest.pause_view.visible, "restart from settings starts a fresh battle and closes the menu")
 	_check(not playtest.expedition.run_inventory().find_instance(id).is_empty(), "replay keeps this session's loot")
+	await _click(settings_button)
+	await _click(playtest.find_child("PlaytestOptionsButton", true, false) as Control)
+	_check(playtest.encounter_picker.is_visible_in_tree() and playtest.quality_picker.is_visible_in_tree(), "advanced test choices expand inside settings")
 	await _click(playtest.find_child("ResetPlaytestButton", true, false) as Control)
 	_check(playtest.battle_number == 1 and playtest.expedition.run_inventory().loadout_list("pack").is_empty(), "reset clears test loot and restores starter loadout")
 	# 失败使用临时结算，确认后直接重试，不走正式农场资产结算。
@@ -155,11 +196,15 @@ func _run() -> void:
 	_check(playtest.battle.visible and playtest.battle.combat.state["outcome"] == "", "defeat retry immediately starts fresh battle")
 	root.size = Vector2i(1024, 640)
 	await _frames()
-	_check(root.get_visible_rect().encloses((playtest.find_child("PlaytestHomeButton", true, false) as Control).get_global_rect()), "home button fits minimum window")
+	_check(root.get_visible_rect().encloses(settings_button.get_global_rect()), "settings button fits minimum window")
 	_check(playtest.battle.end_button.get_global_rect().end.y <= root.get_visible_rect().end.y + 1, "card action controls fit minimum window")
 	for control in playtest.battle.pile_panel.get_children():
 		_check(root.get_visible_rect().encloses(control.get_global_rect()), "every pile control fits minimum window")
 	await _shot("06_small_window")
+	await _click(settings_button)
+	await _click(playtest.find_child("PlaytestOptionsButton", true, false) as Control)
+	for name in ["PlaytestHomeButton", "ResetPlaytestButton", "ReplayBattleButton", "PlaytestResumeButton"]:
+		_check(root.get_visible_rect().encloses((playtest.find_child(name, true, false) as Control).get_global_rect()), "expanded settings action fits minimum window: " + name)
 	await _click(playtest.find_child("PlaytestHomeButton", true, false) as Control)
 	_check(current_scene is MainMenu, "home button returns to homepage")
 	_check(_save_fingerprints() == before, "entry, battle, loot, retry and return do not alter farm or expedition saves")

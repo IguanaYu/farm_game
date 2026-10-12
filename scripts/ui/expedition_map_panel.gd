@@ -99,7 +99,7 @@ func _build() -> void:
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 16)
 	column.add_child(body)
-	var left := ExpeditionUI.panel(Color("#172a33dd"), ExpeditionUI.LINE, 14)
+	var left := ExpeditionUI.panel(Color(ExpeditionUI.INK, 0.88), ExpeditionUI.LINE, 14)
 	left.custom_minimum_size.x = 370
 	left.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	left.size_flags_stretch_ratio = 0.9
@@ -107,14 +107,14 @@ func _build() -> void:
 	map_column = VBoxContainer.new()
 	map_column.add_theme_constant_override("separation", 6)
 	left.add_child(map_column)
-	map_column.add_child(_label("路线图  /  向上深入", 16, CREAM))
+	map_column.add_child(_label("路线", 16, CREAM))
 	route_view = ExpeditionRoute.new()
 	route_view.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	route_view.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	route_view.node_selected.connect(_select_route)
 	map_column.add_child(route_view)
-	map_column.add_child(_label("◆ 当前位置   ✓ 已完成   金色连线：下一步", 12, ExpeditionUI.MUTED))
-	var right := ExpeditionUI.panel(Color("#1b2d35ed"), ExpeditionUI.LINE, 18)
+	route_view.tooltip_text = "向上深入 · ◆ 当前位置 · ✓ 已完成 · 金色连线为下一步"
+	var right := ExpeditionUI.panel(Color(ExpeditionUI.PANEL, 0.94), ExpeditionUI.LINE, 18)
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	body.add_child(right)
 	var right_column := VBoxContainer.new()
@@ -187,10 +187,11 @@ func _refresh() -> void:
 			if str(ItemDefs.get_item(str(instance["def_id"])).get("category", "")) == "supply" and int(instance.get("uses_remaining", 1)) > 0:
 				supplies += 1
 	layer_title.text = str(ExpeditionDefs.layer(str(run["layer_id"])).get("name", "矿洞探索"))
-	header_label.text = "深度 %02d / %02d   ·   生命 %d/%d   ·   补给 %d   ·   携带价值 %d 金币   ·   保险箱 %d 金币%s%s" % [
+	header_label.text = "深度 %02d/%02d · 生命 %d/%d · 补给 %d · %d 金%s%s" % [
 		int(run["current"]["row"]), int(ExpeditionDefs.layer(str(run["layer_id"])).get("rows", 9)) - 1,
 		int(run["player"]["hp"]), int(run["player"]["max_hp"]), supplies,
-		inventory.carry_sell_value(), inventory.protected_value(), _coop_note(run), _vote_note(run)]
+		inventory.carry_sell_value(), _coop_note(run), _vote_note(run)]
+	header_label.tooltip_text = "保险箱保护 %d 金币" % inventory.protected_value()
 	if selected_route.x != int(run["current"]["row"]) + 1 or str(run["phase"]) != "map":
 		selected_route = Vector2i(-1, -1)
 	_refresh_map()
@@ -279,12 +280,13 @@ func _refresh_node() -> void:
 	art.stage_scene = true
 	art.layer_id = str(run.get("layer_id","moss_stone_shallow"))
 	node_column.add_child(art)
-	var title := _label("%s  /  %s" % [ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node["type"]), "?"), str(node.get("hint", ""))], 22, CREAM)
+	var title := _label(ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node["type"]), "?"), 22, CREAM)
+	title.tooltip_text = str(node.get("hint", ""))
 	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	node_column.add_child(title)
 	match str(node["type"]):
 		"start":
-			node_column.add_child(_label("检查配装后出发。", 14, Color("#cfe2c2")))
+			node_column.add_child(_label("选择下一站", 14, Color("#cfe2c2")))
 		"battle", "elite", "gate":
 			_refresh_battle_node(node, resolved, key)
 		"gather", "chest":
@@ -307,7 +309,8 @@ func _refresh_battle_node(node: Dictionary, resolved: Dictionary, key: String) -
 	var run: Dictionary = expedition.run
 	if not bool(resolved.get("battle_won", false)):
 		var warn := str(node.get("risk", "")) == "high"
-		node_column.add_child(_label("高风险：偏向装备与稀有资源，奖励候选更好但不保证都能带走。" if warn else "浅层敌人组合。", 14, BAD_RED if warn else LIGHT_MUTED))
+		if warn:
+			node_column.add_child(_label("高风险 · 稀有奖励", 14, BAD_RED))
 		var fight := _button("进入战斗", Color("#ffd98a"), Color("#9b713a"))
 		fight.pressed.connect(_on_start_battle)
 		node_column.add_child(fight)
@@ -349,7 +352,7 @@ func _refresh_rewards_area(resolved: Dictionary, key: String, choose_one: bool) 
 				var claim_safe := _button("放保险箱", Color("#fff5df"), Color("#d5b87d"))
 				claim_safe.pressed.connect(_on_claim_reward.bind(key, str(def_id), "safe", choose_one))
 				row.add_child(claim_safe)
-		var reward_card := ExpeditionUI.panel(Color("#233941"), ExpeditionUI.LINE, 12)
+		var reward_card := ExpeditionUI.panel(ExpeditionUI.RAISED, ExpeditionUI.LINE, 12)
 		reward_card.add_child(row)
 		node_column.add_child(reward_card)
 	if not public_items.is_empty():

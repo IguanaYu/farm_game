@@ -21,17 +21,16 @@ static func build(node: Dictionary, layer: String, caption: String, confirm: Cal
 	art.tint = ExpeditionUI.RED if str(node.get("risk","")) == "high" else ExpeditionUI.GOLD
 	art.custom_minimum_size = Vector2(300,210)
 	column.add_child(art)
-	column.add_child(ExpeditionUI.label("下一站 · %s" % ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node.get("type","start")),"洞口"),26))
+	column.add_child(ExpeditionUI.label(ExpeditionDefs.NODE_TYPE_DISPLAY.get(str(node.get("type","start")),"洞口"),26))
 	column.add_child(ExpeditionUI.label(ExpeditionRoute.risk_text(str(node.get("risk","none"))),18,art.tint))
-	var hint := ExpeditionUI.label(str(node.get("hint","")),18,ExpeditionUI.MUTED)
-	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	column.add_child(hint)
+	art.tooltip_text = str(node.get("hint", ""))
+	art.mouse_filter = Control.MOUSE_FILTER_PASS
 	var encounter := str(node.get("encounter",""))
 	if CombatGame.ENCOUNTERS.has(encounter):
 		var names: Array[String] = []
 		for id in CombatGame.ENCOUNTERS[encounter]["enemies"]:
 			names.append(str(CombatGame.ENEMIES[id]["name"]))
-		var info := ExpeditionUI.label("可能遭遇："+"、".join(names),18,ExpeditionUI.MUTED)
+		var info := ExpeditionUI.label("、".join(names),16,ExpeditionUI.MUTED)
 		info.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		column.add_child(info)
 	var button := ExpeditionUI.button(caption,true)

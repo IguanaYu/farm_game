@@ -111,11 +111,11 @@ func _draw() -> void:
 			var index := y * bounds.x + x
 			var known := searched.any(func(value): return int(value) == index)
 			var rect := Rect2(origin + Vector2(x, y) * cell_size, Vector2.ONE * cell_size).grow(-2)
-			draw_style_box(ExpeditionUI.style(Color("#10232b") if known else Color("#273b43"), Color("#344c53"), 5, 0), rect)
+			draw_style_box(ExpeditionUI.style(ExpeditionUI.INK if known else ExpeditionUI.PANEL, ExpeditionUI.LINE, 5, 0), rect)
 	var font := get_theme_default_font()
 	for footprint in region.get("unknown", []):
 		var rect := _footprint_rect(footprint).grow(-3)
-		draw_style_box(ExpeditionUI.style(Color("#30454d"), Color("#71878b"), 6, 0), rect)
+		draw_style_box(ExpeditionUI.style(ExpeditionUI.RAISED, ExpeditionUI.LINE.lightened(0.15), 6, 0), rect)
 		if active.is_empty() or not _active_rect().get_center().is_equal_approx(rect.get_center()):
 			draw_string(font, rect.get_center() + Vector2(-8, 8), "?", HORIZONTAL_ALIGNMENT_LEFT, -1, 24, ExpeditionUI.MUTED)
 		if int(footprint["size"][0]) * int(footprint["size"][1]) > 1:
@@ -127,14 +127,14 @@ func _draw() -> void:
 			draw_style_box(ExpeditionUI.style(tint.darkened(0.73), ExpeditionUI.GOLD if selected else tint, 6, 0), _rect(item).grow(-3))
 	if not active.is_empty():
 		var rect := _active_rect().grow(-3)
-		var fill := ExpeditionUI.style(Color("#35464a"), ExpeditionUI.GOLD, 6, 0)
+		var fill := ExpeditionUI.style(ExpeditionUI.RAISED, ExpeditionUI.GOLD, 6, 0)
 		fill.set_border_width_all(2)
 		draw_style_box(fill, rect)
 		var center := rect.get_center()
 		var progress := clampf(1.0 - float(maxi(0, deadline - Time.get_ticks_msec())) / maxf(1, float(active["duration"])), 0, 1)
 		var radius := minf(rect.size.x, rect.size.y) * 0.21
-		draw_circle(center, radius * 1.25, Color("#12232d"))
-		draw_arc(center, radius, -PI / 2, -PI / 2 + TAU, 40, Color("#54686b"), 3, true)
+		draw_circle(center, radius * 1.25, ExpeditionUI.INK)
+		draw_arc(center, radius, -PI / 2, -PI / 2 + TAU, 40, ExpeditionUI.LINE, 3, true)
 		draw_arc(center, radius, -PI / 2, -PI / 2 + maxf(0.03, progress * TAU), 40, ExpeditionUI.GOLD, 4, true)
 		var dimensions: Array = active.get("footprint", {}).get("size", [1, 1])
 		if int(dimensions[0]) * int(dimensions[1]) > 1:

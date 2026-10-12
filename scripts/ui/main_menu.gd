@@ -6,14 +6,9 @@ extends Control
 ## 按钮显式命名（ContinueButton 等），测试按控件名查找。
 ## 设置子页复用 SettingsView（与游戏内暂停菜单共用一套）。
 
-const FOREST := Color("#294f3c")
-const LEAF := Color("#396d50")
-const CREAM := Color("#fff9ed")
-const TEXT_DARK := Color("#35513d")
-const TEXT_MUTED := Color("#3f4a42")
-const BAD_RED := Color("#a4543f")
-const GOLD_FILL := Color("#fff5df")
-const GOLD_LINE := Color("#d5b87d")
+const FOREST := ExpeditionUI.TEXT
+const TEXT_MUTED := ExpeditionUI.MUTED
+const BAD_RED := ExpeditionUI.RED
 
 const WORLD_SCENE := "res://scenes/main.tscn"
 const CARD_PLAYTEST_SCENE := "res://scenes/card_playtest.tscn"
@@ -34,10 +29,12 @@ var _float_bases: Array = []
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
-	theme = LifeUI.make_theme()
+	theme = ExpeditionUI.make_theme()
 	SettingsStore.apply_window_settings()
 	SettingsStore.apply_volumes()
 	_build()
+	resized.connect(_fit_settings_page)
+	_fit_settings_page()
 	set_process(true)
 
 
@@ -55,52 +52,62 @@ func _build() -> void:
 	center.name = "MenuCenter"
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
-	var card := _panel(CREAM, Color("#d5c9aa"), 20)
+	var card := ExpeditionUI.panel(Color(ExpeditionUI.PANEL, 0.98), ExpeditionUI.LINE, 0)
 	card.custom_minimum_size = Vector2(530, 0)
 	center.add_child(card)
 	var margin := MarginContainer.new()
 	margin.add_theme_constant_override("margin_left", 34)
 	margin.add_theme_constant_override("margin_right", 34)
-	margin.add_theme_constant_override("margin_top", 30)
-	margin.add_theme_constant_override("margin_bottom", 26)
+	margin.add_theme_constant_override("margin_top", 24)
+	margin.add_theme_constant_override("margin_bottom", 24)
 	card.add_child(margin)
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 10)
 	margin.add_child(stack)
-	stack.add_child(_label("小小农场", 40, FOREST))
-	stack.add_child(_label("点击种植、离线成长，还有洞穴探险与好友组队", 14, TEXT_MUTED))
+	var signature := HBoxContainer.new()
+	signature.alignment = BoxContainer.ALIGNMENT_CENTER
+	signature.add_theme_constant_override("separation", 16)
+	stack.add_child(signature)
+	signature.add_child(ExpeditionUI.seal(58))
+	var title := VBoxContainer.new()
+	title.add_theme_constant_override("separation", 0)
+	signature.add_child(title)
+	title.add_child(_label("小小农场", 40, FOREST))
+	title.add_child(_label("耕种 · 探险 · 组队", 13, TEXT_MUTED))
 	separator_space(stack, 8)
 
 	main_view = VBoxContainer.new()
 	main_view.name = "MainMenuView"
 	main_view.add_theme_constant_override("separation", 12)
 	stack.add_child(main_view)
-	continue_button = _menu_button("继续游戏", Color("#eaf4df"), Color("#87b06f"), 46, 19)
+	continue_button = _menu_button("继续游戏", 46, 19)
 	continue_button.name = "ContinueButton"
 	continue_button.pressed.connect(_on_continue)
 	main_view.add_child(continue_button)
-	var new_game_button := _menu_button("开始新游戏", GOLD_FILL, GOLD_LINE, 46, 19)
+	var new_game_button := _menu_button("开始新游戏", 46, 19)
 	new_game_button.name = "NewGameButton"
 	new_game_button.pressed.connect(_on_new_game)
 	main_view.add_child(new_game_button)
-	var card_button := _menu_button("单人卡牌试玩 · 战斗与搜刮", Color("#f4e4bc"), Color("#b18d4c"), 46, 19)
+	var card_button := _menu_button("卡牌试玩", 46, 19, true)
+	card_button.tooltip_text = "自动配装，直接体验战斗与战后搜刮。试玩进度独立。"
 	card_button.name = "CardPlaytestButton"
-	card_button.tooltip_text = "自动配好装备，直接开打；可切换敌人、测试尸体搜索和装包。试玩进度独立。"
 	card_button.pressed.connect(_on_card_playtest)
 	main_view.add_child(card_button)
-	var online_button := _menu_button("线上农场 · 服务器进度", Color("#eef4e7"), Color("#9fbf8a"), 44, 20)
+	var online_button := _menu_button("线上农场", 44, 20)
+	online_button.tooltip_text = "连接服务器，继续线上进度。"
 	online_button.name = "OnlineButton"
 	online_button.pressed.connect(_on_online)
 	main_view.add_child(online_button)
-	var coop_button := _menu_button("本地组队 · 本机存档", Color("#e7eef6"), Color("#8fa8c8"), 44, 20)
+	var coop_button := _menu_button("好友组队", 44, 20)
+	coop_button.tooltip_text = "使用本机存档创建或加入好友房间。"
 	coop_button.name = "CoopButton"
 	coop_button.pressed.connect(_on_coop)
 	main_view.add_child(coop_button)
-	var settings_button := _menu_button("设置", Color("#f2eede"), Color("#cfc4a6"), 44, 20)
+	var settings_button := _menu_button("设置", 44, 20)
 	settings_button.name = "SettingsButton"
 	settings_button.pressed.connect(_on_settings)
 	main_view.add_child(settings_button)
-	var quit_button := _menu_button("退出游戏", Color("#f7e9e2"), Color("#c98d77"), 44, 20)
+	var quit_button := _menu_button("退出游戏", 44, 20)
 	quit_button.name = "QuitButton"
 	quit_button.pressed.connect(_on_quit)
 	main_view.add_child(quit_button)
@@ -112,7 +119,9 @@ func _build() -> void:
 	settings_view = _build_settings_view()
 	stack.add_child(settings_view)
 
-	var footer := _label("v%s · 本地档即时保存 · 线上档服务器保存" % SettingsStore.game_version(), 12, TEXT_MUTED)
+	var footer := _label("v%s" % SettingsStore.game_version(), 12, TEXT_MUTED)
+	footer.tooltip_text = "本地档即时保存，线上档由服务器保存。"
+	footer.mouse_filter = Control.MOUSE_FILTER_PASS
 	footer.name = "MenuFooter"
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stack.add_child(footer)
@@ -134,11 +143,11 @@ func _build_confirm_view() -> VBoxContainer:
 	var warning := _label("开始新游戏会覆盖当前存档（旧档自动备份为 farm_save_v1.json.bak）。", 13, BAD_RED)
 	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	view.add_child(warning)
-	var confirm_button := _menu_button("确认覆盖并开始", Color("#eaf4df"), Color("#87b06f"), 42, 17)
+	var confirm_button := _menu_button("确认覆盖并开始", 42, 17, true)
 	confirm_button.name = "ConfirmNewGameButton"
 	confirm_button.pressed.connect(func() -> void: _enter_world(GameFlow.Mode.NEW_GAME))
 	view.add_child(confirm_button)
-	var back_button := _menu_button("返回", Color("#f2eede"), Color("#cfc4a6"), 36, 15)
+	var back_button := _menu_button("返回", 36, 15)
 	back_button.pressed.connect(func() -> void: _show_main_view())
 	view.add_child(back_button)
 	return view
@@ -153,7 +162,7 @@ func _build_online_view() -> VBoxContainer:
 	online_panel.name = "OnlinePanel"
 	online_panel.entered_online.connect(_on_entered_online)
 	view.add_child(online_panel)
-	var back_button := _menu_button("返回", Color("#f2eede"), Color("#cfc4a6"), 36, 15)
+	var back_button := _menu_button("返回", 36, 15)
 	back_button.pressed.connect(func() -> void: _show_main_view())
 	view.add_child(back_button)
 	return view
@@ -168,15 +177,25 @@ func _build_settings_view() -> VBoxContainer:
 	settings_panel = SettingsView.new()
 	settings_panel.name = "SettingsPanel"
 	var settings_scroll := ScrollContainer.new()
-	settings_scroll.custom_minimum_size = Vector2(0,480)
+	settings_scroll.name = "MenuSettingsScroll"
+	settings_scroll.custom_minimum_size = Vector2(0,360)
 	settings_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	view.add_child(settings_scroll)
+	var settings_paper := ExpeditionUI.panel(ExpeditionUI.PAPER, ExpeditionUI.LINE, 12)
+	settings_paper.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	settings_scroll.add_child(settings_paper)
 	settings_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	settings_scroll.add_child(settings_panel)
-	var back_button := _menu_button("返回", Color("#f2eede"), Color("#cfc4a6"), 36, 15)
+	settings_panel.theme = LifeUI.make_theme()
+	settings_paper.add_child(settings_panel)
+	var back_button := _menu_button("返回", 36, 15)
 	back_button.pressed.connect(func() -> void: _show_main_view())
 	view.add_child(back_button)
 	return view
+
+func _fit_settings_page() -> void:
+	var scroll := find_child("MenuSettingsScroll", true, false) as ScrollContainer
+	if scroll != null:
+		scroll.custom_minimum_size.y = clampf(size.y - 360, 180, 360)
 
 
 func _show_main_view() -> void:
@@ -300,14 +319,14 @@ func _build_backdrop() -> void:
 	var env := WorldEnvironment.new()
 	env.environment = Environment.new()
 	env.environment.background_mode = Environment.BG_COLOR
-	env.environment.background_color = Color("#c6dcd0")
+	env.environment.background_color = Color("#847587")
 	env.environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.environment.ambient_light_color = Color("#ecf3ea")
+	env.environment.ambient_light_color = Color("#d7bdcd")
 	env.environment.ambient_light_energy = 0.65
 	world.add_child(env)
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-58,-25,0)
-	sun.light_color = Color("#fffaf0")
+	sun.light_color = Color("#ffd7b5")
 	sun.light_energy = 0.7
 	sun.shadow_enabled = true
 	world.add_child(sun)
@@ -320,7 +339,7 @@ func _build_backdrop() -> void:
 	camera.make_current()
 	var veil := ColorRect.new()
 	veil.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	veil.color = Color(0.88,0.91,0.81,0.22)
+	veil.color = Color(ExpeditionUI.INK, 0.38)
 	veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(veil)
 
@@ -337,49 +356,17 @@ func separator_space(parent: Control, height: int) -> void:
 	parent.add_child(spacer)
 
 
-func _panel(fill: Color, border: Color, radius: int) -> PanelContainer:
-	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = fill
-	style.border_color = border
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(radius)
-	style.content_margin_left = 0
-	style.content_margin_right = 0
-	style.content_margin_top = 0
-	style.content_margin_bottom = 0
-	panel.add_theme_stylebox_override("panel", style)
-	return panel
-
-
 func _label(content: String, size: int, color: Color) -> Label:
 	var label := Label.new()
 	label.text = content
-	label.add_theme_font_size_override("font_size", maxi(18,size))
+	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	return label
 
 
-func _menu_button(content: String, fill: Color, border: Color, height: int, font_size: int) -> Button:
-	var button := Button.new()
-	button.text = content
+func _menu_button(content: String, height: int, font_size: int, primary := false) -> Button:
+	var button := ExpeditionUI.button(content, primary)
 	button.custom_minimum_size = Vector2(0, height)
 	button.add_theme_font_size_override("font_size", font_size)
-	button.add_theme_color_override("font_color", TEXT_DARK)
-	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
-	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
-	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
-	var style := StyleBoxFlat.new()
-	style.bg_color = fill
-	style.border_color = border
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(12)
-	style.content_margin_left = 12
-	style.content_margin_right = 12
-	button.add_theme_stylebox_override("normal", style)
-	button.add_theme_stylebox_override("hover", style)
-	button.add_theme_stylebox_override("pressed", style)
-	button.add_theme_stylebox_override("disabled", style)
-	button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 	return button

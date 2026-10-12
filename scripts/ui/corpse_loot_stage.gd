@@ -33,9 +33,10 @@ func display(run: Dictionary, sources: Array) -> void:
 	var titles := VBoxContainer.new()
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	header.add_child(titles)
-	titles.add_child(ExpeditionUI.label("战斗胜利 · 清理战场", 32, ExpeditionUI.PAPER))
-	titles.add_child(ExpeditionUI.label("点击倒下的敌人，自动按顺序搜索它身上的物品", 18, ExpeditionUI.MUTED))
-	var menu := ExpeditionUI.button("☰ 菜单")
+	titles.add_child(ExpeditionUI.label("战场搜刮", 32, ExpeditionUI.PAPER))
+	titles.add_child(ExpeditionUI.label("点击遗骸搜索", 16, ExpeditionUI.MUTED))
+	var menu := ExpeditionUI.settings_button()
+	menu.name = "CorpseSettingsButton"
 	menu.pressed.connect(func() -> void: menu_requested.emit())
 	header.add_child(menu)
 	var spacer := Control.new()
@@ -81,7 +82,7 @@ func display(run: Dictionary, sources: Array) -> void:
 	content.add_child(below)
 	var footer := HBoxContainer.new()
 	content.add_child(footer)
-	var hint := ExpeditionUI.label("物品装包后才能带走 · 离开当前战场会放弃剩余物资", 15, ExpeditionUI.MUTED)
+	var hint := ExpeditionUI.label("离开后，剩余物资丢失", 15, ExpeditionUI.MUTED)
 	hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	footer.add_child(hint)
 	var leave := ExpeditionUI.button(leave_text, true)

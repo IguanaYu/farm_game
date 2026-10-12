@@ -99,6 +99,18 @@ func _run() -> void:
 	await _pump(10)
 	var guest_battle: BattleScreen = coop_panel.battle_screen
 	_check(guest_battle != null and guest_battle.visible, "战斗：客机战斗界面打开（p2 视角）")
+	var settings := guest_battle.find_child("BattleSettingsButton", true, false) as Button
+	settings.pressed.emit()
+	_check(guest_battle.inspector_panel.visible and guest_battle.modal_shade.visible, "战斗：合作局齿轮打开本地设置菜单")
+	var before_menu: Dictionary = guest_battle.combat.state.duplicate(true)
+	var menu_key := InputEventKey.new()
+	menu_key.pressed = true
+	menu_key.keycode = KEY_E
+	guest_battle._unhandled_key_input(menu_key)
+	_check(guest_battle.combat.state == before_menu, "战斗：设置菜单拦住结束回合快捷键")
+	menu_key.keycode = KEY_ESCAPE
+	guest_battle._unhandled_key_input(menu_key)
+	_check(not guest_battle.inspector_panel.visible and guest_battle.visible, "战斗：Esc 关闭设置，保留合作战斗")
 	if _check(guest_battle.combat != null and guest_battle.combat.state["players"].has("p2"), "战斗：客机视角含 p2"):
 		var p2: Dictionary = guest_battle.combat.state["players"]["p2"]
 		var hand_before: int = (p2["hand"] as Array).size()

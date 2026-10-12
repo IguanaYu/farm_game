@@ -37,9 +37,10 @@ var slot_min_sizes := {
 }
 var grid_min_height := 280
 var show_hint := true
+var dark_doll := false
 
-const SLOT_FRAME := Color("#f2e9d2")
-const SLOT_LINE := Color("#cfc19b")
+const SLOT_FRAME := LifeUI.PAPER
+const SLOT_LINE := LifeUI.LINE
 const SLOT_ART_SUBJECT := {"main_weapon": "attack", "off_weapon": "attack", "helmet": "helmet", "armor": "shield"}
 const CONTAINER_ART := {"chest": "rig_chest", "pack": "rig_pack", "safe": "rig_safe"}
 
@@ -85,7 +86,7 @@ class EquipSlot extends Control:
 		ExpeditionUI.clear(self)
 		if instance.is_empty():
 			tooltip_text = "%s槽：把%s拖到这里装备（第 1 回合入牌堆）" % [ExpeditionBaseline.SLOT_DISPLAY[slot], _category_name()]
-			var caption := ExpeditionUI.label(ExpeditionBaseline.SLOT_DISPLAY[slot], 12, Color("#8a7f5c"))
+			var caption := ExpeditionUI.label(ExpeditionBaseline.SLOT_DISPLAY[slot], 12, LifeUI.MUTED)
 			caption.position = Vector2(2, size.y / 2.0 - 20)
 			caption.size = Vector2(size.x - 4, 20)
 			caption.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -99,7 +100,7 @@ class EquipSlot extends Control:
 		art.position = Vector2(6, 6)
 		art.size = Vector2(size.x - 12, size.y - 30)
 		add_child(art)
-		var label := ExpeditionUI.label(str(def.get("name", "?")), 12, ExpeditionUI.INK)
+		var label := ExpeditionUI.label(str(def.get("name", "?")), 12, ExpeditionUI.TEXT)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		label.position = Vector2(2, size.y - 24)
@@ -298,10 +299,15 @@ func _build() -> void:
 	doll_column.custom_minimum_size = Vector2(doll_width, 0)
 	doll_column.add_theme_constant_override("separation", 8)
 	columns.add_child(doll_column)
-	doll_column.add_child(_title_label("装备"))
+	var doll_title := _title_label("装备")
+	if dark_doll:
+		doll_title.add_theme_color_override("font_color", ExpeditionUI.TEXT)
+	doll_column.add_child(doll_title)
 	doll_column.add_child(_make_slot("helmet"))
 	doll_column.add_child(_make_slot_row(["main_weapon", "armor", "off_weapon"]))
-	doll_hint = _title_label("装备槽的牌第 1 回合入堆")
+	doll_hint = _title_label("第 1 回合入牌")
+	if dark_doll:
+		doll_hint.add_theme_color_override("font_color", ExpeditionUI.MUTED)
 	doll_hint.add_theme_font_size_override("font_size", 12)
 	doll_column.add_child(doll_hint)
 	doll_hint.visible = show_hint
@@ -345,7 +351,7 @@ func _make_slot_row(slots: Array) -> HBoxContainer:
 func _build_container_block(container: String) -> PanelContainer:
 	var block := PanelContainer.new()
 	block.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	block.add_theme_stylebox_override("panel", ExpeditionUI.style(Color("#f7f1de"), Color("#e2e4d4"), 10, 6))
+	block.add_theme_stylebox_override("panel", ExpeditionUI.style(LifeUI.PAPER, LifeUI.LINE, 10, 6))
 	var column := VBoxContainer.new()
 	column.add_theme_constant_override("separation", 6)
 	block.add_child(column)
@@ -415,9 +421,10 @@ func refresh(inventory: InventoryGame, selected_id: int) -> void:
 		var dims := ExpeditionBaseline.size_for(inventory.expedition, container)
 		var caption: Label = container_captions[container]
 		if container == "safe":
-			caption.text = "%d×%d 格 · 不入牌堆 · 死亡保留" % [dims.x, dims.y]
+			caption.text = "%d×%d · 不入牌堆 · 保留" % [dims.x, dims.y]
+			caption.tooltip_text = "保险箱不入牌堆，死亡时保留。"
 		else:
-			caption.text = "%d×%d 格 · 第 %d 回合入牌库" % [dims.x, dims.y, ExpeditionBaseline.JOIN_ROUND[container]]
+			caption.text = "%d×%d · 回合 %d 入牌" % [dims.x, dims.y, ExpeditionBaseline.JOIN_ROUND[container]]
 		var grid: WorkspaceGrid = container_grids[container]
 		grid.display(instances, dims, selected_id)
 
@@ -432,5 +439,5 @@ func _title_label(content: String) -> Label:
 	var label := Label.new()
 	label.text = content
 	label.add_theme_font_size_override("font_size", 16)
-	label.add_theme_color_override("font_color", Color("#35513d"))
+	label.add_theme_color_override("font_color", LifeUI.INK)
 	return label

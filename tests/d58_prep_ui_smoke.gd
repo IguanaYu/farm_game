@@ -97,7 +97,7 @@ func _run() -> void:
 	_check(panel.workspace.container_grids.size() == 3, "容器栈三块（胸挂/背包/保险箱）")
 	_check(panel.workspace.container_captions["safe"].text.contains("不入牌堆"), "保险箱标注不入牌堆·死亡保留")
 	_check(panel.warehouse_grid.entries.size() == 7, "仓库大格子 7 件（自动装箱）")
-	_check(panel.stats_label.text.contains("第 1 回合牌（装备槽）6 张"), "统计标签按装备槽口径显示首回合牌数")
+	_check(panel.stats_label.tooltip_text.contains("第 1 回合牌（装备槽）6 张"), "统计详情按装备槽口径显示首回合牌数")
 	await _shot("01_三栏总览")
 
 	# —— 装备/卸下：协议级（真窗口再补真实拖放） ——

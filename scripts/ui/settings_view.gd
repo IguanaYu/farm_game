@@ -6,8 +6,8 @@ extends VBoxContainer
 
 const RELAY_PREFS_PATH := "user://relay_prefs.cfg"
 const RELAY_DEFAULT_ADDRESS := "127.0.0.1:31970"
-const TEXT_MAIN := Color("#35513d")
-const TEXT_MUTED := Color("#5f6d63")
+const TEXT_MAIN := LifeUI.INK
+const TEXT_MUTED := LifeUI.MUTED
 const ROW_LABEL_WIDTH := 92
 
 var fullscreen_option: OptionButton
@@ -96,7 +96,7 @@ func _build() -> void:
 	relay_save_button.text = "保存联机服务器地址"
 	relay_save_button.pressed.connect(save_relay_address)
 	add_child(relay_save_button)
-	hint_label = _label("", 12, Color("#396d50"))
+	hint_label = _label("", 12, LifeUI.MUTED)
 	hint_label.name = "SettingsHint"
 	hint_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(hint_label)

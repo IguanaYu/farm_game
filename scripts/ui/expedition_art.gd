@@ -3,10 +3,11 @@ extends Control
 ## 可缩放的原生矢量插画；不需要外部贴图，所有敌人都有对应形象。
 
 var subject := "crystal"
-var tint := Color("#7ac7b3")
+var tint := ExpeditionUI.SAGE
 var layer_id := "moss_stone_shallow"
 var stage_scene := false
 var fallen := false
+var show_shadow := true
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -28,7 +29,7 @@ func _draw() -> void:
 		_draw_cave()
 	var unit := minf(size.x, size.y) / 200.0
 	draw_set_transform(Vector2(size.x / 2.0 - 100.0 * unit, size.y / 2.0 - 100.0 * unit), 0, Vector2.ONE * unit)
-	var shadow := Color("#101d25")
+	var shadow := ExpeditionUI.INK
 	var light := tint.lightened(0.3)
 	draw_circle(Vector2(100, 100), 82, Color(tint, 0.055))
 	match subject:
@@ -206,7 +207,8 @@ func draw_ellipse_shadow() -> void:
 	for i in range(32):
 		var angle := TAU * i / 32.0
 		points.append(Vector2(100 + cos(angle) * 65, 168 + sin(angle) * 9))
-	draw_colored_polygon(points, Color("#0e1a20"))
+	if show_shadow:
+		draw_colored_polygon(points, Color("#0e1a20"))
 	if fallen:
 		var angle := -0.9
 		draw_set_transform(size / 2 + Vector2(-100, -100).rotated(angle) * unit * 0.85, angle, Vector2.ONE * unit * 0.85)
@@ -214,18 +216,18 @@ func draw_ellipse_shadow() -> void:
 func _draw_cave() -> void:
 	var iron := layer_id == "iron_root_deeps"
 	var crystal := layer_id == "crystal_vein_deeps"
-	var base := Color("#201e29") if crystal else (Color("#272922") if iron else Color("#162b2a"))
-	var rock := Color("#3c3850") if crystal else (Color("#454333") if iron else Color("#30443b"))
+	var base := Color("#282033") if crystal else (Color("#302722") if iron else Color("#2b222e"))
+	var rock := Color("#574366") if crystal else (Color("#5a473b") if iron else Color("#58404d"))
 	draw_rect(Rect2(Vector2.ZERO, size), base)
 	var w := size.x
 	var h := size.y
 	_poly([[0, 0], [w, 0], [w, h * 0.8], [w * 0.84, h * 0.59], [w * 0.75, h * 0.18], [w * 0.59, h * 0.1], [w * 0.45, h * 0.23], [w * 0.25, h * 0.18], [w * 0.12, h * 0.54], [0, h * 0.76]], rock.darkened(0.25))
-	_poly([[0, 0], [w * 0.22, 0], [w * 0.16, h * 0.16], [w * 0.18, h * 0.28], [w * 0.1, h * 0.64], [0, h * 0.8]], Color("#20363c"))
-	_poly([[w, 0], [w * 0.82, 0], [w * 0.87, h * 0.27], [w * 0.84, h * 0.51], [w * 0.92, h * 0.68], [w, h * 0.75]], Color("#21353a"))
+	_poly([[0, 0], [w * 0.22, 0], [w * 0.16, h * 0.16], [w * 0.18, h * 0.28], [w * 0.1, h * 0.64], [0, h * 0.8]], base.lightened(0.045))
+	_poly([[w, 0], [w * 0.82, 0], [w * 0.87, h * 0.27], [w * 0.84, h * 0.51], [w * 0.92, h * 0.68], [w, h * 0.75]], base.lightened(0.07))
 	for i in range(18):
 		var point := Vector2(w * (0.12 + fmod(i * 0.173, 0.79)), h * (0.2 + fmod(i * 0.137, 0.5)))
-		draw_circle(point, 2 if i % 3 == 0 else 1, Color("#789783", 0.38))
-	_poly([[0, h], [0, h * 0.87], [w * 0.27, h * 0.73], [w * 0.58, h * 0.79], [w, h * 0.69], [w, h]], Color("#17272d"))
+		draw_circle(point, 2 if i % 3 == 0 else 1, Color("#ba917e", 0.38))
+	_poly([[0, h], [0, h * 0.87], [w * 0.27, h * 0.73], [w * 0.58, h * 0.79], [w, h * 0.69], [w, h]], ExpeditionUI.INK)
 	for i in range(7):
 		var x := w*(0.08+i*0.14)
 		if crystal:
@@ -233,9 +235,9 @@ func _draw_cave() -> void:
 		elif iron:
 			draw_polyline(PackedVector2Array([Vector2(x,0),Vector2(x+18,h*0.18),Vector2(x+8,h*0.35)]),Color("#8b775b",0.25),maxf(3,w*0.006),true)
 		else:
-			_poly([[x,h*0.78],[x+20,h*0.72],[x+43,h*0.79],[x+23,h*0.82]],Color("#68895b",0.32))
+			_poly([[x,h*0.78],[x+20,h*0.72],[x+43,h*0.79],[x+23,h*0.82]],Color("#879b72",0.32))
 	for x in [w * 0.06, w * 0.94]:
 		for radius in [55, 35, 18]:
-			draw_circle(Vector2(x, h * 0.49), radius, Color("#e5bd78", 0.025))
+			draw_circle(Vector2(x, h * 0.49), radius, Color(ExpeditionUI.ACCENT, 0.035))
 		draw_line(Vector2(x, h * 0.49), Vector2(x, h * 0.56), Color("#8b7052"), 5)
-		draw_circle(Vector2(x, h * 0.48), 5, Color("#e5bd78"))
+		draw_circle(Vector2(x, h * 0.48), 5, ExpeditionUI.ACCENT)

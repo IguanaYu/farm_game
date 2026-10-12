@@ -10,14 +10,14 @@ signal demo_battle_requested
 signal depart_requested
 
 
-const FOREST := Color("#294f3c")
-const CREAM := Color("#fff9ed")
-const TEXT_DARK := Color("#35513d")
-const TEXT_MUTED := Color("#3f4a42")
+const FOREST := Color("#5d435c")
+const CREAM := LifeUI.PAPER
+const TEXT_DARK := LifeUI.INK
+const TEXT_MUTED := LifeUI.MUTED
 const BAD_RED := Color("#a4543f")
 const WARN_GOLD := Color("#9b713a")
-const CELL_EMPTY := Color("#efe8d4")
-const CELL_BORDER := Color("#d8cfb2")
+const CELL_EMPTY := LifeUI.SOFT
+const CELL_BORDER := LifeUI.LINE
 const CATEGORY_COLOR := {
 	"weapon": Color("#c08050"),
 	"armor": Color("#7d9cb5"),
@@ -85,13 +85,13 @@ func mark_saved() -> void:
 
 func _build() -> void:
 	var shade := ColorRect.new()
-	shade.color = Color(0.11,0.20,0.14,0.30)
+	shade.color = Color(ExpeditionUI.INK,0.30)
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(shade)
 	var center := CenterContainer.new()
 	center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(center)
-	var panel := _panel(CREAM,Color("#c9ceb4"),14)
+	var panel := _panel(CREAM,LifeUI.LINE,14)
 	panel.custom_minimum_size = Vector2(1160,710)
 	center.add_child(panel)
 	var column := VBoxContainer.new()
@@ -99,10 +99,11 @@ func _build() -> void:
 	panel.add_child(column)
 	var top := HBoxContainer.new()
 	column.add_child(top)
-	var title := _label("洞口战备箱",28,FOREST)
+	var title := _label("配装",28,FOREST)
 	title.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	top.add_child(title)
-	var close_button := _button("回洞口营地 ×",Color("#e8efdb"),Color("#b2bd9d"))
+	var close_button := _button("×",LifeUI.SOFT,LifeUI.LINE)
+	close_button.tooltip_text = "返回营地"
 	close_button.pressed.connect(_on_close)
 	top.add_child(close_button)
 	stats_label = _label("",18,TEXT_DARK)
@@ -136,7 +137,7 @@ func _build() -> void:
 	right.add_child(filter_row)
 	var filters := [["all", "全部"], ["weapon", "武器"], ["armor", "防具"], ["helmet", "头盔"], ["tool", "工具"], ["supply", "补给"], ["material", "材料"], ["cargo", "货物"]]
 	for entry in filters:
-		var filter_button := _small_button(entry[1], Color("#fff5df") if filter != entry[0] else Color("#e8f0d8"), Color("#d5b87d"))
+		var filter_button := _small_button(entry[1], CREAM if filter != entry[0] else LifeUI.SOFT, LifeUI.LINE)
 		filter_button.pressed.connect(_on_filter.bind(entry[0]))
 		filter_row.add_child(filter_button)
 	warehouse_header = _label("装备／材料仓库", 15, FOREST)
@@ -147,8 +148,8 @@ func _build() -> void:
 	warehouse_grid.entry_selected.connect(_on_select_instance)
 	right.add_child(warehouse_grid)
 	detail_column = _section(right,"物品详情", false)
-	deck_column = _section(right,"牌组与加入回合", false)
-	check_column = _section(right,"出发前检查", false)
+	deck_column = _section(right,"牌组", false)
+	check_column = _section(right,"准备检查", false)
 	var presets := HBoxContainer.new()
 	column.add_child(presets)
 	preset_option = OptionButton.new()
@@ -160,24 +161,24 @@ func _build() -> void:
 	preset_name_edit.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	presets.add_child(preset_name_edit)
 	for entry in [["保存预设",func(): save_preset(preset_name_edit.text)],["应用预设",apply_selected],["删除预设",delete_selected]]:
-		var button := _small_button(entry[0],Color("#e8efdb"),Color("#b2bd9d"))
+		var button := _small_button(entry[0],LifeUI.SOFT,LifeUI.LINE)
 		button.pressed.connect(entry[1])
 		presets.add_child(button)
 	var actions := HFlowContainer.new()
 	column.add_child(actions)
 	for entry in [["补领基础装备",_on_grant_kit],["清空配置",_on_clear_loadout]]:
-		var button := _small_button(entry[0],Color("#e8efdb"),Color("#b2bd9d"))
+		var button := _small_button(entry[0],LifeUI.SOFT,LifeUI.LINE)
 		button.pressed.connect(entry[1])
 		actions.add_child(button)
-	put_back_button = _small_button("放回仓库",Color("#f1e8d3"),Color("#cfc4a6"))
+	put_back_button = _small_button("放回仓库",CREAM,LifeUI.LINE)
 	put_back_button.pressed.connect(_on_put_back)
 	actions.add_child(put_back_button)
-	rotate_button = _small_button("旋转 R",Color("#f1e8d3"),Color("#cfc4a6"))
+	rotate_button = _small_button("旋转 R",CREAM,LifeUI.LINE)
 	rotate_button.pressed.connect(_on_rotate)
 	actions.add_child(rotate_button)
 	if OS.is_debug_build():
 		for entry in [["演示物品",_on_inject_demo],["演示战斗",func(): demo_battle_requested.emit()]]:
-			var button := _small_button(entry[0],Color("#f1e8d3"),Color("#cfc4a6"))
+			var button := _small_button(entry[0],CREAM,LifeUI.LINE)
 			button.pressed.connect(entry[1])
 			actions.add_child(button)
 	var bottom := HBoxContainer.new()
@@ -186,13 +187,13 @@ func _build() -> void:
 	status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	status_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	bottom.add_child(status_label)
-	var depart := _button("准备妥当 · 单人出发 →",Color("#dce8c8"),Color("#839b6b"))
+	var depart := _button("出发 →",ExpeditionUI.ACCENT,ExpeditionUI.ACCENT.darkened(0.15))
 	depart.pressed.connect(func(): depart_requested.emit())
 	bottom.add_child(depart)
 
 
 func _section(parent: VBoxContainer, title: String, expand := true) -> VBoxContainer:
-	var box := _panel(Color("#f7f1de"), Color("#e2e4d4"), 10)
+	var box := _panel(CREAM, LifeUI.LINE, 10)
 	if expand:
 		box.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	parent.add_child(box)
@@ -519,11 +520,8 @@ func _refresh_stats() -> void:
 	var value_text := str(inventory.carry_sell_value()) + " 金币"
 	if inventory.has_basic_in_loadout():
 		value_text += "（基础装备不计可售价值）"
-	stats_label.text = "生命上限 %d ｜ 容器已用格 %d/%d ｜ 第 1 回合牌（装备槽）%d 张 ｜ 胸挂/背包后续加入 %d 张 ｜ 携带可售价值 %s ｜ 保险箱保护 %d 金币" % [
-		ExpeditionBaseline.MAX_HP, used, total,
-		int(preview["totals"][1]), int(preview["totals"][2]) + int(preview["totals"][3]),
-		value_text, inventory.protected_value(),
-	]
+	stats_label.text = "生命 %d · %d 张牌 · %d/%d 格 · %d 金" % [ExpeditionBaseline.MAX_HP, int(preview["totals"][1]) + int(preview["totals"][2]) + int(preview["totals"][3]), used, total, inventory.carry_sell_value()]
+	stats_label.tooltip_text = "第 1 回合牌（装备槽）%d 张 · 胸挂/背包后续加入 %d 张\n携带价值 %s · 保险箱保护 %d 金币" % [int(preview["totals"][1]), int(preview["totals"][2]) + int(preview["totals"][3]), value_text, inventory.protected_value()]
 
 
 func _refresh_warehouse() -> void:
@@ -544,7 +542,7 @@ func _refresh_warehouse() -> void:
 				def["name"], ItemDefs.quality_name(ItemDefs.quality_of(instance)),
 				def["size"].x, def["size"].y, def["cards"].size()],
 		})
-	warehouse_header.text = "装备／材料仓库 · %d 件" % entries.size()
+	warehouse_header.text = "仓库 · %d 件" % entries.size()
 	warehouse_grid.set_items(entries)
 
 
@@ -556,15 +554,17 @@ func _refresh_detail() -> void:
 	rotate_button.visible = false
 	var instance := inventory.find_instance(selected_instance_id)
 	if instance.is_empty():
-		detail_column.add_child(_label("（选中一件物品查看详情）", 13, TEXT_MUTED))
+		detail_column.add_child(_label("选择物品", 13, TEXT_MUTED))
 		return
 	var def := ItemDefs.get_item(str(instance["def_id"]))
 	var demo_mark := "［演示］" if bool(instance.get("demo", false)) else ""
-	detail_column.add_child(_label("%s%s（%s）" % [demo_mark, def["name"], ItemDefs.quality_name(ItemDefs.quality_of(instance))], 17, FOREST))
-	detail_column.add_child(_label("类别：%s ｜ 占格：%d×%d%s" % [
+	var item_title := _label("%s%s · %s" % [demo_mark, def["name"], ItemDefs.quality_name(ItemDefs.quality_of(instance)).split(" · ")[0]], 17, FOREST)
+	item_title.tooltip_text = str(def.get("desc", ""))
+	detail_column.add_child(item_title)
+	detail_column.add_child(_label("%s · %d×%d%s" % [
 		ExpeditionBaseline.CATEGORY_DISPLAY.get(str(def["category"]), "?"),
 		def["size"].x, def["size"].y,
-		"（已旋转）" if bool(instance.get("rotated", false)) else "",
+		" · 已旋转" if bool(instance.get("rotated", false)) else "",
 	], 14, TEXT_DARK))
 	var cards_text := ""
 	var counts := {}
@@ -574,17 +574,14 @@ func _refresh_detail() -> void:
 		if cards_text != "":
 			cards_text += "、"
 		cards_text += "%s×%d" % [CardDefs.get_card(card_id)["name"], counts[card_id]]
-	detail_column.add_child(_label("来源牌（%d 张）：%s" % [def["cards"].size(), cards_text], 14, TEXT_DARK))
+	detail_column.add_child(_label(cards_text if cards_text != "" else "无卡牌", 14, TEXT_DARK))
 	if bool(def.get("basic_kit", false)):
-		detail_column.add_child(_label("价值：基础装备，不计可售价值；不能出售、分享或用于制作。", 14, WARN_GOLD))
+		var basic_note := _label("基础装备 · 不可售", 14, WARN_GOLD)
+		basic_note.tooltip_text = "不计可售价值；不能分享或用于制作。"
+		detail_column.add_child(basic_note)
 	else:
-		detail_column.add_child(_label("可售价值：%d 金币 ｜ %s" % [int(def.get("base_value", 0)),
-			"可放保险箱（失败时保留）" if bool(def.get("safe_allowed", false)) else "不可放保险箱"], 14, TEXT_DARK))
-	detail_column.add_child(_label("当前归属：%s" % _owner_display(str(instance["container"]), instance), 14, TEXT_DARK))
-	var desc := _label(str(def.get("desc", "")), 13, TEXT_MUTED)
-	desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	desc.custom_minimum_size = Vector2(330, 0)
-	detail_column.add_child(desc)
+		detail_column.add_child(_label("%d 金 · %s" % [int(def.get("base_value", 0)), "可保护" if bool(def.get("safe_allowed", false)) else "不可保护"], 14, TEXT_DARK))
+	detail_column.add_child(_label(_owner_display(str(instance["container"]), instance), 14, TEXT_DARK))
 	if ExpeditionBaseline.JOIN_ROUND.has(str(instance["container"])):
 		put_back_button.visible = true
 	if ExpeditionBaseline.CONTAINER_SIZE.has(str(instance["container"])):
@@ -597,11 +594,11 @@ func _refresh_deck() -> void:
 		child.queue_free()
 	var preview := inventory.deck_preview()
 	if int(preview["totals"][1]) + int(preview["totals"][2]) + int(preview["totals"][3]) == 0:
-		deck_column.add_child(_label("（装备槽与容器都是空的：放入物品后这里显示会抽到什么牌）", 13, TEXT_MUTED))
+		deck_column.add_child(_label("配装后生成牌组", 13, TEXT_MUTED))
 		return
 	for join_round in [1, 2, 3]:
 		var source: String = {"1": "装备槽", "2": "胸挂", "3": "背包"}[str(join_round)]
-		var text := "第 %d 回合（%s，共 %d 张）：" % [join_round, source, int(preview["totals"][join_round])]
+		var text := "%s · 回合 %d · %d 张" % [source, join_round, int(preview["totals"][join_round])]
 		var parts: Array = []
 		var order: Array = preview["rounds"][join_round].map(func(entry): return str(entry["card_id"]))
 		for card_id in order:
@@ -611,12 +608,11 @@ func _refresh_deck() -> void:
 		var names: Array = []
 		for card_id in parts:
 			names.append("%s×%d" % [CardDefs.get_card(card_id)["name"], int(preview["counts"][join_round][card_id])])
-		text += "、".join(names)
 		var label := _label(text, 14, TEXT_DARK)
+		label.tooltip_text = "、".join(names)
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.custom_minimum_size = Vector2(330, 0)
 		deck_column.add_child(label)
-	deck_column.add_child(_label("装备槽牌第 1 回合、胸挂第 2、背包第 3；保险箱的牌永不入堆（死亡时保留）。", 12, TEXT_MUTED))
 
 
 func _refresh_check() -> void:
@@ -625,7 +621,7 @@ func _refresh_check() -> void:
 		child.queue_free()
 	var check := inventory.loadout_check()
 	if check["hard_blocks"].is_empty() and check["advises"].is_empty():
-		check_column.add_child(_label("准备检查通过：点左下「出发（单人）」即可进入洞窟。", 14, Color("#3f7048")))
+		check_column.add_child(_label("准备就绪", 14, FOREST))
 		return
 	for problem in check["hard_blocks"]:
 		var label := _label("⛔ %s" % problem, 13, BAD_RED)
@@ -633,7 +629,9 @@ func _refresh_check() -> void:
 		label.custom_minimum_size = Vector2(330, 0)
 		check_column.add_child(label)
 	for advice in check["advises"]:
-		var label := _label("△ %s" % advice, 13, WARN_GOLD)
+		var short_advice := "攻击牌不足" if str(advice).contains("攻击牌") else ("防御牌不足" if str(advice).contains("防御") else "首回合牌不足")
+		var label := _label("△ " + short_advice, 13, WARN_GOLD)
+		label.tooltip_text = str(advice)
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		label.custom_minimum_size = Vector2(330, 0)
 		check_column.add_child(label)
@@ -653,12 +651,8 @@ func _owner_display(owner: String, instance := {}) -> String:
 
 
 func _panel(fill: Color, border: Color, radius: int) -> PanelContainer:
-	var panel := PanelContainer.new()
-	var style := StyleBoxFlat.new()
-	style.bg_color = fill
-	style.border_color = border
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(radius)
+	var panel := ExpeditionUI.JournalPanel.new()
+	var style := ExpeditionUI.style(fill, border, radius)
 	style.content_margin_left = 16
 	style.content_margin_right = 16
 	style.content_margin_top = 12
@@ -668,11 +662,8 @@ func _panel(fill: Color, border: Color, radius: int) -> PanelContainer:
 
 
 func _style(fill: Color, border: Color, radius: int) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = fill
-	style.border_color = border
+	var style := ExpeditionUI.style(fill, border, radius, 0)
 	style.set_border_width_all(2)
-	style.set_corner_radius_all(radius)
 	return style
 
 
@@ -689,18 +680,26 @@ func _button(content: String, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.text = content
 	button.custom_minimum_size.y = 38
-	button.add_theme_color_override("font_color", Color("#35513d"))
-	button.add_theme_color_override("font_hover_color", Color("#1f3327"))
-	button.add_theme_color_override("font_pressed_color", Color("#1f3327"))
-	button.add_theme_color_override("font_disabled_color", Color("#5c6b5e"))
+	button.add_theme_color_override("font_color", TEXT_DARK)
+	button.add_theme_color_override("font_hover_color", TEXT_DARK)
+	button.add_theme_color_override("font_pressed_color", TEXT_DARK)
+	button.add_theme_color_override("font_disabled_color", TEXT_MUTED)
 	button.add_theme_font_size_override("font_size", 18)
 	var style := _style(fill, border, 12)
 	style.content_margin_left = 12
 	style.content_margin_right = 12
 	button.add_theme_stylebox_override("normal", style)
-	button.add_theme_stylebox_override("hover", style)
-	button.add_theme_stylebox_override("pressed", style)
-	button.add_theme_stylebox_override("disabled", style)
+	var hover := style.duplicate() as StyleBoxFlat
+	hover.bg_color = fill.lightened(0.08)
+	hover.border_color = ExpeditionUI.ACCENT
+	button.add_theme_stylebox_override("hover", hover)
+	var pressed := style.duplicate() as StyleBoxFlat
+	pressed.bg_color = fill.darkened(0.08)
+	button.add_theme_stylebox_override("pressed", pressed)
+	var disabled := style.duplicate() as StyleBoxFlat
+	disabled.bg_color = LifeUI.SOFT
+	disabled.border_color = LifeUI.LINE
+	button.add_theme_stylebox_override("disabled", disabled)
 	return button
 
 

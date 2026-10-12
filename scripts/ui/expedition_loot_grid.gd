@@ -110,7 +110,7 @@ func _notification(what: int) -> void:
 func _draw() -> void:
 	for y in range(bounds.y):
 		for x in range(bounds.x):
-			draw_style_box(ExpeditionUI.style(Color("#102029"), Color("#304750"), 6, 0), Rect2(origin + Vector2(x, y) * cell_size, Vector2.ONE * cell_size).grow(-2))
+			draw_style_box(ExpeditionUI.style(ExpeditionUI.INK, ExpeditionUI.LINE, 6, 0), Rect2(origin + Vector2(x, y) * cell_size, Vector2.ONE * cell_size).grow(-2))
 	for instance in items:
 		var tint: Color = instance.get("loot_tint", ExpeditionUI.TEAL)
 		var selected := int(instance["instance_id"]) == selected_id

@@ -158,8 +158,9 @@ func _run() -> void:
 	await _frames()
 	var shield := _card(screen, "shield_up")
 	var uid := int(shield["uid"])
-	var chip := screen.hand_row.find_child("CardSource", true, false) as Label
-	_check(chip != null and chip.text.contains("木盾") and chip.get_theme_color("font_color").is_equal_approx(ItemDefs.quality_color(5)), "card face labels actual red shield source")
+	var shield_button := screen.hand_row.find_child("Card_%d" % uid, true, false) as Button
+	_check(shield_button != null and shield_button.tooltip_text.contains("木盾") and int(shield_button.get_meta("source_quality", 0)) == 5, "card inspection preserves actual red shield source")
+	_check(shield_button.get_theme_stylebox("normal").border_color.is_equal_approx(ItemDefs.quality_color(5).darkened(0.25)), "card border still communicates source quality")
 	await _click(screen.hand_row.find_child("Card_%d" % uid, true, false) as Control)
 	_check(int(battle.state["players"]["p1"]["block"]) == 6 and screen.selected_uid == -1 and screen._hand_card(uid).is_empty(), "one actual card click immediately stacks armor")
 	_check(_effect_count(screen, "block") == 1 and _effect_count(screen, "card_played") == 1, "committed self card generates shield and card effects")
