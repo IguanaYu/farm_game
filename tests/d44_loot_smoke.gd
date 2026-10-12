@@ -133,6 +133,18 @@ func _click_button(text: String) -> void:
 			return
 	_check(false, "visible clickable button: " + text)
 
+
+func _click_named(button_name: String, what: String) -> void:
+	## 8c45f9f 起菜单＝设置图标按钮（无文字），按节点名定位点击。
+	for button in loot.find_children("*", "Button", true, false):
+		if str(button.name) == button_name and button.is_visible_in_tree() and not button.disabled:
+			await _settle()
+			_mouse(button.get_global_rect().get_center(), true)
+			_mouse(button.get_global_rect().get_center(), false)
+			await _settle()
+			return
+	_check(false, "visible clickable button: " + what)
+
 func _click_block_tidy(container: String) -> void:
 	var block: Control = loot.workspace.container_blocks[container]
 	for button in block.find_children("*", "Button", true, false):
@@ -177,7 +189,7 @@ func _run() -> void:
 	panel.open(expedition)
 	loot = panel.loot_panel
 	_check(loot.visible and not panel.map_frame.visible, "post-battle screen takes over route")
-	await _click_button("菜单")
+	await _click_named("LootSettingsButton", "菜单(设置图标)")
 	_check(panel.overlay_panel.visible, "loot menu opens map pause overlay")
 	await _key(KEY_ESCAPE)
 	_check(not panel.overlay_panel.visible and loot.visible, "escape closes parent menu without re-opening it")
@@ -272,6 +284,58 @@ func _run() -> void:
 	loot.select_item("public:bandage")
 	await _shot("07_full_backpack")
 	_check(not loot._has_space(loot._entry("public:bandage"), "pack"), "full bag clearly has no space")
+	# 详情卡＝点击旁弹出的浮动菜单：锚点定位、空点收起（渲染延迟一帧，拖拽路径不弹卡）。
+	_check(loot.detail_card.visible, "detail popup opens with selection")
+	loot.select_item("public:bandage", Rect2(Vector2(240, 260), Vector2.ONE))
+	await _settle()
+	_check(loot.detail_card.visible and absf(loot.detail_card.offset_left - 257.0) < 2.0, "popup anchors beside the clicked item")
+	loot.select_item("")
+	_check(not loot.detail_card.visible, "clicking empty space closes the popup")
+	# 已装备物品从装备槽拖进容器：payload 只带 instance_id，放置按 carried 条目兜底。
+	var weapon_id := -1
+	for instance in inv.loadout_list("chest"):
+		if str(ItemDefs.get_item(str(instance["def_id"])).get("category", "")) == "weapon":
+			weapon_id = int(instance["instance_id"])
+			break
+	_check(weapon_id > 0, "fixture keeps a weapon in chest rig")
+	_check(expedition.loot_action("p1", "loot_manage", {"operation": "equip", "instance_id": weapon_id, "slot": "main_weapon"})["ok"], "weapon equips into main slot")
+	loot.display(expedition.run)
+	var weapon_def: Dictionary = ItemDefs.get_item(str(inv.find_instance(weapon_id)["def_id"]))
+	var chest_bounds := ExpeditionBaseline.size_for(inv.expedition, "chest")
+	var chest_used := ExpeditionBaseline.occupancy_map(inv.loadout_list("chest"), "chest")
+	var target := Vector2i(-1, -1)
+	for y in range(chest_bounds.y):
+		for x in range(chest_bounds.x):
+			if ExpeditionBaseline.can_place_in(chest_bounds, weapon_def["size"], Vector2i(x, y), false, chest_used, weapon_id):
+				target = Vector2i(x, y)
+				break
+		if target.x >= 0:
+			break
+	_check(target.x >= 0, "chest rig keeps a straight cell for the weapon")
+	var slot_ctrl: Control = loot.workspace.slot_controls["main_weapon"]
+	var slot_rect := slot_ctrl.get_global_rect()
+	_mouse(slot_rect.get_center(), true)
+	var pull := InputEventMouseMotion.new()
+	pull.position = slot_rect.get_center() + Vector2(36, 0)
+	pull.global_position = pull.position
+	pull.relative = Vector2(36, 0)
+	pull.button_mask = MOUSE_BUTTON_MASK_LEFT
+	root.push_input(pull, true)
+	await _settle()
+	var equip_payload: Dictionary = root.gui_get_drag_data().duplicate(true) if root.gui_is_dragging() else {}
+	_mouse(pull.position, false)
+	await _settle()
+	# 真窗口下 OS 光标可能吞掉拖动起点：按 EquipSlot 协议重放。
+	if equip_payload.is_empty():
+		equip_payload = {"instance_id": weapon_id, "def_id": str(inv.find_instance(weapon_id)["def_id"]), "rotated": false, "workspace_owner": loot.workspace.owner_id}
+	_check(int(equip_payload.get("instance_id", -1)) == weapon_id and not equip_payload.has("token"), "slot drag payload carries instance id only")
+	var chest_grid: Control = loot.workspace.container_grids["chest"]
+	var drop_local: Vector2 = chest_grid.origin + (Vector2(target) + Vector2(0.5, 0.5)) * chest_grid.cell_size
+	_check(chest_grid._can_drop_data(drop_local, equip_payload), "equipped weapon fits the chosen chest cell")
+	chest_grid._drop_data(drop_local, equip_payload)
+	await _settle()
+	var holstered: Dictionary = inv.find_instance(weapon_id)
+	_check(str(holstered.get("container")) == "chest" and holstered["cell"] == [target.x, target.y], "dragging from equip slot stows the weapon in chest rig")
 	# 客机等待同一动作回执 + 更新快照，不因无关广播解锁。
 	var sends := [0]
 	loot.action_sink = func(_kind: String, _args: Dictionary) -> String: sends[0] += 1; return "loot-action-1"

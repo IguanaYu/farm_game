@@ -66,10 +66,10 @@ func _gui_input(event: InputEvent) -> void:
 				var def := ItemDefs.get_item(str(instance["def_id"]))
 				tooltip_text = "%s · %s · %d×%d 格 · %d 张牌\n点选查看，拖动移动，R 旋转。" % [def["name"], ItemDefs.quality_name(ItemDefs.quality_of(instance)), def["size"].x, def["size"].y, def["cards"].size()]
 				break
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		## 松开且未拖动＝点击选中（-1＝点空格清除）；按下留给拖拽。
 		var id := int(occupied.get(ExpeditionBaseline.cell_key(_cell(event.position)), -1))
-		if id >= 0:
-			item_selected.emit(id)
+		item_selected.emit(id)
 		accept_event()
 
 func _get_drag_data(at_position: Vector2) -> Variant:

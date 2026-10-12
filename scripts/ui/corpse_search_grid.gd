@@ -84,16 +84,22 @@ func _gui_input(event: InputEvent) -> void:
 		var item: Dictionary = loot_owner._entry("corpse:%d" % _id(event.position))
 		if not item.is_empty():
 			tooltip_text = str(ItemDefs.get_item(str(item["def_id"]))["name"]) + " · " + ItemDefs.quality_name(ItemDefs.quality_of(item["instance"])) + "\n拖入自己的背包"
-	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
-		if _id(event.position) >= 0:
-			loot_owner.select_item("corpse:%d" % _id(event.position))
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		# 松开且未拖动＝点击：详情卡弹在物品旁；点空格＝清除选择收起详情卡。
+		# （按下时不选中——否则弹卡会吞掉紧随的拖动 motion，拖拽起不来。）
+		var id := _id(event.position)
+		if id >= 0:
+			loot_owner.select_item("corpse:%d" % id, Rect2(get_global_transform_with_canvas() * event.position, Vector2.ONE))
+		else:
+			loot_owner.select_item("")
 		accept_event()
 
 func _get_drag_data(point: Vector2) -> Variant:
 	var id := _id(point)
 	if id < 0:
 		return null
-	loot_owner.select_item("corpse:%d" % id)
+	# 拖拽起点静默选中：只更新高亮不弹详情卡（弹卡会杀拖拽）。
+	loot_owner.select_item("corpse:%d" % id, Rect2(get_global_transform_with_canvas() * point, Vector2.ONE), false)
 	var payload: Dictionary = loot_owner.drag_payload("corpse:%d" % id)
 	if payload.is_empty():
 		return null

@@ -33,9 +33,12 @@ var leave_button: Button
 var workspace: BackpackWorkspace
 var detail_card: PanelContainer
 var detail_card_content: VBoxContainer
-var corpse_detail_column: VBoxContainer
 var _action_target: VBoxContainer
 var _detail_host: VBoxContainer
+## 详情卡锚点：点击物品时记录其全局位置，弹卡落在旁边（Rect2()＝无锚点＝不弹卡，
+## 自动选中与拖拽路径都不弹，只有真实点击才弹）。
+var _detail_anchor := Rect2()
+var _saw_drag := false
 var filter_buttons: Array[Button] = []
 var modal: CenterContainer
 var modal_content: VBoxContainer
@@ -143,7 +146,8 @@ func _build() -> void:
 		"place": _on_workspace_place,
 		"equip": _on_workspace_equip,
 		"tidy": _on_workspace_tidy,
-		"select": func(id: int) -> void: select_item("carried:%d" % id),
+		"select": func(id: int) -> void: select_item("carried:%d" % id if id >= 0 else ""),
+		"select_drag": func(id: int) -> void: select_item("carried:%d" % id, Rect2(), false),
 	})
 	workspace.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	body.add_child(workspace)
@@ -181,22 +185,15 @@ func _build() -> void:
 	context_scroll.add_child(context_column)
 	count_label = _wrapped("", 13, ExpeditionUI.MUTED)
 	loot.add_child(count_label)
-	# 浮动详情卡：选中物品时出现在右上角，不遮左侧工作台。
+	# 浮动详情卡：点击物品时弹在物品旁边（定位见 _layout_detail_card）。
 	detail_card = ExpeditionUI.panel(ExpeditionUI.PANEL, ExpeditionUI.GOLD, 14)
 	detail_card.visible = false
 	detail_card.z_index = 40
 	detail_card.mouse_filter = Control.MOUSE_FILTER_STOP
-	detail_card.anchor_left = 1.0
-	detail_card.anchor_right = 1.0
-	detail_card.anchor_top = 0.0
-	detail_card.anchor_bottom = 0.0
-	detail_card.offset_left = -356
-	detail_card.offset_right = -16
-	detail_card.offset_top = 96
 	add_child(detail_card)
 	var card_column := VBoxContainer.new()
 	card_column.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	card_column.custom_minimum_size = Vector2(320, 420)
+	card_column.custom_minimum_size = Vector2(300, 0)
 	detail_card.add_child(card_column)
 	var card_header := HBoxContainer.new()
 	card_column.add_child(card_header)
@@ -278,6 +275,7 @@ func display(snapshot: Dictionary, member_key := "p1", serial := -1) -> void:
 		revealed_seen.clear()
 		screen_identity = next
 		selected_token = ""
+		_detail_anchor = Rect2()
 		filter_index = 0
 		pending_action = false
 		pending_action_id = ""
@@ -398,17 +396,24 @@ func _entry(token: String) -> Dictionary:
 			return entry
 	return {}
 
-func select_item(token: String) -> void:
+## 点选物品：anchor＝点击处的全局矩形，详情卡弹在它旁边；空 token＝清除选择。
+## show_card=false＝拖拽起点的静默选中（_get_drag_data 路径）：只更新选择与高亮，
+## 不弹卡——同步翻 visible 会在光标下冒出 STOP 控件、当场取消拖拽（d54 实证）。
+func select_item(token: String, anchor := Rect2(), show_card := true) -> void:
 	if pending_action or modal.visible:
 		return
 	selected_token = token
+	if anchor == Rect2() and token != "":
+		anchor = Rect2(get_global_mouse_position(), Vector2.ONE)
+	_detail_anchor = anchor
 	AudioKit.play(self, "ui_click", -8)
 	# 选择只重绘区域格与详情卡，不重建上下文栏——否则按下瞬间就释放拖动源控件。
 	if _resolved().has("corpses"):
 		for region_grid in source_grids.values():
 			if is_instance_valid(region_grid):
 				region_grid.queue_redraw()
-	_render_detail()
+	if show_card:
+		_render_detail()
 
 func _render_context() -> void:
 	## 上下文栏：尸体模式（_render_search）或物资大格子模式。
@@ -455,8 +460,7 @@ func _render_context() -> void:
 		})
 	flow.set_items(flow_entries)
 	flow.token_selected.connect(func(token: String) -> void:
-		if token != "":
-			select_item(token))
+		select_item(token))
 	if visible_entries.is_empty():
 		context_column.add_child(_wrapped("这个分类下没有现场物资。\n可以切换分类，或整理已携带的物品。", 15, ExpeditionUI.MUTED))
 	share_box = VBoxContainer.new()
@@ -468,16 +472,9 @@ func _render_context() -> void:
 func _render_detail() -> void:
 	if detail_card == null or detail_card_content == null:
 		return
-	# 双宿主：物资模式＝右上浮动卡；尸体模式＝上下文栏底部常驻详情区
-	# （悬浮卡会盖住尸体格挡拖放，reparent 方案在布局重建时会连坐释放控件，均弃用）。
-	if _resolved().has("corpses"):
-		if corpse_detail_column == null or not is_instance_valid(corpse_detail_column):
-			return
-		_detail_host = corpse_detail_column
-		detail_card.visible = false
-	else:
-		_detail_host = detail_card_content
-		detail_card.visible = not _entry(selected_token).is_empty() and workspace_frame.visible
+	# 详情菜单＝浮动卡锚定到点击的物品旁；可见性由锚点＋拖拽状态判定（拖拽路径不进这里）。
+	_detail_host = detail_card_content
+	_update_detail_visibility()
 	ExpeditionUI.clear(_detail_host)
 	var entry := _entry(selected_token)
 	if entry.is_empty():
@@ -600,6 +597,35 @@ func _render_detail() -> void:
 		_detail_host.add_child(_wrapped("也可以直接拖到左侧装备槽或容器格；拖动时按 R 旋转。", 12, ExpeditionUI.MUTED))
 	else:
 		_detail_host.add_child(_wrapped(str(entry["state"]), 16, ExpeditionUI.MUTED))
+	_layout_detail_card()
+
+
+## 详情卡可见性：有选择、有点击锚点、工作台可见、且不在拖拽中。
+func _update_detail_visibility() -> void:
+	if detail_card == null:
+		return
+	var dragging: bool = get_viewport() != null and get_viewport().gui_is_dragging()
+	detail_card.visible = not _entry(selected_token).is_empty() and workspace_frame.visible and _detail_anchor != Rect2() and not dragging
+
+
+## 详情卡落位：锚点右侧优先，右边放不下换左侧；整体裁剪在面板内。
+func _layout_detail_card() -> void:
+	if _detail_anchor == Rect2():
+		return
+	var anchor := _detail_anchor
+	var to_panel := get_global_transform_with_canvas().affine_inverse()
+	var anchor_point: Vector2 = to_panel * anchor.position
+	var width := 316.0
+	var height: float = minf(500.0, maxf(240.0, size.y - 24.0))
+	var pos := Vector2(anchor_point.x + anchor.size.x + 16.0, maxf(12.0, anchor_point.y - 8.0))
+	if pos.x + width > size.x - 10.0:
+		pos.x = anchor_point.x - width - 16.0
+	pos.x = clampf(pos.x, 10.0, maxf(10.0, size.x - width - 10.0))
+	pos.y = clampf(pos.y, 10.0, maxf(10.0, size.y - height - 10.0))
+	detail_card.offset_left = pos.x
+	detail_card.offset_top = pos.y
+	detail_card.offset_right = pos.x + width
+	detail_card.offset_bottom = pos.y + height
 
 
 ## 武器/头盔/护甲的可装备槽位（优先空槽；武器占用时可换装，旧件自动回仓库）。
@@ -637,7 +663,11 @@ func _refresh_workspace() -> void:
 
 
 func _on_workspace_place(payload: Dictionary, container: String, cell: Vector2i) -> void:
+	## 物资大格子拖放带 token；装备槽/容器格的拖放只带 instance_id，按 carried 条目兜底
+	##（否则已装备物品拖进胸挂/背包会静默失效）。
 	var entry := _entry(str(payload.get("token", "")))
+	if entry.is_empty():
+		entry = _entry("carried:%d" % int(payload.get("instance_id", -1)))
 	if entry.is_empty():
 		return
 	_take(entry, container, cell, bool(payload.get("rotated", false)))
@@ -967,9 +997,6 @@ func _render_search() -> void:
 		share_box = VBoxContainer.new()
 		share_box.add_theme_constant_override("separation", 6)
 		context_column.add_child(share_box)
-		corpse_detail_column = VBoxContainer.new()
-		corpse_detail_column.add_theme_constant_override("separation", 10)
-		context_column.add_child(corpse_detail_column)
 	ExpeditionUI.clear(ground_drops)
 	for entry in entries:
 		if str(entry["kind"]) == "pick_drop":
@@ -1038,6 +1065,17 @@ func _process(_delta: float) -> void:
 		_refresh_workspace()
 		_render_context()
 		_render_detail()
+	# 拖动期间详情卡隐藏（不挡放置目标）；拖动结束后清掉锚点不重开菜单——点击才会再弹
+	#（拖拽起点的 _get_drag_data 也会选中物品并留下锚点，不清会在下次刷新时凭空弹卡）。
+	if get_viewport().gui_is_dragging():
+		if detail_card.visible:
+			detail_card.visible = false
+		_saw_drag = true
+	elif _saw_drag:
+		_saw_drag = false
+		if _detail_anchor != Rect2():
+			_detail_anchor = Rect2()
+			_render_detail()
 	if pending_action:
 		return
 	if stop_search_pending:

@@ -10,10 +10,12 @@ extends Control
 signal item_selected(instance_id: int)
 
 ## 宿主注入的命令口（setup 必填前四个；select 可空＝只发 item_selected 信号）。
+## select_drag＝拖拽起点的静默选中（宿主只更新高亮，不弹详情卡，防弹卡杀拖拽）。
 var place_action: Callable
 var equip_action: Callable
 var tidy_action: Callable
 var select_action: Callable
+var select_drag_action: Callable
 var owner_id := 0
 ## 宿主异步命令进行中＝true：拖放校验一律拒绝，防止旧意图覆盖新状态。
 var busy := false
@@ -53,7 +55,7 @@ class WorkspaceGrid extends ExpeditionLootGrid:
 		var id := int(occupied.get(ExpeditionBaseline.cell_key(_cell(at_position)), -1))
 		if id < 0:
 			return null
-		item_selected.emit(id)
+		workspace._select(id, true)
 		var instance: Dictionary = workspace._inventory().find_instance(id)
 		if instance.is_empty():
 			return null
@@ -114,14 +116,15 @@ class EquipSlot extends Control:
 		return {"weapon": "武器", "helmet": "帽子／头盔", "armor": "防具"}[ExpeditionBaseline.SLOT_CATEGORY[slot]]
 
 	func _gui_input(event: InputEvent) -> void:
-		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed and not instance.is_empty():
-			workspace._select(int(instance["instance_id"]))
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+			## 松开且未拖动＝点击选中（点空槽＝-1 清除选择）；按下留给拖拽。
+			workspace._select(int(instance["instance_id"]) if not instance.is_empty() else -1)
 			accept_event()
 
 	func _get_drag_data(_at_position: Vector2) -> Variant:
 		if instance.is_empty():
 			return null
-		workspace._select(int(instance["instance_id"]))
+		workspace._select(int(instance["instance_id"]), true)
 		var preview := ExpeditionUI.label(ItemDefs.get_item(str(instance["def_id"]))["name"], 20)
 		set_drag_preview(preview)
 		return {"instance_id": int(instance["instance_id"]), "def_id": instance["def_id"], "rotated": false, "workspace_owner": workspace.owner_id}
@@ -178,6 +181,7 @@ class FlowItemGrid extends Control:
 		mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
 		resized.connect(_relayout)
 
+
 	func set_items(new_entries: Array) -> void:
 		entries = new_entries
 		_pack()
@@ -229,12 +233,14 @@ class FlowItemGrid extends Control:
 		if event is InputEventMouseMotion:
 			var hit := _hit(event.position)
 			tooltip_text = str(entries[hit].get("tooltip", "")) if hit >= 0 else ""
-		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
 			var hit := _hit(event.position)
 			if hit >= 0:
 				entry_selected.emit(int(entries[hit].get("instance_id", -1)))
 				token_selected.emit(str(entries[hit].get("payload_extra", {}).get("token", "")))
-				accept_event()
+			else:
+				token_selected.emit("")
+			accept_event()
 
 	func _get_drag_data(at_position: Vector2) -> Variant:
 		var hit := _hit(at_position)
@@ -283,6 +289,7 @@ func setup(owner_control: Control, actions: Dictionary) -> void:
 	equip_action = actions.get("equip", Callable())
 	tidy_action = actions.get("tidy", Callable())
 	select_action = actions.get("select", Callable())
+	select_drag_action = actions.get("select_drag", Callable())
 
 
 func _build() -> void:
@@ -429,10 +436,11 @@ func refresh(inventory: InventoryGame, selected_id: int) -> void:
 		grid.display(instances, dims, selected_id)
 
 
-func _select(instance_id: int) -> void:
+func _select(instance_id: int, from_drag := false) -> void:
 	item_selected.emit(instance_id)
-	if select_action.is_valid():
-		select_action.call(instance_id)
+	var action := select_drag_action if from_drag else select_action
+	if action.is_valid():
+		action.call(instance_id)
 
 
 func _title_label(content: String) -> Label:
