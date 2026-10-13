@@ -70,6 +70,11 @@ func _ready() -> void:
 	context.boot()
 
 
+func _exit_tree() -> void:
+	if context != null and context.test_clock != null and game != null:
+		_save()
+
+
 ## 上下文就绪（离线 boot 完成 / 线上首快照到达）：构建视图。幂等——重复快照不重建。
 func _on_context_ready() -> void:
 	if hud != null:
@@ -130,7 +135,7 @@ func _process(delta: float) -> void:
 
 
 func _unhandled_key_input(event: InputEvent) -> void:
-	if OS.is_debug_build() and event is InputEventKey and event.pressed and not event.echo and event.is_action_pressed("debug_mature_all"):
+	if (OS.is_debug_build() or (context != null and context.test_clock != null)) and event is InputEventKey and event.pressed and not event.echo and event.is_action_pressed("debug_mature_all"):
 		_debug_mature_all()
 
 
@@ -686,6 +691,7 @@ func _build_hud() -> void:
 	hud = HUD_SCRIPT.new()
 	hud.name = "FarmHud"
 	hud.game = game
+	hud.test_clock = context.test_clock
 	canvas.add_child(hud)
 	hud.buy_seed_requested.connect(_on_buy_seed_requested)
 	hud.buy_fertilizer_requested.connect(_on_buy_fertilizer_requested)
@@ -714,6 +720,7 @@ func _build_hud() -> void:
 	hud.unlock_formula_requested.connect(_on_unlock_formula_requested)
 	hud.sell_batch_to_requested.connect(_on_sell_batch_to_requested)
 	hud.debug_mature_requested.connect(_debug_mature_all)
+	hud.test_speed_requested.connect(_on_test_speed_requested)
 	hud.expedition_save_requested.connect(_on_expedition_save_requested)
 	hud.save_requested.connect(_on_plain_save_requested)
 	hud.visit_water_requested.connect(_on_visit_water_requested)
@@ -799,6 +806,11 @@ func _on_clock_tick() -> void:
 	if context.tick_market():
 		_save()
 		_refresh_guest_models()
+	if context.test_clock != null:
+		var previous_pending := int(game.state["breeder"]["pending"])
+		game.breeder_settle(_now())
+		if int(game.state["breeder"]["pending"]) != previous_pending:
+			_save()
 	for plot_id in range(1, FarmGame.MAX_PLOTS + 1):
 		_refresh_plot_model(plot_id)
 	_refresh_hover_hint()
@@ -880,7 +892,7 @@ func _on_online_status(text: String, is_online: bool) -> void:
 func _start_clock() -> void:
 	var clock := Timer.new()
 	clock.name = "GrowthRefreshTimer"
-	clock.wait_time = 1.0
+	clock.wait_time = 0.25 if context.test_clock != null else 1.0
 	clock.timeout.connect(_on_clock_tick)
 	add_child(clock)
 	clock.start()
@@ -1018,7 +1030,10 @@ func _finish_plant_seed(result: Dictionary, plot_id: int) -> void:
 	_refresh_all()
 	var plot := game.get_plot(plot_id)
 	var defn := PlantDefs.get_plant(plot["kind"])
-	hud.show_status("第 %d 块地已播种%s（品质 %d 分），约 %d 分钟后成熟。" % [plot_id, defn["display_name"], BreedingDefs.quality_score(plot["parent_traits"]), int(defn["grow_seconds"] / 60)])
+	var wait_text := "约 %d 分钟后成熟" % int(defn["grow_seconds"] / 60)
+	if context.test_clock != null:
+		wait_text = "测试 ×%d · 约 %d 秒后成熟" % [context.test_clock.speed, ceili(float(defn["grow_seconds"]) / context.test_clock.speed)]
+	hud.show_status("第 %d 块地已播种%s（品质 %d 分），%s。" % [plot_id, defn["display_name"], BreedingDefs.quality_score(plot["parent_traits"]), wait_text])
 	hud.close_modal_after_action()
 
 
@@ -1581,7 +1596,7 @@ func _on_expedition_save_requested(dirty: bool) -> void:
 
 
 func _debug_mature_all() -> void:
-	if not OS.is_debug_build() or online != null:
+	if online != null or (not OS.is_debug_build() and context.test_clock == null):
 		return
 	var changed := false
 	for plot in game.state["plots"]:
@@ -1591,7 +1606,18 @@ func _debug_mature_all() -> void:
 	if changed:
 		_save()
 	_refresh_all()
-	hud.show_status("调试：作物已成熟，可点击收获。" if changed else "没有正在生长的作物。")
+	hud.show_status("作物已成熟，可点击收获。" if changed else "没有正在生长的作物。")
+
+
+func _on_test_speed_requested(speed: int) -> void:
+	if context.test_clock == null or online != null:
+		return
+	context.test_clock.set_speed(speed)
+	if not _save():
+		hud.show_status("测试存档写入失败。")
+		return
+	_on_clock_tick()
+	hud.show_status("测试时间 ×%d · 生长与育种计时已加速。" % context.test_clock.speed)
 
 
 func _advance_tutorial(completed_step: int) -> void:

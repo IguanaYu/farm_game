@@ -120,7 +120,7 @@ func _key(code: int) -> void:
 
 func _click_button(text: String) -> void:
 	for button in loot.find_children("*", "Button", true, false):
-		if button.is_visible_in_tree() and not button.disabled and button.text.contains(text):
+		if button.is_visible_in_tree() and not button.disabled and (button.name == text or button.text.contains(text)):
 			var parent := button.get_parent()
 			while parent != loot and parent != null:
 				if parent is ScrollContainer:
@@ -177,7 +177,7 @@ func _run() -> void:
 	panel.open(expedition)
 	loot = panel.loot_panel
 	_check(loot.visible and not panel.map_frame.visible, "post-battle screen takes over route")
-	await _click_button("菜单")
+	await _click_button("LootSettingsButton")
 	_check(panel.overlay_panel.visible, "loot menu opens map pause overlay")
 	await _key(KEY_ESCAPE)
 	_check(not panel.overlay_panel.visible and loot.visible, "escape closes parent menu without re-opening it")
@@ -254,6 +254,9 @@ func _run() -> void:
 	await _click_button("丢到现场")
 	await _click_button("确认丢到现场")
 	_check(inv.loadout_list("safe").is_empty() and expedition.run["node_drops"].size() == 1, "confirmed discard transfers seed to floor")
+	if expedition.run["node_drops"].is_empty():
+		quit(1)
+		return
 	var dropped_id := int(expedition.run["node_drops"][0]["instance_id"])
 	loot.select_item("drop:%d" % dropped_id)
 	await _click_button("放保险箱")

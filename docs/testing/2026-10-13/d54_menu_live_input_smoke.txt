@@ -1,0 +1,32 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: 有档时继续按钮可用
+  ok: 主菜单·设置按钮：可点击前提（可见且未禁用）
+  ok: 真实点击后设置页可见
+  ok: 设置页真实 ESC 返回主按钮页
+  ok: 主菜单·开始新游戏按钮：可点击前提（可见且未禁用）
+  ok: 有档时新游戏真实点击弹出覆盖确认
+  ok: 确认页·返回按钮：可点击前提（可见且未禁用）
+  ok: 确认页真实点击返回后关闭
+  ok: 主菜单·继续游戏按钮：可点击前提（可见且未禁用）
+  ok: 真实点击继续后切进农场世界
+  ok: 继续模式读种子档（金币 999）
+  ok: farm_world 消费模式后 GameFlow 复位
+  ok: 农场 HUD 就绪
+  ok: 真实 ESC 输入弹出暂停菜单
+  ok: 暂停·继续游戏按钮：可点击前提（可见且未禁用）
+  ok: 真实点击继续后暂停关闭
+  ok: 再次真实 ESC 重新弹出暂停
+  ok: 暂停·设置按钮：可点击前提（可见且未禁用）
+  ok: 真实点击后暂停设置子页可见
+  ok: 暂停设置·返回按钮：可点击前提（可见且未禁用）
+  ok: 设置子页真实点击返回后回暂停主视图
+  ok: 暂停·回到主菜单按钮：可点击前提（可见且未禁用）
+  ok: 真实点击回到主菜单后场景切回
+  ok: 回到主菜单后继续按钮可用
+D54_MENU_LIVE_PASS
+  ok: 主菜单·退出游戏按钮：可点击前提（可见且未禁用）
+WARNING: ObjectDB instances leaked at exit (run with --verbose for details).
+   at: cleanup (core/object/object.cpp:2641)
+ERROR: 1 resources still in use at exit (run with --verbose for details).
+   at: clear (core/io/resource.cpp:810)
