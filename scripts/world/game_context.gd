@@ -14,6 +14,8 @@ enum Mode { OFFLINE_NEW, OFFLINE_LOAD, ONLINE }
 var mode := Mode.OFFLINE_LOAD
 var game := FarmGame.new()
 var online: OnlineFarmBridge = null
+var test_clock: FarmTestMode = null
+var save_path := SaveStore.SAVE_PATH
 ## 离线启动参数（GameFlow 意图在 boot() 内消费）。
 var open_room_on_entry := false
 ## 线上欢迎附带活动局（M3 重连恢复）→ 视图据此直回局面板。
@@ -32,6 +34,9 @@ static func create() -> GameContext:
 			context.mode = Mode.ONLINE
 		_:
 			context.mode = Mode.OFFLINE_LOAD
+	if context.mode != Mode.ONLINE and FarmTestMode.enabled:
+		context.test_clock = FarmTestMode.new()
+		context.save_path = FarmTestMode.SAVE_PATH
 	return context
 
 
@@ -48,23 +53,34 @@ func boot() -> void:
 
 func _boot_offline() -> void:
 	var fresh_start := mode == Mode.OFFLINE_NEW
+	var copied_save := false
 	if fresh_start:
 		game.new_game(_now())
 	else:
-		var saved := SaveStore.load_state()
+		var saved := SaveStore.load_state(save_path)
 		var loaded := not saved.is_empty() and game.load_state(saved)
 		if not loaded:
-			saved = SaveStore.load_backup_state()
+			saved = SaveStore.load_backup_state(save_path)
 			loaded = not saved.is_empty() and game.load_state(saved)
+		if not loaded and test_clock != null:
+			# 第一次测试从正式档复制一份；之后继续独立测试进度。
+			saved = SaveStore.load_state()
+			loaded = not saved.is_empty() and game.load_state(saved)
+			if not loaded:
+				saved = SaveStore.load_backup_state()
+				loaded = not saved.is_empty() and game.load_state(saved)
+			copied_save = loaded
 		if not loaded:
 			fresh_start = true
 			game.new_game(_now())
+	if test_clock != null:
+		test_clock.restore(game.state)
 	var replay := _consume_tutorial_replay()
 	if replay and not fresh_start:
 		## 只有读档路径需要归零（新档本来就是 0）；新档只落一次盘，保住"开新局前"的 .bak。
 		game.state["tutorial_step"] = 0
 		save_game(game)
-	elif fresh_start:
+	elif fresh_start or copied_save:
 		save_game(game)
 	open_room_on_entry = GameFlow.open_room_on_entry
 	GameFlow.reset()
@@ -134,6 +150,8 @@ func _now() -> int:
 	if online != null:
 		## F08：线上时间锚定服务器（本机单调流逝补足），改本机时钟不影响生长/收益。
 		return online.now()
+	if test_clock != null:
+		return test_clock.now()
 	return int(Time.get_unix_time_from_system())
 
 
@@ -147,7 +165,9 @@ func save_game(target: FarmGame) -> bool:
 		## 线上档只存在服务器（F01/F09）：每命令成功即事务落库，本地无保存动作。
 		return true
 	target.breeder_settle(_now())
-	var ok := SaveStore.save_state(target.state)
+	if test_clock != null:
+		target.state["test_clock"] = test_clock.snapshot()
+	var ok := SaveStore.save_state(target.state, save_path)
 	if not ok:
 		push_error("存档写入失败，请检查磁盘空间与 user:// 目录权限。")
 	return ok

@@ -21,6 +21,8 @@ var online_panel: OnlineLoginPanel
 var settings_panel: SettingsView
 var continue_button: Button
 var confirm_summary: Label
+var test_mode_button: Button
+var test_mode_hint: Label
 ## 装饰 emoji 的基准位置，_process 里做轻微浮动。
 var _float_labels: Array = []
 var _float_bases: Array = []
@@ -125,7 +127,47 @@ func _build() -> void:
 	footer.name = "MenuFooter"
 	footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	stack.add_child(footer)
+	_build_test_toggle()
 	_refresh_continue_summary()
+	_refresh_test_mode()
+
+
+func _build_test_toggle() -> void:
+	var corner := ExpeditionUI.panel(ExpeditionUI.PAPER, ExpeditionUI.LINE, 12)
+	corner.name = "TestModeCorner"
+	corner.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	corner.offset_left = -242
+	corner.offset_right = -20
+	corner.offset_top = -104
+	corner.offset_bottom = -20
+	add_child(corner)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 6)
+	corner.add_child(stack)
+	test_mode_button = _menu_button("", 36, 16)
+	test_mode_button.name = "TestModeButton"
+	test_mode_button.toggle_mode = true
+	test_mode_button.tooltip_text = "加速植物生长与育种机计时。首次继续会复制本地进度，测试结果独立保存。"
+	test_mode_button.toggled.connect(func(on: bool) -> void:
+		FarmTestMode.enabled = on
+		_refresh_test_mode()
+		_refresh_continue_summary())
+	stack.add_child(test_mode_button)
+	test_mode_hint = _label("", 12, TEXT_MUTED)
+	test_mode_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	stack.add_child(test_mode_hint)
+
+
+func _refresh_test_mode() -> void:
+	var on := FarmTestMode.enabled
+	test_mode_button.set_pressed_no_signal(on)
+	test_mode_button.text = "测试功能：开" if on else "测试功能：关"
+	test_mode_hint.text = "独立存档 · 可调时间倍率" if on else "加速生长与育种"
+	(find_child("NewGameButton", true, false) as Button).text = "开始新测试" if on else "开始新游戏"
+	for button_name in ["OnlineButton", "CoopButton"]:
+		var button := find_child(button_name, true, false) as Button
+		button.disabled = on
+		button.tooltip_text = "关闭测试功能后可联机。" if on else ("连接服务器，继续线上进度。" if button_name == "OnlineButton" else "使用本机存档创建或加入好友房间。")
 
 
 # —— 三个子视图 ——————————————————————————————————————————————
@@ -141,6 +183,7 @@ func _build_confirm_view() -> VBoxContainer:
 	confirm_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	view.add_child(confirm_summary)
 	var warning := _label("开始新游戏会覆盖当前存档（旧档自动备份为 farm_save_v1.json.bak）。", 13, BAD_RED)
+	warning.name = "OverwriteWarning"
 	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	view.add_child(warning)
 	var confirm_button := _menu_button("确认覆盖并开始", 42, 17, true)
@@ -221,10 +264,11 @@ func _on_continue() -> void:
 
 
 func _on_new_game() -> void:
-	if _load_save_summary() == "":
+	if _load_save_summary() == "" or (FarmTestMode.enabled and SaveStore.load_state(FarmTestMode.SAVE_PATH).is_empty()):
 		_enter_world(GameFlow.Mode.NEW_GAME)
 		return
 	confirm_summary.text = "当前进度：%s" % _load_save_summary()
+	(find_child("OverwriteWarning", true, false) as Label).text = "开始新测试会覆盖测试存档，旧测试档自动备份。" if FarmTestMode.enabled else "开始新游戏会覆盖当前存档（旧档自动备份为 farm_save_v1.json.bak）。"
 	_show_view(confirm_view)
 
 
@@ -268,10 +312,14 @@ func _enter_world(mode: int) -> void:
 
 ## 无档返回空串；有档返回"第 N 天 · 金币 X"。
 func _load_save_summary() -> String:
-	var saved: Dictionary = SaveStore.load_state()
+	var saved: Dictionary = SaveStore.load_state(FarmTestMode.SAVE_PATH if FarmTestMode.enabled else SaveStore.SAVE_PATH)
+	if saved.is_empty() and FarmTestMode.enabled:
+		saved = SaveStore.load_state()
 	if saved.is_empty():
 		return ""
 	var now := int(Time.get_unix_time_from_system())
+	if FarmTestMode.enabled:
+		now = int(saved.get("test_clock", {}).get("now", now))
 	var created := int(saved.get("created_at", 0))
 	var day := maxi(1, int((now - maxi(created, 0)) / 86400) + 1) if created > 0 else 1
 	return "第 %d 天 · 金币 %d" % [day, int(saved.get("coins", 0))]
@@ -281,10 +329,10 @@ func _refresh_continue_summary() -> void:
 	var summary := _load_save_summary()
 	if summary == "":
 		continue_button.disabled = true
-		continue_button.text = "继续游戏（暂无存档）"
+		continue_button.text = "继续测试（暂无进度）" if FarmTestMode.enabled else "继续游戏（暂无存档）"
 	else:
 		continue_button.disabled = false
-		continue_button.text = "继续游戏 · %s" % summary
+		continue_button.text = "%s · %s" % ["继续测试" if FarmTestMode.enabled else "继续游戏", summary]
 
 
 # —— 背景装饰 ———————————————————————————————————————————————

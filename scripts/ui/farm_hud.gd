@@ -28,6 +28,7 @@ signal lock_formula_requested(kind: String)
 signal unlock_formula_requested
 signal sell_batch_to_requested(batch_id: int, count: int, guest_id: int)
 signal debug_mature_requested
+signal test_speed_requested(speed: int)
 signal expedition_save_requested(dirty: bool)
 ## HUD 本地改动需要立即落盘时发出（如跳过引导），世界层执行普通保存＋刷新。
 signal save_requested
@@ -88,6 +89,10 @@ var toast_timer: Timer
 var tutorial_label: Label
 var tutorial_panel: PanelContainer
 var care_remaining_label: Label
+var breeder_count_label: Label
+var breeder_progress_bar: ProgressBar
+var breeder_progress_label: Label
+var breeder_collect_button: Button
 var coins_value: Label
 var seeds_value: Label
 var crops_value: Label
@@ -97,6 +102,7 @@ var status_label: Label
 ## M1 线上模式（计划 §5.6）：状态角标 + 未联网化入口的门控。
 var online_mode := false
 var online_badge: Label = null
+var test_clock: FarmTestMode = null
 ## M2：线上命令发送口，farm_world 在线模式注入 Callable(online, "request")；
 ## 空 Callable = 单机。制作/装备仓库/战备三个面板经它发命令而不直改本地档。
 var online_request: Callable = Callable()
@@ -164,6 +170,7 @@ func _ready() -> void:
 	_build_context()
 	_build_actions()
 	_build_tutorial_banner()
+	_build_test_controls()
 	_build_modal()
 	_build_expedition_panels()
 	_build_pause_overlay()
@@ -191,6 +198,15 @@ func refresh(state: Dictionary) -> void:
 
 func tick_update(now: int) -> void:
 	## 每秒更新倒计时、进度与时段状态，不重建操作按钮，避免吃掉点击。
+	if test_clock != null and active_modal == "breeder" and is_instance_valid(breeder_count_label):
+		var status := game.breeder_status(now)
+		breeder_count_label.text = "Lv.%d · 副本 %d/%d" % [status["level"], status["pending"], status["capacity"]]
+		if is_instance_valid(breeder_progress_bar):
+			breeder_progress_bar.value = 100.0 * status["progress_seconds"] / maxf(1, status["cycle_seconds"])
+			breeder_progress_label.text = "复制中 · %d%%" % int(breeder_progress_bar.value) if status["running"] else "机内已满 · 复制暂停"
+		if is_instance_valid(breeder_collect_button):
+			breeder_collect_button.text = "领取 %d 粒" % status["pending"]
+			breeder_collect_button.disabled = int(status["pending"]) == 0
 	if active_modal == "plot_care" and care_plot_id > 0 and is_instance_valid(care_remaining_label):
 		var plot := game.get_plot(care_plot_id)
 		if not plot.is_empty() and plot["seed_id"] != 0:
@@ -545,6 +561,42 @@ func _build_actions() -> void:
 	actions.add_child(harvest_all_entry)
 
 
+func _build_test_controls() -> void:
+	if test_clock == null:
+		return
+	var panel := _panel(CREAM, Color("#a8bf8a"), 12)
+	panel.name = "FarmTestControls"
+	panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+	panel.offset_left = -328
+	panel.offset_right = -24
+	panel.offset_top = -200
+	panel.offset_bottom = -110
+	add_child(panel)
+	var margin := _margin(12, 8)
+	panel.add_child(margin)
+	var stack := VBoxContainer.new()
+	margin.add_child(stack)
+	stack.add_child(_label("测试模式 · 独立进度", 14, LEAF))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	stack.add_child(row)
+	var speed := OptionButton.new()
+	speed.name = "TestSpeedSelect"
+	speed.custom_minimum_size = Vector2(126, 34)
+	speed.tooltip_text = "加速农场计时，包括生长、育种、肥料与每日集市。"
+	for value in FarmTestMode.SPEEDS:
+		speed.add_item("时间 ×%d" % value, value)
+	speed.select(FarmTestMode.SPEEDS.find(test_clock.speed))
+	speed.item_selected.connect(func(index: int) -> void: test_speed_requested.emit(speed.get_item_id(index)))
+	row.add_child(speed)
+	var mature := _plain_button("作物立即成熟", TEXT_DARK)
+	mature.name = "TestMatureButton"
+	mature.custom_minimum_size.y = 34
+	mature.tooltip_text = "让所有已播种作物立即可收获。"
+	mature.pressed.connect(func() -> void: debug_mature_requested.emit())
+	row.add_child(mature)
+
+
 func _icon_action(caption: String, texture: Texture2D, fill: Color, border: Color) -> Button:
 	var button := Button.new()
 	button.custom_minimum_size = Vector2(112, 76)
@@ -639,6 +691,10 @@ func _build_modal() -> void:
 
 func _render_modal() -> void:
 	care_remaining_label = null
+	breeder_count_label = null
+	breeder_progress_bar = null
+	breeder_progress_label = null
+	breeder_collect_button = null
 	growth_bar = null
 	care_water_button = null
 	care_segments = null
@@ -1312,8 +1368,12 @@ func _render_breeder() -> void:
 		stack.add_child(_wrapped("种地 Lv.%d 解锁" % BreedingDefs.BREEDER_UNLOCK_FARMING_LEVEL))
 	else:
 		var level: int = status["level"]
-		stack.add_child(_label("Lv.%d · 副本 %d/%d" % [level, status["pending"], status["capacity"]], 22, LEAF))
-		stack.add_child(_wrapped("%d 分钟 / 粒" % int(status["cycle_seconds"] / 60)))
+		breeder_count_label = _label("Lv.%d · 副本 %d/%d" % [level, status["pending"], status["capacity"]], 22, LEAF)
+		stack.add_child(breeder_count_label)
+		var cycle_text := "%d 分钟 / 粒" % int(status["cycle_seconds"] / 60)
+		if test_clock != null:
+			cycle_text = "约 %d 秒 / 粒 · 测试 ×%d" % [ceili(float(status["cycle_seconds"]) / test_clock.speed), test_clock.speed]
+		stack.add_child(_wrapped(cycle_text))
 		if status["template"].is_empty():
 			var choose := _plain_button("去种子仓库选择模板", TEXT_DARK)
 			choose.pressed.connect(func(): open_warehouse("seeds"))
@@ -1323,12 +1383,15 @@ func _render_breeder() -> void:
 			_item_heading(stack, CROP_ICONS[template["kind"]], PlantDefs.get_plant(template["kind"])["display_name"], "品质 %d · 当前模板" % BreedingDefs.quality_score(template.get("traits", [])))
 			stack.add_child(_trait_chips(template.get("traits", [])))
 			var progress := _progress(LEAF)
+			breeder_progress_bar = progress
 			progress.value = 100.0 * status["progress_seconds"] / maxf(1, status["cycle_seconds"])
 			stack.add_child(progress)
-			stack.add_child(_wrapped("复制中 · %d%%" % int(progress.value) if status["running"] else "机内已满 · 复制暂停"))
+			breeder_progress_label = _wrapped("复制中 · %d%%" % int(progress.value) if status["running"] else "机内已满 · 复制暂停")
+			stack.add_child(breeder_progress_label)
 		var actions := HBoxContainer.new()
 		stack.add_child(actions)
 		var collect := _solid_button("领取 %d 粒" % status["pending"], LEAF)
+		breeder_collect_button = collect
 		collect.disabled = int(status["pending"]) == 0
 		collect.pressed.connect(func(): collect_breeder_requested.emit())
 		actions.add_child(collect)
@@ -1755,6 +1818,9 @@ func set_online_expedition(bridge: OnlineFarmBridge) -> void:
 
 func open_room() -> void:
 	## 2.6：好友组队房间页（局域网／本机直连）；M3 线上模式走服务器房间。
+	if test_clock != null:
+		show_status("测试模式使用独立进度；回主菜单关闭测试功能后可组队。")
+		return
 	if location_router.is_valid() and location_id != "cave_camp":
 		location_router.call("cave_camp",false)
 	if online_mode:

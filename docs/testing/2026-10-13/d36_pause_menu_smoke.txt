@@ -1,0 +1,20 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+  ok: AUTO 直启农场正常（旧路径不回归）
+  ok: ESC 弹出暂停菜单
+  ok: 暂停菜单按钮存在
+  ok: 非联机时回到主菜单可用
+  ok: 再按 ESC 关闭暂停菜单
+  ok: 继续按钮同样关闭暂停
+  ok: 暂停菜单含设置与退出游戏按钮
+  ok: 再次 ESC 打开暂停
+  ok: 设置子视图打开（含共用 SettingsView）
+  ok: 设置子视图 ESC 返回暂停主视图（不关暂停）
+  ok: 暂停主视图 ESC 关闭暂停
+  ok: 商店模态打开时 ESC 不弹暂停
+  ok: 探险面板打开时 ESC 不弹暂停
+  ok: 联机占用时 ESC 仍可暂停查看
+  ok: 联机占用时回到主菜单置灰并说明原因
+  ok: 回到主菜单按钮切换回主菜单场景
+  ok: 主菜单继续按钮可用（新档已落盘）
+D36_PAUSE_MENU_PASS
