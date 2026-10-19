@@ -37,16 +37,30 @@ static func prop(template_id: String) -> Dictionary:
 	return _placeholder(template_id, palette, str(record["name"]))
 
 
-## 敌人占位：简化身体＋名称；元素史莱姆等辨识信息由战斗符号层补（不单靠颜色）。
+## 敌人占位：简化身体＋名称；三色史莱姆按元素着色（元素辨识图标在 P2 战斗符号层补）。
 static func enemy(enemy_id: String) -> Dictionary:
 	var record: Dictionary = ChapterOneDefs.ENEMIES.get(enemy_id, {})
 	if record.is_empty():
 		return _placeholder(enemy_id, FALLBACK)
 	var palette := {"base": Color("#4d5a52"), "accent": Color("#9db8a4")}
+	match enemy_id:
+		"forest_green_slime":
+			palette = {"base": Color("#5f8f5a"), "accent": Color("#a3ccb2")}
+		"forest_red_slime":
+			palette = {"base": Color("#a55550"), "accent": Color("#e0a09a")}
+		"forest_blue_slime":
+			palette = {"base": Color("#5a7fa5"), "accent": Color("#a0bfe0")}
 	if record.has("area"):
 		var area := ChapterOneDefs.area(str(record["area"]))
-		palette = {"base": area.get("base", FALLBACK["base"]).darkened(0.15), "accent": area.get("accent", FALLBACK["accent"])}
-	return _placeholder(enemy_id, palette, str(record["name"]))
+		palette = {"base": Color(area["base"]).darkened(0.15), "accent": area["accent"]}
+	return {
+		"art_id": enemy_id,
+		"ready": false,
+		"name": str(record["name"]),
+		"shape": _enemy_shape_for(enemy_id),
+		"base": palette["base"],
+		"accent": palette["accent"],
+	}
 
 
 ## 资源 ID → 当前表现。已登记 ID 一律 ready=false（首批图片未做）；
@@ -88,3 +102,27 @@ static func _shape_for(resource_key: String) -> String:
 		if key.contains(str(pair[0])):
 			return str(pair[1])
 	return "box"
+
+
+## 敌人专用轮廓（计划 §3：简化身体＋武器轮廓；同类共用剪影，颜色与名称区分）。
+static func _enemy_shape_for(enemy_id: String) -> String:
+	var key := enemy_id.to_lower()
+	if key.contains("slime") or key.contains("matriarch"):
+		return "slime"
+	if key.contains("bat"):
+		return "bat"
+	if key.contains("wolf"):
+		return "wolf"
+	if key.contains("spider"):
+		return "spider"
+	if key.contains("wisp"):
+		return "wisp"
+	if key.contains("goblin"):
+		return "goblin"
+	if key.contains("bandit"):
+		return "bandit"
+	if key.contains("priest") or key.contains("wrapped") or key.contains("walker"):
+		return "robe"
+	if key.contains("guard") or key.contains("keeper"):
+		return "golem"
+	return "body"

@@ -35,6 +35,17 @@ func _run() -> void:
 		scroll.scroll_vertical = int(scroll.get_v_scroll_bar().max_value)
 	await _frames(3)
 	await _shot("04_chapter_preview_bottom")
+	# 敌人与物品登记区。
+	var enemy_section := root.find_child("EnemySection", true, false) as Control
+	if scroll != null and enemy_section != null:
+		scroll.scroll_vertical = maxi(0, int(enemy_section.position.y) - 12)
+	await _frames(3)
+	await _shot("05_enemies")
+	var item_section := root.find_child("ItemSection", true, false) as Control
+	if scroll != null and item_section != null:
+		scroll.scroll_vertical = maxi(0, int(item_section.position.y) - 12)
+	await _frames(3)
+	await _shot("06_items")
 	# 返回主菜单（验证回程链路）。
 	root.find_child("BackButton", true, false).pressed.emit()
 	await _frames(4)

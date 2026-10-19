@@ -442,8 +442,8 @@ UI 只提交来源、区域、实例和目标位置；权威端验证当前节�
     内容开关 DEPARTURE_ENABLED=false、出发/恢复双检查、validate_registrations 自检）
   新增 scripts/ui/chapter_art_registry.gd（资源 ID→占位绘制参数；未知 ID 统一回退）
   新增 scripts/ui/chapter_preview_panel.gd + scenes/chapter_preview.tscn（五区预览面板）
-  新增 tests/forest_defs_smoke.gd（P0 断言 46 项）
-  新增 tests/capture_forest_preview.gd + screenshots/forest_ch1_p0_2026-10-19（4 张）
+  新增 tests/forest_defs_smoke.gd（P0 断言 53 项）
+  新增 tests/capture_forest_preview.gd + screenshots/forest_ch1_p0_2026-10-19（6 张）
   修改 scripts/domain/expedition_game.gd（compose_run/depart/depart_coop 预留 content_set，
     缺省不写字段保持旧局语义；出发前经 ChapterOneDefs 统一裁定）
   修改 scripts/services/session_host.gd（begin_depart 带内容集，pending_content_set
@@ -472,7 +472,10 @@ UI 只提交来源、区域、实例和目标位置；权威端验证当前节�
   ① 计划 §4.4/P5 指出的"古道事件节点依赖 P6 NPC 事件"问题在 P0 不处理（路线 P4 落地）；
   ② 隔离夹具：P0 以现有测试隔离约定（删档重建＋GameFlow.reset）＋单测级断言覆盖，
     四类完整局恢复夹具随 P4/P7 的 forest_route/forest_recovery smoke 落地；
-  ③ "探索场景为卡牌路线内点击场景"的确认在 P3 场景落地时执行，P0 未改任何现有交互节点。
+  ③ "探索场景为卡牌路线内点击场景"的确认在 P3 场景落地时执行，P0 未改任何现有交互节点；
+  ④ 追加（验收实机前）：预览面板补充"首章敌人（23）"与"首章物品登记（36）"两节，
+    敌人按批次列占位剪影（三色史莱姆按元素着色、首领金框），物品按 I01~I36 列出并标
+    复用项——均为登记数据的展示层，不改玩法；真正的掉落池仍按计划在 P3/P5/P6 接入。
 已知问题与下一阶段依赖：P1 需在 ItemDefs/CardDefs 落 31 件新物品与 16 张新牌定义
   （登记表已锁 ID 与前缀）；P5 打开 DEPARTURE_ENABLED 时需同步 server_main 特性表与 PROTO 版本。
 ```

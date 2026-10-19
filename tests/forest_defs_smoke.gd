@@ -120,6 +120,22 @@ func _run() -> void:
 	_check(preview.find_child("BackButton", true, false) != null, "预览：返回主菜单按钮存在")
 	var note := preview.find_child("DepartureNote", true, false) as Label
 	_check(note != null and str(note.text).contains("未打开"), "预览：标明出发开关状态")
+	_check(preview.find_child("EnemySection", true, false) != null, "预览：敌人登记区存在")
+	_check(preview.find_child("ItemSection", true, false) != null, "预览：物品登记区存在")
+	var enemy_chips := 0
+	for enemy_id in ChapterOneDefs.ENEMIES:
+		if preview.find_child("EnemyChip_%s" % enemy_id, true, false) != null:
+			enemy_chips += 1
+	_check(enemy_chips == 23, "预览：敌人芯片 23 个齐全")
+	var item_chips := 0
+	for design_no in ChapterOneDefs.ITEM_MAPPING:
+		if preview.find_child("ItemChip_%s" % design_no, true, false) != null:
+			item_chips += 1
+	_check(item_chips == 36, "预览：物品芯片 36 个齐全")
+	var slime_shape := str(ChapterArtRegistry.enemy("forest_green_slime")["shape"])
+	_check(slime_shape == "slime", "敌人轮廓：史莱姆走 slime 剪影")
+	_check(str(ChapterArtRegistry.enemy("forest_goblin_archer")["shape"]) == "goblin", "敌人轮廓：弓手走 goblin 剪影")
+	_check(str(ChapterArtRegistry.enemy("forest_root_coffin_priest")["shape"]) == "robe", "敌人轮廓：根棺祭司走 robe 剪影")
 	preview.queue_free()
 	await _frames(1)
 

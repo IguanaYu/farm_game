@@ -65,6 +65,8 @@ func _build() -> void:
 
 	for area_id in ChapterOneDefs.AREA_ORDER:
 		areas.add_child(_build_area_card(str(area_id)))
+	areas.add_child(_build_enemy_section())
+	areas.add_child(_build_item_section())
 
 
 func _build_area_card(area_id: String) -> PanelContainer:
@@ -135,6 +137,114 @@ func _build_prop_chip(template_id: String) -> PanelContainer:
 	return chip
 
 
+func _build_enemy_section() -> PanelContainer:
+	var card := PanelContainer.new()
+	card.name = "EnemySection"
+	var style := StyleBoxFlat.new()
+	style.bg_color = ExpeditionUI.PANEL.lightened(0.02)
+	style.border_color = ExpeditionUI.LINE
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(12)
+	style.set_content_margin_all(12)
+	card.add_theme_stylebox_override("panel", style)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 8)
+	card.add_child(stack)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
+	stack.add_child(head)
+	head.add_child(ExpeditionUI.label("首章敌人（23）", 17, ExpeditionUI.TEXT))
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(spacer)
+	head.add_child(ExpeditionUI.label("P2 批 11 ／ P6 批 12 · 金框＝区域强敌", 13, ExpeditionUI.MUTED))
+	var chips := FlowContainer.new()
+	chips.add_theme_constant_override("h_separation", 8)
+	chips.add_theme_constant_override("v_separation", 8)
+	stack.add_child(chips)
+	for batch in [2, 6]:
+		for enemy_id in ChapterOneDefs.enemies_for_batch(int(batch)):
+			chips.add_child(_build_enemy_chip(str(enemy_id)))
+	return card
+
+
+func _build_enemy_chip(enemy_id: String) -> PanelContainer:
+	var spec := ChapterArtRegistry.enemy(enemy_id)
+	var record: Dictionary = ChapterOneDefs.ENEMIES.get(enemy_id, {})
+	var boss := bool(record.get("boss", false))
+	var chip := PanelContainer.new()
+	chip.name = "EnemyChip_%s" % enemy_id
+	var chip_style := StyleBoxFlat.new()
+	chip_style.bg_color = Color(spec["base"]).darkened(0.5)
+	chip_style.border_color = Color(spec["accent"]) if boss else Color(spec["base"])
+	chip_style.set_border_width_all(3 if boss else 1)
+	chip_style.set_corner_radius_all(9)
+	chip_style.set_content_margin_all(6)
+	chip.add_theme_stylebox_override("panel", chip_style)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 7)
+	chip.add_child(row)
+	var glyph := PlaceholderGlyph.new()
+	glyph.spec = spec
+	glyph.custom_minimum_size = Vector2(34, 34)
+	glyph.tooltip_text = "%s（%s 轮廓）" % [str(spec["art_id"]), str(spec["shape"])]
+	row.add_child(glyph)
+	var text := str(spec["name"])
+	if text == "":
+		text = enemy_id
+	row.add_child(ExpeditionUI.label(text + (" ·首领" if boss else ""), 14, ExpeditionUI.TEXT))
+	return chip
+
+
+func _build_item_section() -> PanelContainer:
+	var card := PanelContainer.new()
+	card.name = "ItemSection"
+	var style := StyleBoxFlat.new()
+	style.bg_color = ExpeditionUI.PANEL.lightened(0.02)
+	style.border_color = ExpeditionUI.LINE
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(12)
+	style.set_content_margin_all(12)
+	card.add_theme_stylebox_override("panel", style)
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 8)
+	card.add_child(stack)
+	var head := HBoxContainer.new()
+	head.add_theme_constant_override("separation", 10)
+	stack.add_child(head)
+	head.add_child(ExpeditionUI.label("首章物品登记（36）", 17, ExpeditionUI.TEXT))
+	var spacer := Control.new()
+	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	head.add_child(spacer)
+	head.add_child(ExpeditionUI.label("金框＝复用现有定义 · 图标 P1 接入 · 掉落池 P3 起按模板接入", 13, ExpeditionUI.MUTED))
+	var chips := FlowContainer.new()
+	chips.add_theme_constant_override("h_separation", 8)
+	chips.add_theme_constant_override("v_separation", 8)
+	stack.add_child(chips)
+	for design_no in ChapterOneDefs.ITEM_MAPPING:
+		chips.add_child(_build_item_chip(str(design_no)))
+	return card
+
+
+func _build_item_chip(design_no: String) -> PanelContainer:
+	var record: Dictionary = ChapterOneDefs.ITEM_MAPPING.get(design_no, {})
+	var reuse := bool(record.get("reuse", false))
+	var chip := PanelContainer.new()
+	chip.name = "ItemChip_%s" % design_no
+	var chip_style := StyleBoxFlat.new()
+	chip_style.bg_color = ExpeditionUI.RAISED.darkened(0.1)
+	chip_style.border_color = ExpeditionUI.ACCENT if reuse else ExpeditionUI.LINE
+	chip_style.set_border_width_all(2 if reuse else 1)
+	chip_style.set_corner_radius_all(9)
+	chip_style.set_content_margin_all(6)
+	chip.add_theme_stylebox_override("panel", chip_style)
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 7)
+	chip.add_child(row)
+	row.add_child(ExpeditionUI.label("%s %s%s" % [design_no, str(record.get("name", "")), "（复用）" if reuse else ""], 13, ExpeditionUI.TEXT))
+	return chip
+
+
 ## 占位图形：按 ChapterArtRegistry 的 shape 参数画简化轮廓（开发计划 §3 搜索对象行）。
 class PlaceholderGlyph extends Control:
 	var spec: Dictionary = {}
@@ -177,6 +287,72 @@ class PlaceholderGlyph extends Control:
 			"wisp":
 				draw_circle(center, radius * 0.35, accent)
 				draw_arc(center, radius, 0, TAU, 20, Color(accent, 0.5), 2.0, true)
+			"slime":
+				var blob := PackedVector2Array()
+				for i in range(14):
+					var angle := TAU * i / 14.0
+					blob.append(center + Vector2(cos(angle) * radius * 1.05, sin(angle) * radius * 0.72 - radius * 0.1))
+				draw_colored_polygon(blob, base.lightened(0.15))
+				draw_arc(center + Vector2(0, -radius * 0.1), radius * 0.95, PI + 0.4, TAU - 0.4, 14, Color(accent, 0.7), 2.0, true)
+				_dots(center + Vector2(-radius * 0.3, -radius * 0.2), center + Vector2(radius * 0.3, -radius * 0.2), accent)
+			"bat":
+				for side in [-1.0, 1.0]:
+					draw_colored_polygon(PackedVector2Array([
+						center + Vector2(side * radius * 0.2, -radius * 0.15), center + Vector2(side * radius * 1.45, -radius * 0.85),
+						center + Vector2(side * radius * 1.25, radius * 0.35), center + Vector2(side * radius * 0.65, radius * 0.05),
+						center + Vector2(side * radius * 0.45, radius * 0.55),
+					]), base.lightened(0.15))
+				draw_circle(center, radius * 0.42, base.lightened(0.3))
+				_dots(center + Vector2(-radius * 0.15, -radius * 0.1), center + Vector2(radius * 0.15, -radius * 0.1), accent)
+			"wolf":
+				draw_rect(Rect2(center + Vector2(-radius * 1.0, -radius * 0.1), Vector2(radius * 1.45, radius * 0.7)), base.lightened(0.15))
+				draw_colored_polygon(PackedVector2Array([
+					center + Vector2(-radius * 1.0, radius * 0.6), center + Vector2(-radius * 0.75, -radius * 0.1), center + Vector2(-radius * 0.55, radius * 0.6),
+				]), base.lightened(0.15))
+				draw_circle(center + Vector2(radius * 0.62, -radius * 0.32), radius * 0.44, base.lightened(0.25))
+				draw_colored_polygon(PackedVector2Array([
+					center + Vector2(radius * 0.4, -radius * 0.55), center + Vector2(radius * 0.52, -radius * 1.0), center + Vector2(radius * 0.72, -radius * 0.5),
+				]), base.lightened(0.25))
+				draw_line(center + Vector2(radius * 0.78, -radius * 0.2), center + Vector2(radius * 1.25, -radius * 0.12), base.lightened(0.25), 3.0, true)
+				_dots(center + Vector2(radius * 0.72, -radius * 0.4), center + Vector2(radius * 0.72, -radius * 0.4), accent)
+			"goblin":
+				draw_line(center + Vector2(-radius * 0.9, radius * 0.8), center + Vector2(radius * 1.0, -radius * 0.9), accent, 2.5, true)
+				draw_circle(center + Vector2(-radius * 0.1, -radius * 0.42), radius * 0.4, base.lightened(0.2))
+				draw_rect(Rect2(center + Vector2(-radius * 0.42, -radius * 0.05), Vector2(radius * 0.84, radius * 0.95)), base.lightened(0.15))
+				draw_line(center + Vector2(-radius * 0.28, -radius * 0.5), center + Vector2(-radius * 0.52, -radius * 0.32), base.lightened(0.35), 3.0, true)
+				draw_line(center + Vector2(radius * 0.08, -radius * 0.5), center + Vector2(radius * 0.32, -radius * 0.32), base.lightened(0.35), 3.0, true)
+				_dots(center + Vector2(-radius * 0.22, -radius * 0.45), center + Vector2(radius * 0.02, -radius * 0.45), accent)
+			"bandit":
+				draw_circle(center + Vector2(0, -radius * 0.4), radius * 0.38, base.lightened(0.2))
+				draw_line(center + Vector2(-radius * 0.55, -radius * 0.52), center + Vector2(radius * 0.55, -radius * 0.52), base.lightened(0.3), 3.0, true)
+				draw_rect(Rect2(center + Vector2(-radius * 0.4, -radius * 0.05), Vector2(radius * 0.8, radius * 0.95)), base.lightened(0.15))
+				draw_line(center + Vector2(radius * 0.4, radius * 0.3), center + Vector2(radius * 1.05, -radius * 0.5), accent, 3.0, true)
+				draw_circle(center + Vector2(radius * 1.12, -radius * 0.6), radius * 0.2, accent)
+				_dots(center + Vector2(-radius * 0.14, -radius * 0.44), center + Vector2(radius * 0.14, -radius * 0.44), accent)
+			"spider":
+				for side in [-1.0, 1.0]:
+					for i in range(4):
+						var spread := -0.9 + i * 0.6
+						draw_line(center + Vector2(side * radius * 0.3, 0), center + Vector2(side * radius * 1.35, radius * spread), base.lightened(0.25), 2.0, true)
+				draw_circle(center, radius * 0.5, base.lightened(0.2))
+				draw_circle(center + Vector2(0, -radius * 0.55), radius * 0.28, base.lightened(0.3))
+				_dots(center + Vector2(-radius * 0.18, -radius * 0.6), center + Vector2(radius * 0.18, -radius * 0.6), accent)
+			"robe":
+				draw_colored_polygon(PackedVector2Array([
+					center + Vector2(-radius * 0.75, radius * 1.0), center + Vector2(-radius * 0.3, -radius * 0.55),
+					center + Vector2(radius * 0.3, -radius * 0.55), center + Vector2(radius * 0.75, radius * 1.0),
+				]), base.lightened(0.18))
+				draw_circle(center + Vector2(0, -radius * 0.55), radius * 0.32, base.lightened(0.3))
+				draw_rect(Rect2(center + Vector2(-radius * 0.32, -radius * 0.62), Vector2(radius * 0.64, radius * 0.22)), base.darkened(0.1))
+				draw_line(center + Vector2(-radius * 0.6, radius * 0.35), center + Vector2(radius * 0.6, radius * 0.35), accent, 2.0, true)
+			"golem":
+				draw_rect(Rect2(center + Vector2(-radius * 0.6, -radius * 0.25), Vector2(radius * 1.2, radius * 1.2)), base.lightened(0.15))
+				draw_rect(Rect2(center + Vector2(-radius * 0.42, -radius * 0.85), Vector2(radius * 0.84, radius * 0.55)), base.lightened(0.25))
+				draw_circle(center + Vector2(0, radius * 0.35), radius * 0.18, accent)
+				_dots(center + Vector2(-radius * 0.16, -radius * 0.62), center + Vector2(radius * 0.16, -radius * 0.62), accent)
+			"body":
+				draw_circle(center + Vector2(0, -radius * 0.45), radius * 0.36, base.lightened(0.25))
+				draw_rect(Rect2(center + Vector2(-radius * 0.45, -radius * 0.05), Vector2(radius * 0.9, radius * 1.0)), base.lightened(0.15))
 			"gem":
 				draw_colored_polygon(PackedVector2Array([
 					center + Vector2(0, -radius), center + Vector2(radius * 0.85, -radius * 0.2),
@@ -190,3 +366,8 @@ class PlaceholderGlyph extends Control:
 				draw_rect(Rect2(center - Vector2(radius, radius * 0.85), Vector2(radius * 2.0, radius * 1.7)), base.lightened(0.12))
 				draw_rect(Rect2(center - Vector2(radius, radius * 0.85), Vector2(radius * 2.0, radius * 1.7)), accent, false, 2.0)
 				draw_line(center + Vector2(0, -radius * 0.2), center + Vector2(0, radius * 0.2), accent, 2.0, true)
+
+	func _dots(left: Vector2, right: Vector2, tint: Color) -> void:
+		for point in [left, right]:
+			draw_circle(point, 2.4, Color("#14262a"))
+			draw_circle(point + Vector2(-0.7, -0.7), 1.0, tint.lightened(0.6))
