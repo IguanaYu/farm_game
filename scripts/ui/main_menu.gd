@@ -12,6 +12,8 @@ const BAD_RED := ExpeditionUI.RED
 
 const WORLD_SCENE := "res://scenes/main.tscn"
 const CARD_PLAYTEST_SCENE := "res://scenes/card_playtest.tscn"
+## 森林第一章开发预览（P0）：开发入口，正式入口在 P8 整理（开发计划 §2）。
+const FOREST_PREVIEW_SCENE := "res://scenes/chapter_preview.tscn"
 
 var main_view: VBoxContainer
 var confirm_view: VBoxContainer
@@ -138,12 +140,17 @@ func _build_test_toggle() -> void:
 	corner.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
 	corner.offset_left = -242
 	corner.offset_right = -20
-	corner.offset_top = -104
+	corner.offset_top = -170
 	corner.offset_bottom = -20
 	add_child(corner)
 	var stack := VBoxContainer.new()
 	stack.add_theme_constant_override("separation", 6)
 	corner.add_child(stack)
+	var forest_button := _menu_button("森林预览", 36, 16)
+	forest_button.name = "ForestPreviewButton"
+	forest_button.tooltip_text = "苔冠森林五区占位一览（开发预览，不影响存档）。"
+	forest_button.pressed.connect(_on_forest_preview)
+	stack.add_child(forest_button)
 	test_mode_button = _menu_button("", 36, 16)
 	test_mode_button.name = "TestModeButton"
 	test_mode_button.toggle_mode = true
@@ -160,6 +167,9 @@ func _build_test_toggle() -> void:
 
 func _refresh_test_mode() -> void:
 	var on := FarmTestMode.enabled
+	var forest_button := find_child("ForestPreviewButton", true, false) as Button
+	if forest_button != null:
+		forest_button.visible = on
 	test_mode_button.set_pressed_no_signal(on)
 	test_mode_button.text = "测试功能：开" if on else "测试功能：关"
 	test_mode_hint.text = "独立存档 · 可调时间倍率" if on else "加速生长与育种"
@@ -278,6 +288,10 @@ func _on_settings() -> void:
 
 func _on_card_playtest() -> void:
 	get_tree().change_scene_to_file(CARD_PLAYTEST_SCENE)
+
+
+func _on_forest_preview() -> void:
+	get_tree().change_scene_to_file(FOREST_PREVIEW_SCENE)
 
 
 func _on_online() -> void:

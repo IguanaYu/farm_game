@@ -429,3 +429,60 @@ UI 只提交来源、区域、实例和目标位置；权威端验证当前节�
 ```
 
 原内容设计 SHA256：`6CD020D00F40FD4333EF0EB08D7F351242C6BD0C9FE68BBA0204A7F8EDA6170A`。该值用于确认本次计划编写保留了原稿，不作为未来正常修订设计的限制。
+
+## 附录 C：阶段实施记录
+
+### C1. P0（2026-10-19）
+
+```text
+阶段：P0
+状态：已验证（headless 全量回归＋真实窗口截图）；待实机
+实际改动文件：
+  新增 scripts/domain/chapter_one_defs.gd（五区/43 搜索模板/23 敌人/36 物品映射/16+11 牌登记、
+    内容开关 DEPARTURE_ENABLED=false、出发/恢复双检查、validate_registrations 自检）
+  新增 scripts/ui/chapter_art_registry.gd（资源 ID→占位绘制参数；未知 ID 统一回退）
+  新增 scripts/ui/chapter_preview_panel.gd + scenes/chapter_preview.tscn（五区预览面板）
+  新增 tests/forest_defs_smoke.gd（P0 断言 46 项）
+  新增 tests/capture_forest_preview.gd + screenshots/forest_ch1_p0_2026-10-19（4 张）
+  修改 scripts/domain/expedition_game.gd（compose_run/depart/depart_coop 预留 content_set，
+    缺省不写字段保持旧局语义；出发前经 ChapterOneDefs 统一裁定）
+  修改 scripts/services/session_host.gd（begin_depart 带内容集，pending_content_set
+    与 pending_run_id 同生命周期，开局/作废即清）
+  修改 scripts/server/room_service.gd（run.depart_solo/room.begin_depart 解析可选
+    content_set；_build_depart 为统一裁定点，拒绝时不改任何账户状态；depart_solo 去重
+    摘要输入加入 content_set）
+  修改 scripts/services/online_protocol.gd（预留 FEATURE_FOREST_CH1 常量，未入
+    server_main 特性表——开关打开即 P5 时随 PROTO 升版口径发布）
+  修改 scripts/ui/main_menu.gd（测试角新增"森林预览"入口，仅测试功能开启时可见）
+覆盖功能编号：F12（登记与占位规范部分）、F11 的开关与链路预留部分
+采用的内容/规则版本与数值初值：CONTENT_VERSION=1；五区基色取计划 §3 建议值；
+  风险模板仅登记计划点名的 4 类（蜂巢/石棺/祭司棺/倒塌蜂树＋狼巢猎袋按 P3 口径）；
+  区域强敌归属取内容设计 §2 表；常规敌人不带区域归属（遭遇配置 P4/P6 登记）
+占位资源与正式资源清单：全部为程序占位（ChapterArtRegistry 形状分类：box/nest/pool/
+  wood/plant/sarcophagus/remains/camp/wisp/gem）；正式图片 0 张，替换接口已预留
+专项验证结果与证据路径：tests/forest_defs_smoke.gd 全绿；tests/capture_forest_preview.gd
+  真实窗口 4 张截图（screenshots/forest_ch1_p0_2026-10-19/）；全量回归 71 项全绿
+  （REGRESSION_ALL_PASS，0 失败；d41/d53/d54/stage6 的 5 条 errors 均为既有白名单引擎提示）。
+  环境备注：本工作树首次跑全量需从主仓库复制 server/secrets/ 开发自签证书（d52 起本地
+  TLS 服务器依赖，目录已 gitignore）；新 class_name 文件落地后先 --import 重建类缓存。
+旧档、本地合作、专用服务端验证情况：旧洞窟出发/恢复回归由现有 d24/d27/d45/d50/d52
+  等测试覆盖（全绿）；compose_run 缺省不写 content_set 已断言；服务端链路 P0 只覆盖
+  代码路径与单测，双端一致性验收按计划留 P7
+与计划偏差及原因：
+  ① 计划 §4.4/P5 指出的"古道事件节点依赖 P6 NPC 事件"问题在 P0 不处理（路线 P4 落地）；
+  ② 隔离夹具：P0 以现有测试隔离约定（删档重建＋GameFlow.reset）＋单测级断言覆盖，
+    四类完整局恢复夹具随 P4/P7 的 forest_route/forest_recovery smoke 落地；
+  ③ "探索场景为卡牌路线内点击场景"的确认在 P3 场景落地时执行，P0 未改任何现有交互节点。
+已知问题与下一阶段依赖：P1 需在 ItemDefs/CardDefs 落 31 件新物品与 16 张新牌定义
+  （登记表已锁 ID 与前缀）；P5 打开 DEPARTURE_ENABLED 时需同步 server_main 特性表与 PROTO 版本。
+```
+
+工程模块地图登记（本轮新增模块，后续阶段按 §4.1 扩展）：
+
+| 模块 | P0 状态 | 后续阶段 |
+| --- | --- | --- |
+| `domain/chapter_one_defs.gd` | 新增：内容登记/开关/版本检查 | P1 扩物品与牌定义校验；P4 扩路线模板；P6 扩事件与 NPC |
+| `ui/chapter_art_registry.gd` | 新增：占位解析与回退 | P5 扩探索场景入口；P8 接正式图片 |
+| `ui/chapter_preview_panel.gd` `scenes/chapter_preview.tscn` | 新增：五区开发预览 | P5 起并入森林开发入口 |
+| `domain/search_loot_game.gd` `environment_loot_game.gd` `chapter_route_game.gd` `chapter_progress_game.gd` | 未创建（按 §4.1 目标名预留） | P3/P4 |
+| `ui/exploration_scene_panel.gd` `ui/chapter_journal_panel.gd` | 未创建 | P3/P4 |

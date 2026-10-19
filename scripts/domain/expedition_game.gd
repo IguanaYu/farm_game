@@ -47,7 +47,9 @@ static func depart_check(farm_game: FarmGame) -> String:
 
 ## 纯构造 run 字典（M3 服务器复用）：不占用、不落盘；coop=true 时并入 guest 成员。
 ## log_line 由调用方传入（单人/双人出发文案不同）。
-static func compose_run(farm_game: FarmGame, guest_profile: Dictionary, run_id: String, now: int, coop: bool, log_line: String) -> Dictionary:
+## content_set 预留（森林 P0）：空串=旧洞窟不写字段（旧局判定按缺省恢复）；
+## "forest_ch1" 写入 content_set/content_version，供恢复与结算按内容集分支（P4 起接入森林地图）。
+static func compose_run(farm_game: FarmGame, guest_profile: Dictionary, run_id: String, now: int, coop: bool, log_line: String, content_set := "") -> Dictionary:
 	var expedition: Dictionary = farm_game.state["expedition"]
 	var seed_value := run_id.hash() + int(Time.get_unix_time_from_system())
 	var run := {
@@ -73,6 +75,9 @@ static func compose_run(farm_game: FarmGame, guest_profile: Dictionary, run_id: 
 		"consumed": [],
 		"log": [log_line],
 	}
+	if content_set != "":
+		run["content_set"] = content_set
+		run["content_version"] = ChapterOneDefs.CONTENT_VERSION
 	if coop:
 		run["coop"] = true
 		run["guest"] = _guest_member(guest_profile)
@@ -81,7 +86,10 @@ static func compose_run(farm_game: FarmGame, guest_profile: Dictionary, run_id: 
 	return run
 
 
-static func depart(farm_game: FarmGame, now: int) -> Dictionary:
+static func depart(farm_game: FarmGame, now: int, content_set := "") -> Dictionary:
+	var content_problem := ChapterOneDefs.departure_problem(content_set)
+	if content_problem != "":
+		return {"ok": false, "reason": content_problem}
 	var problem := depart_check(farm_game)
 	if problem != "":
 		return {"ok": false, "reason": problem}
@@ -92,7 +100,8 @@ static func depart(farm_game: FarmGame, now: int) -> Dictionary:
 		return {"ok": false, "reason": "写入占用失败"}
 	var preview := inventory.deck_preview()
 	var run := compose_run(farm_game, {}, run_id, now, false,
-		"出发：生命 %d/%d，携带牌 %d 张" % [ExpeditionBaseline.MAX_HP, ExpeditionBaseline.MAX_HP, preview["totals"][1] + preview["totals"][2] + preview["totals"][3]])
+		"出发：生命 %d/%d，携带牌 %d 张" % [ExpeditionBaseline.MAX_HP, ExpeditionBaseline.MAX_HP, preview["totals"][1] + preview["totals"][2] + preview["totals"][3]],
+		content_set)
 	var instance := ExpeditionGame.new()
 	instance.game = farm_game
 	instance.run = run
@@ -146,7 +155,10 @@ static func _build_map(layer_id: String) -> Dictionary:
 ## 出发（双人）：主机侧事务。guest_profile 由客机在出发握手时提供：
 ## {name, player_id, loadout(实例快照), carried(实例 id 列表), next_instance_id, hp}。
 ## 主机只占用主机农场；客机在自己的存档里自行占用（握手协议负责）。
-static func depart_coop(farm_game: FarmGame, guest_profile: Dictionary, now: int, run_id_override := "") -> Dictionary:
+static func depart_coop(farm_game: FarmGame, guest_profile: Dictionary, now: int, run_id_override := "", content_set := "") -> Dictionary:
+	var content_problem := ChapterOneDefs.departure_problem(content_set)
+	if content_problem != "":
+		return {"ok": false, "reason": content_problem}
 	var inventory := InventoryGame.new()
 	inventory.bind(farm_game.state["expedition"])
 	var check := inventory.loadout_check()
@@ -159,7 +171,8 @@ static func depart_coop(farm_game: FarmGame, guest_profile: Dictionary, now: int
 	if not inventory.set_run_occupied(run_id)["ok"]:
 		return {"ok": false, "reason": "写入占用失败"}
 	var run := compose_run(farm_game, guest_profile, run_id, now, true,
-		"双人出发：主机与 %s" % str(guest_profile.get("name", "队友")))
+		"双人出发：主机与 %s" % str(guest_profile.get("name", "队友")),
+		content_set)
 	var instance := ExpeditionGame.new()
 	instance.game = farm_game
 	instance.run = run

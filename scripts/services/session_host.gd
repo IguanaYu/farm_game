@@ -19,6 +19,8 @@ var transport: SessionTransport = null
 var room: Dictionary = {}
 var expedition: ExpeditionGame = null
 var pending_run_id := ""
+## 森林 P0 预留：与 pending_run_id 同生命周期，开局/作废时一并清空。
+var pending_content_set := ""
 ## 未确认的客机结算单：按 player_id 暂存，重连或收到 settlement_applied 前不丢弃。
 var pending_settlements: Dictionary = {}
 var farm_game: FarmGame
@@ -150,6 +152,7 @@ func _handle(sender: int, message: Dictionary) -> void:
 		"depart_declined":
 			## 客机保存失败等明确拒绝：本次出发作废（不开局），主机可再次发起。
 			pending_run_id = ""
+			pending_content_set = ""
 			var declined_member: Dictionary = room["members"].get(sender, {})
 			if not declined_member.is_empty():
 				declined_member["depart_saved"] = false
@@ -279,7 +282,8 @@ func _try_begin_run() -> void:
 			guest = member.get("profile", {})
 	if guest.is_empty():
 		return
-	var result := ExpeditionGame.depart_coop(farm_game, guest, int(Time.get_unix_time_from_system()), pending_run_id)
+	var result := ExpeditionGame.depart_coop(farm_game, guest, int(Time.get_unix_time_from_system()), pending_run_id, pending_content_set)
+	pending_content_set = ""
 	if not result["ok"]:
 		broadcast({"t": "depart_failed", "reason": result["reason"]})
 		return
@@ -294,7 +298,7 @@ func host_set_ready(ready: bool) -> void:
 
 
 ## 主机确认出发（双方已准备）：先广播预备，等所有成员 depart_saved 再开局。
-func begin_depart() -> Dictionary:
+func begin_depart(content_set := "") -> Dictionary:
 	if expedition != null:
 		return {"ok": false, "reason": "已在局中"}
 	if pending_run_id != "":
@@ -306,6 +310,11 @@ func begin_depart() -> Dictionary:
 		var member: Dictionary = room["members"][member_id]
 		if not bool(member.get("ready", false)):
 			return {"ok": false, "reason": "还有成员未准备"}
+	## 内容开关在 depart_coop 内统一裁定：拒绝时作废本次预备并广播原因。
+	var content_problem := ChapterOneDefs.departure_problem(content_set)
+	if content_problem != "":
+		return {"ok": false, "reason": content_problem}
+	pending_content_set = content_set
 	## 两段式出发：先发局 ID 让客机写占用；全员回执后才真正开局（设计 §3）。
 	pending_run_id = ExpeditionStore.new_run_id(int(Time.get_unix_time_from_system() * 1000.0))
 	broadcast({"t": "depart_begin", "run_id": pending_run_id})

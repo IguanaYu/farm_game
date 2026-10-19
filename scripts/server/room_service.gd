@@ -178,8 +178,8 @@ func handle(account_id: int, nick: String, req_id: String, op: String, args: Dic
 		"room.join": return _op_room_join(account_id, nick, req_id, args)
 		"room.leave": return _op_room_leave(account_id, req_id)
 		"room.ready": return _op_room_ready(account_id, req_id, args)
-		"room.begin_depart": return _op_begin_depart(account_id, req_id)
-		"run.depart_solo": return _op_depart_solo(account_id, req_id)
+		"room.begin_depart": return _op_begin_depart(account_id, req_id, args)
+		"run.depart_solo": return _op_depart_solo(account_id, req_id, args)
 		"run.action": return _op_run_action(account_id, req_id, args)
 	return _req_err(req_id, op, OnlineProtocol.ERR_UNKNOWN_OP)
 
@@ -368,8 +368,9 @@ func _farm_occupied(account_id: int) -> String:
 	return ExpeditionGame.depart_check(farm)
 
 
-func _op_depart_solo(account_id: int, req_id: String) -> Dictionary:
-	var dedup := _dedup_check(account_id, req_id, {})
+func _op_depart_solo(account_id: int, req_id: String, args: Dictionary) -> Dictionary:
+	var content_set := str(args.get("content_set", ""))
+	var dedup := _dedup_check(account_id, req_id, {"content_set": content_set})
 	if dedup.has("error"):
 		return dedup["error"]
 	if not dedup.is_empty():
@@ -384,13 +385,14 @@ func _op_depart_solo(account_id: int, req_id: String) -> Dictionary:
 	var run_id := ExpeditionStore.new_run_id()
 	var env := {"reply": null, "req_id": req_id, "account_id": account_id}
 	var tx: Array = store.tx(func() -> bool:
-		return _build_depart([account_id], {}, run_id, false, ["", ""], null, env)
+		return _build_depart([account_id], {}, run_id, false, ["", ""], null, env, content_set)
 	)
 	return _finish_depart(tx, env, req_id, "run.depart_solo", null, run_id)
 
 
-func _op_begin_depart(account_id: int, req_id: String) -> Dictionary:
-	var dedup := _dedup_check(account_id, req_id, {})
+func _op_begin_depart(account_id: int, req_id: String, args: Dictionary) -> Dictionary:
+	var content_set := str(args.get("content_set", ""))
+	var dedup := _dedup_check(account_id, req_id, {"content_set": content_set})
 	if dedup.has("error"):
 		return dedup["error"]
 	if not dedup.is_empty():
@@ -422,7 +424,7 @@ func _op_begin_depart(account_id: int, req_id: String) -> Dictionary:
 			return false
 		var profile := _guest_profile(guest_farm, guest_nick)
 		var labels := ["", "队友（%s）：" % guest_nick]
-		var built := _build_depart([creator_id, guest_id], profile, run_id, true, labels, room_ref.row_id, env)
+		var built := _build_depart([creator_id, guest_id], profile, run_id, true, labels, room_ref.row_id, env, content_set)
 		if built and env["reply"] != null and str((env["reply"] as Dictionary).get("kind", "")) == "ok":
 			room_ref.state["run_members"] = {
 				"p1": {"account_id": creator_id, "nick": creator_nick},
@@ -440,7 +442,12 @@ func _op_begin_depart(account_id: int, req_id: String) -> Dictionary:
 
 ## 出发事务主体：候选装载 → 逐成员校验 → compose_run → 占用 → INSERT runs →
 ## UPDATE accounts → 收据。规则失败=空事务提交（op_failed）；DB 失败=false 回滚。
-func _build_depart(account_ids: Array, guest_profile: Dictionary, run_id: String, coop: bool, labels: Array, room_row: Variant, env: Dictionary) -> bool:
+func _build_depart(account_ids: Array, guest_profile: Dictionary, run_id: String, coop: bool, labels: Array, room_row: Variant, env: Dictionary, content_set := "") -> bool:
+	## 内容开关/版本检查（森林 P0）：三个构造入口统一经此裁定，拒绝时不改动任何账户状态。
+	var content_problem := ChapterOneDefs.departure_problem(content_set)
+	if content_problem != "":
+		env["reply"] = {"kind": "op_failed", "msg": content_problem}
+		return true
 	var candidates := {}  # account_id -> {farm, seq}
 	for account_id in account_ids:
 		var row := store.query_one("SELECT farm_state, farm_seq FROM accounts WHERE id = ?", [account_id])
@@ -468,7 +475,7 @@ func _build_depart(account_ids: Array, guest_profile: Dictionary, run_id: String
 			var prefix := str(labels[index]) if index < labels.size() else ""
 			env["reply"] = {"kind": "op_failed", "msg": prefix + problem}
 			return true
-	var run := ExpeditionGame.compose_run(p1, guest_profile, run_id, now(), coop, log_line)
+	var run := ExpeditionGame.compose_run(p1, guest_profile, run_id, now(), coop, log_line, content_set)
 	## 占用各候选（depart_check 已确认未占用）。
 	for account_id in account_ids:
 		var farm: FarmGame = candidates[int(account_id)]["farm"]

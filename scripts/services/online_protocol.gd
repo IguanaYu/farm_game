@@ -26,6 +26,9 @@ const FEATURE_FARM_INVENTORY := "farm_inventory"  # M2：装备仓库与战备
 const FEATURE_EXPEDITION := "expedition"          # M3：房间/单人洞窟/局内动作/结算
 const FEATURE_VISIT := "visit"                    # R7：邻里地址簿/只读家园参观
 const FEATURE_VISIT_HELP := "visit_help"          # R8：好友互助（visit.water/visit.fertilize 跨账户写）
+## 森林第一章（P0 预留）：出发开关打开（P5）时加入 server_main 特性表并按 PROTO 升版口径发布；
+## 在此之前服务端不向 welcome 下发该特性，客户端经 ChapterOneDefs 开关统一拒绝森林出发。
+const FEATURE_FOREST_CH1 := "forest_ch1"
 
 ## 默认服务器地址（M0 已部署：腾讯云 + 自签证书直连；设置可覆盖）。
 const DEFAULT_SERVER_URL := "wss://111.229.19.23:31971"
