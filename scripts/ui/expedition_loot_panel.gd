@@ -6,6 +6,8 @@ signal menu_requested
 var action_sink: Callable
 var input_blocked: Callable
 var run: Dictionary = {}
+var visual_layer_id := ""
+var enemy_art_overrides: Dictionary = {}
 var player_key := "p1"
 var selected_token := ""
 var pending_action := false
@@ -290,6 +292,9 @@ func display(snapshot: Dictionary, member_key := "p1", serial := -1) -> void:
 	visible = is_loot_phase(run)
 	if not visible:
 		return
+	ExpeditionUI.set_layer(self, visual_layer_id if visual_layer_id != "" else str(run.get("layer_id", "moss_stone_shallow")))
+	battlefield.visual_layer_id = visual_layer_id
+	battlefield.enemy_art_overrides = enemy_art_overrides
 	var corpses: Array = _resolved().get("corpses", [])
 	var searchable := not corpses.is_empty()
 	filters_container.visible = not searchable
@@ -357,6 +362,12 @@ func _node() -> Dictionary:
 func _resolved() -> Dictionary:
 	return run.get("resolved", {}).get(_node_key(run), {})
 
+func _source_display_name(source: Dictionary) -> String:
+	var art_id := str(enemy_art_overrides.get(str(source.get("id", "")), ""))
+	if art_id != "":
+		return str(ChapterArtRegistry.resolve(art_id).get("name", source.get("name", "尸体")))
+	return str(source.get("name", "尸体"))
+
 func _choose_one() -> bool:
 	return bool(_resolved().get("choose_one", str(_node().get("type", "")) in ["battle", "elite", "gate"]))
 
@@ -374,7 +385,7 @@ func _build_entries() -> void:
 					if not revealed_seen.has(id):
 						revealed_seen[id] = true
 						AudioKit.play(self, "open", -12)
-					entries.append({"token": "corpse:%d" % int(item["instance_id"]), "def_id": item["def_id"], "instance_id": int(item["instance_id"]), "kind": "claim_corpse", "source_id": source["id"], "region_id": region["id"], "source": "%s · %s" % [source["name"], region["name"]], "available": true, "state": "已发现 · 可装包", "instance": item})
+					entries.append({"token": "corpse:%d" % int(item["instance_id"]), "def_id": item["def_id"], "instance_id": int(item["instance_id"]), "kind": "claim_corpse", "source_id": source["id"], "region_id": region["id"], "source": "%s · %s" % [_source_display_name(source), region["name"]], "available": true, "state": "已发现 · 可装包", "instance": item})
 	var mine: Array = resolved.get("claimed", {}).get(player_key, [])
 	var locked := _choose_one() and not mine.is_empty()
 	for id in resolved.get("rewards", []):
@@ -952,7 +963,7 @@ func _render_search() -> void:
 		ExpeditionUI.clear(context_column)
 		count_label.text = "点击战场上的尸体开始搜索。"
 		return
-	loot_heading.text = "搜索 %s" % str(source.get("name", "尸体"))
+	loot_heading.text = "搜索 %s" % _source_display_name(source)
 	var layout_key := screen_identity + ":" + search_source
 	if search_layout_key != layout_key:
 		search_layout_key = layout_key
@@ -963,7 +974,7 @@ func _render_search() -> void:
 		var picker := OptionButton.new()
 		picker.custom_minimum_size.y = 34
 		for i in range(sources.size()):
-			picker.add_item(str(sources[i]["name"]))
+			picker.add_item(_source_display_name(sources[i]))
 			if str(sources[i]["id"]) == search_source:
 				picker.select(i)
 		picker.item_selected.connect(func(index: int) -> void: _open_corpse(str(sources[index]["id"])))
@@ -1153,6 +1164,8 @@ func _card_strength(def: Dictionary) -> int:
 	return maximum
 
 static func item_art(id: String) -> String:
+	if bool(ChapterArtRegistry.item(id).get("ready", false)):
+		return "item." + id
 	var category := str(ItemDefs.get_item(id).get("category", ""))
 	if id.contains("crystal") or id.contains("radiant"):
 		return "crystal"

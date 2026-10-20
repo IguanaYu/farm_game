@@ -1,7 +1,7 @@
 extends Control
-## 森林第一章开发预览（P0）：五区名称、占位背景与代表搜索物一览。
-## 只读展示 ChapterOneDefs 登记 + ChapterArtRegistry 占位解析，不触任何玩法状态；
-## 森林出发开关打开前，这是五区占位的唯一可见入口（开发计划 §5-P0、§2 开发入口约定）。
+## 森林第一章插图预览：五区、敌人、搜索物、物品与来源牌。
+## 只读展示 ChapterOneDefs 登记 + ChapterArtRegistry 插图，不触任何玩法状态；
+## 可进入独立森林美术试玩，正式章节仍遵守开发入口约定。
 
 const MENU_SCENE := "res://scenes/main_menu.tscn"
 
@@ -37,7 +37,7 @@ func _build() -> void:
 	titles.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	titles.add_theme_constant_override("separation", 2)
 	header.add_child(titles)
-	var title := ExpeditionUI.label("苔冠森林 · 内容预览（占位）", 24, ExpeditionUI.SAGE)
+	var title := ExpeditionUI.label("苔冠森林 · 插图图鉴", 24, ExpeditionUI.SAGE)
 	title.name = "ChapterTitle"
 	titles.add_child(title)
 	var note := ExpeditionUI.label(
@@ -47,6 +47,10 @@ func _build() -> void:
 	note.name = "DepartureNote"
 	note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	titles.add_child(note)
+	var play := ExpeditionUI.button("进入森林试玩", true)
+	play.name = "ForestPlaytestButton"
+	play.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/forest_playtest.tscn"))
+	header.add_child(play)
 	var back := ExpeditionUI.button("返回主菜单")
 	back.name = "BackButton"
 	back.pressed.connect(func() -> void: get_tree().change_scene_to_file(MENU_SCENE))
@@ -67,6 +71,7 @@ func _build() -> void:
 		areas.add_child(_build_area_card(str(area_id)))
 	areas.add_child(_build_enemy_section())
 	areas.add_child(_build_item_section())
+	areas.add_child(_build_card_section())
 
 
 func _build_area_card(area_id: String) -> PanelContainer:
@@ -97,6 +102,19 @@ func _build_area_card(area_id: String) -> PanelContainer:
 	head.add_child(spacer)
 	head.add_child(ExpeditionUI.label("区域强敌：%s" % str(boss.get("name", "未登记")), 14, area["accent"]))
 
+	var aspect := AspectRatioContainer.new()
+	aspect.ratio = 2.0
+	aspect.stretch_mode = AspectRatioContainer.STRETCH_WIDTH_CONTROLS_HEIGHT
+	aspect.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	aspect.custom_minimum_size.y = 240
+	aspect.resized.connect(func() -> void: aspect.custom_minimum_size.y = aspect.size.x / 2.0)
+	stack.add_child(aspect)
+	var landscape := PlaceholderGlyph.new()
+	landscape.name = "Background_%s" % area_id
+	landscape.spec = ChapterArtRegistry.background(area_id)
+	landscape.tooltip_text = str(area["name"])
+	aspect.add_child(landscape)
+
 	var chips := FlowContainer.new()
 	chips.add_theme_constant_override("h_separation", 8)
 	chips.add_theme_constant_override("v_separation", 8)
@@ -124,7 +142,7 @@ func _build_prop_chip(template_id: String) -> PanelContainer:
 	chip.add_child(row)
 	var glyph := PlaceholderGlyph.new()
 	glyph.spec = spec
-	glyph.custom_minimum_size = Vector2(34, 34)
+	glyph.custom_minimum_size = Vector2(64, 64)
 	glyph.tooltip_text = str(spec["art_id"])
 	row.add_child(glyph)
 	var text := str(spec["name"])
@@ -181,18 +199,21 @@ func _build_enemy_chip(enemy_id: String) -> PanelContainer:
 	chip_style.set_corner_radius_all(9)
 	chip_style.set_content_margin_all(6)
 	chip.add_theme_stylebox_override("panel", chip_style)
-	var row := HBoxContainer.new()
+	var row := VBoxContainer.new()
 	row.add_theme_constant_override("separation", 7)
 	chip.add_child(row)
 	var glyph := PlaceholderGlyph.new()
 	glyph.spec = spec
-	glyph.custom_minimum_size = Vector2(34, 34)
+	glyph.name = "EnemyArt_%s" % enemy_id
+	glyph.custom_minimum_size = Vector2(144, 144)
 	glyph.tooltip_text = "%s（%s 轮廓）" % [str(spec["art_id"]), str(spec["shape"])]
 	row.add_child(glyph)
 	var text := str(spec["name"])
 	if text == "":
 		text = enemy_id
-	row.add_child(ExpeditionUI.label(text + (" ·首领" if boss else ""), 14, ExpeditionUI.TEXT))
+	var label := ExpeditionUI.label(text + (" ·首领" if boss else ""), 14, ExpeditionUI.TEXT)
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	row.add_child(label)
 	return chip
 
 
@@ -216,7 +237,7 @@ func _build_item_section() -> PanelContainer:
 	var spacer := Control.new()
 	spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	head.add_child(spacer)
-	head.add_child(ExpeditionUI.label("金框＝复用现有定义 · 图标 P1 接入 · 掉落池 P3 起按模板接入", 13, ExpeditionUI.MUTED))
+	head.add_child(ExpeditionUI.label("金框＝复用现有定义 · 物品数值 P1 接入 · 掉落池 P3 起接入", 13, ExpeditionUI.MUTED))
 	var chips := FlowContainer.new()
 	chips.add_theme_constant_override("h_separation", 8)
 	chips.add_theme_constant_override("v_separation", 8)
@@ -241,16 +262,60 @@ func _build_item_chip(design_no: String) -> PanelContainer:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 7)
 	chip.add_child(row)
+	var glyph := PlaceholderGlyph.new()
+	glyph.name = "ItemArt_%s" % design_no
+	glyph.spec = ChapterArtRegistry.item(str(record["def_id"]))
+	glyph.custom_minimum_size = Vector2(64, 64)
+	row.add_child(glyph)
 	row.add_child(ExpeditionUI.label("%s %s%s" % [design_no, str(record.get("name", "")), "（复用）" if reuse else ""], 13, ExpeditionUI.TEXT))
 	return chip
+
+
+func _build_card_section() -> PanelContainer:
+	var card := PanelContainer.new()
+	card.name = "CardSection"
+	card.add_theme_stylebox_override("panel", ExpeditionUI.style(ExpeditionUI.PANEL, ExpeditionUI.LINE, 12, 12))
+	var stack := VBoxContainer.new()
+	stack.add_theme_constant_override("separation", 12)
+	card.add_child(stack)
+	stack.add_child(ExpeditionUI.label("来源牌插图（16）", 17, ExpeditionUI.TEXT))
+	stack.add_child(ExpeditionUI.label("仅展示插图 · 牌名和规则由界面绘制 · 正式牌效按 P1 接入", 13, ExpeditionUI.MUTED))
+	var flow := FlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 12)
+	flow.add_theme_constant_override("v_separation", 12)
+	stack.add_child(flow)
+	for card_id in ChapterOneDefs.NEW_CARDS:
+		var cell := VBoxContainer.new()
+		cell.name = "CardArt_%s" % card_id
+		flow.add_child(cell)
+		var art := PlaceholderGlyph.new()
+		art.spec = ChapterArtRegistry.card(str(card_id))
+		art.custom_minimum_size = Vector2(224, 140)
+		cell.add_child(art)
+		var label := ExpeditionUI.label(str(ChapterOneDefs.NEW_CARDS[card_id]["name"]), 14, ExpeditionUI.TEXT)
+		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cell.add_child(label)
+	return card
 
 
 ## 占位图形：按 ChapterArtRegistry 的 shape 参数画简化轮廓（开发计划 §3 搜索对象行）。
 class PlaceholderGlyph extends Control:
 	var spec: Dictionary = {}
+	var _texture: Texture2D
+
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_texture = ChapterArtRegistry.texture(spec)
+		resized.connect(queue_redraw)
 
 	func _draw() -> void:
 		if spec.is_empty() or size.x <= 0:
+			return
+		if _texture != null:
+			var extent := _texture.get_size()
+			var scale_factor := minf(size.x / extent.x, size.y / extent.y)
+			var target := extent * scale_factor
+			draw_texture_rect(_texture, Rect2((size - target) / 2.0, target), false)
 			return
 		var base: Color = spec.get("base", Color("#6b7280"))
 		var accent: Color = spec.get("accent", Color("#aeb6c2"))

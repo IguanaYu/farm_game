@@ -1,6 +1,9 @@
 class_name BattleScreen
 extends Control
 var layer_id := "moss_stone_shallow"
+## 仅独立美术试玩使用；不修改 CombatGame 的敌人定义、数值或掉落。
+var enemy_art_overrides: Dictionary = {}
+var presentation_caption := ""
 ## 战斗界面（2.2 设计 D2.2-01/02/06）。规则裁定全部走 CombatGame；本脚本只消费事件、
 ## 展示状态、出牌轨迹、护盾/命中/恢复特效与浮动数字，不做第二次结算或阻塞输入。
 
@@ -121,6 +124,9 @@ class BattlefieldGround extends Control:
 			floor_color = Color("#37392e")
 		elif screen.layer_id == "crystal_vein_deeps":
 			floor_color = Color("#353345")
+		elif screen.layer_id.begins_with("forest_ch1."):
+			var area := ChapterOneDefs.area(screen.layer_id.trim_prefix("forest_ch1."))
+			floor_color = Color(area.get("base", ExpeditionUI.SAGE)).darkened(0.38)
 		draw_circle(Vector2.ZERO, 1.0, floor_color)
 		draw_set_transform(Vector2.ZERO)
 		for target in screen.target_controls.values():
@@ -533,6 +539,8 @@ func _refresh() -> void:
 	if selected_uid >= 0 and _hand_card(selected_uid).is_empty():
 		selected_uid = -1
 	round_label.text = "回合 %02d" % int(combat.state["round"])
+	if presentation_caption != "":
+		round_label.text += " · " + presentation_caption
 	energy_label.text = "%d / %d" % [int(player["energy"]), ExpeditionBaseline.ENERGY_PER_TURN]
 	ExpeditionUI.clear(energy_pips)
 	for i in range(ExpeditionBaseline.ENERGY_PER_TURN):
@@ -598,12 +606,15 @@ func _refresh_enemies() -> void:
 		var art := ExpeditionArt.new()
 		art.show_shadow = false
 		art.layer_id = layer_id
-		art.subject = str(enemy.get("def_id", "slime"))
+		art.subject = str(enemy_art_overrides.get(key, enemy.get("def_id", "slime")))
 		art.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		target.add_child(art)
 		if not alive:
 			card.modulate.a = 0.4
-		var name_label := _label(str(enemy["name"]), 17, CREAM)
+		var display_name := str(enemy["name"])
+		if enemy_art_overrides.has(key):
+			display_name = str(ChapterArtRegistry.resolve(art.subject).get("name", display_name))
+		var name_label := _label(display_name, 17, CREAM)
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		card.add_child(name_label)
 		card.add_child(ExpeditionUI.bar(int(enemy["hp"]), int(enemy["max_hp"]), ExpeditionUI.RED))
@@ -675,6 +686,10 @@ func _refresh_hand() -> void:
 		title.add_child(name_label)
 		var art := ExpeditionArt.new()
 		art.subject = _card_subject(str(card["card_id"]))
+		if bool(ChapterArtRegistry.card(str(card["card_id"])).get("ready", false)):
+			art.subject = "card." + str(card["card_id"])
+		elif bool(ChapterArtRegistry.item(str(source.get("def_id", ""))).get("ready", false)):
+			art.subject = "item." + str(source["def_id"])
 		art.tint = accent
 		art.custom_minimum_size.y = 42 if size.y < 680 else 78
 		art.size_flags_vertical = Control.SIZE_EXPAND_FILL

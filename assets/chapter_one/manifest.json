@@ -1,0 +1,867 @@
+{
+  "style": "flat_geometry_v1",
+  "generator": "tools/build_forest_art.py",
+  "assets": [
+    {
+      "id": "trail",
+      "name": "林间古道",
+      "kind": "backgrounds",
+      "path": "res://assets/chapter_one/backgrounds/trail.svg",
+      "sha256": "c43f9f5d588355af590df04f80f04b4390116a70b95dac12d3ff54eaebbf814c"
+    },
+    {
+      "id": "temple",
+      "name": "苔封神殿",
+      "kind": "backgrounds",
+      "path": "res://assets/chapter_one/backgrounds/temple.svg",
+      "sha256": "9b91880ed4c41066e9996b6c43d8306943ad9e99ca4196b8ccb9763a9ff98478"
+    },
+    {
+      "id": "tower",
+      "name": "空铃废塔",
+      "kind": "backgrounds",
+      "path": "res://assets/chapter_one/backgrounds/tower.svg",
+      "sha256": "c997d25deb29105e6ae21bc8843797bf059defe7b6dcd4f84e687fdf392415b7"
+    },
+    {
+      "id": "camp",
+      "name": "废弃伐木营地",
+      "kind": "backgrounds",
+      "path": "res://assets/chapter_one/backgrounds/camp.svg",
+      "sha256": "6a6a710d1ab6a84505173d54faa37b3cf59ff01b4a1d4219926358efc824fce8"
+    },
+    {
+      "id": "wetland",
+      "name": "荧沼湿地",
+      "kind": "backgrounds",
+      "path": "res://assets/chapter_one/backgrounds/wetland.svg",
+      "sha256": "7adeee5d9058866ebdec2814ca76d207e1fff19d198f3dcf15d88d1316ffcf77"
+    },
+    {
+      "id": "forest_goblin_archer",
+      "name": "弓手",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_goblin_archer.svg",
+      "sha256": "944da3affb51221228fc3a66de15fa91f978d86264dc5ab67b61882461ea2357"
+    },
+    {
+      "id": "forest_goblin_shield",
+      "name": "剑盾兵",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_goblin_shield.svg",
+      "sha256": "b0f7216cd8b6219ece0e1ca43df4170653fadbb95f9001ac636c51d130d96661"
+    },
+    {
+      "id": "forest_green_slime",
+      "name": "绿史莱姆",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_green_slime.svg",
+      "sha256": "bbd058b2e40819856c045bf6f489313136ad5130fbb66289eb08e22b8be6ef5f"
+    },
+    {
+      "id": "forest_red_slime",
+      "name": "红史莱姆",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_red_slime.svg",
+      "sha256": "1acd40517ad374abee4be57d814c7a2cad6c612ac2e51239953205023efedd7c"
+    },
+    {
+      "id": "forest_blue_slime",
+      "name": "蓝史莱姆",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_blue_slime.svg",
+      "sha256": "8eeca1f3cc72f0b9361b3b2b1b501dc89b57c4f2a22ae037ce2b7c5e0c91815d"
+    },
+    {
+      "id": "forest_wolf",
+      "name": "森林狼",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_wolf.svg",
+      "sha256": "1eba193fa504658ffe5dfe39f8cd76fd5c8427c03905e7fea0abdc37844056ec"
+    },
+    {
+      "id": "forest_cave_bat",
+      "name": "穴蝠",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_cave_bat.svg",
+      "sha256": "49c5f3486cde9b5dc93d9eac09892249685aa2dc9da61c98253e5d0268e18193"
+    },
+    {
+      "id": "forest_wrapped_guard",
+      "name": "裹尸守卫",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_wrapped_guard.svg",
+      "sha256": "a471d049efae332eece5089d57dc25bca518b408b1a26b42f9a902e7b751cac9"
+    },
+    {
+      "id": "forest_seal_priest",
+      "name": "封棺祭司",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_seal_priest.svg",
+      "sha256": "864bdbdefdf9da3d8f775c993e4c4a4e24db8713d439f5515ecce74176c64464"
+    },
+    {
+      "id": "forest_alpha_wolf",
+      "name": "灰鬃头狼",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_alpha_wolf.svg",
+      "sha256": "f2a42eae72fe9f020e8739052e7a68c5325626102ad63274fe7f63376599297d"
+    },
+    {
+      "id": "forest_root_coffin_priest",
+      "name": "根棺祭司",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_root_coffin_priest.svg",
+      "sha256": "05be5c31b7d3d9e3fa6f7c5b10cd5f6016d48193638cc9d8ff6d57463d8fe68b"
+    },
+    {
+      "id": "forest_goblin_spearman",
+      "name": "长矛手",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_goblin_spearman.svg",
+      "sha256": "8a138be75f39c6ced3e3ae3ff17df5e465c8870b03291a3593982ead89cee51d"
+    },
+    {
+      "id": "forest_goblin_herbalist",
+      "name": "采药者",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_goblin_herbalist.svg",
+      "sha256": "9efd3e0ecbafebcc1b671de7dd019d6257129ba40f14c960fb3612ae1b507a27"
+    },
+    {
+      "id": "forest_bandit_axeman",
+      "name": "斧匪",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_bandit_axeman.svg",
+      "sha256": "4910799f60c0f9124858dd270090ce1a5d3bd5ec2a8bfa2a16144d5c5690da36"
+    },
+    {
+      "id": "forest_bandit_crossbowman",
+      "name": "弩匪",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_bandit_crossbowman.svg",
+      "sha256": "7fa3f7ad641b28add7b89c8033267c2f066ce9cfbe781e37d5d8ef1a88c41df5"
+    },
+    {
+      "id": "forest_bandit_trapper",
+      "name": "绳网猎匪",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_bandit_trapper.svg",
+      "sha256": "ab2d47d32c99b6cbb8a12704ee2948cde99bc5b8c8ccddc3af0146bf9662723c"
+    },
+    {
+      "id": "forest_wood_guard",
+      "name": "木甲守卫",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_wood_guard.svg",
+      "sha256": "42d325371f4d9e906cb2e298d4e2e6e038f4b8fc188d2c1cbd04fa3f609ceceb"
+    },
+    {
+      "id": "forest_bell_wisp",
+      "name": "铃影",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_bell_wisp.svg",
+      "sha256": "252ad102661ff3f6d3b5c7580507b3fed6a8c83e02545c132ee09e9d0eb34152"
+    },
+    {
+      "id": "forest_rotwood_spider",
+      "name": "腐木蛛",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_rotwood_spider.svg",
+      "sha256": "33a2847bfe1c4f72a47947aa19f04eaa1a8c7dc43b4c556b69617913d2d54c7e"
+    },
+    {
+      "id": "forest_fungal_walker",
+      "name": "菌寄行尸",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_fungal_walker.svg",
+      "sha256": "d331182d32e20813507d8bd23fb4117c6ef636efa451034acb83bf8de15216d3"
+    },
+    {
+      "id": "forest_bell_keeper",
+      "name": "空铃守塔人",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_bell_keeper.svg",
+      "sha256": "d905dae18716c7523195a434919db594b680051a9c0f59df51d5c027617d5c26"
+    },
+    {
+      "id": "forest_bandit_captain",
+      "name": "劫路头目",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_bandit_captain.svg",
+      "sha256": "2f780144f75653eb3f8578bb425318beb7c60bf11b4ecdb687a0cf0ac0fab03b"
+    },
+    {
+      "id": "forest_fungal_matriarch",
+      "name": "菌冠母体",
+      "kind": "enemies",
+      "path": "res://assets/chapter_one/enemies/forest_fungal_matriarch.svg",
+      "sha256": "e8a1165d2486c257e530ad9a6fc0e8288754659d99608283726a2d9b7ec48232"
+    },
+    {
+      "id": "trail_hollow_log",
+      "name": "树洞",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/trail_hollow_log.svg",
+      "sha256": "a94a55e70da33fe01d489696fbace27a69974a67715230cff14e69a226306b6f"
+    },
+    {
+      "id": "trail_rotten_stump",
+      "name": "腐树桩",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/trail_rotten_stump.svg",
+      "sha256": "fd3e7aa4a2028f4780783d70e3ee027b7326cd9c9390798160ba70bb0741d9df"
+    },
+    {
+      "id": "trail_wagon_crate",
+      "name": "散货箱",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/trail_wagon_crate.svg",
+      "sha256": "5aafdd995d1f3e0cf2539b49d17a92cd2f19a78028cb425e48805a1096caacf5"
+    },
+    {
+      "id": "trail_wagon_lockbox",
+      "name": "马车锁箱",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/trail_wagon_lockbox.svg",
+      "sha256": "3ae72e11d90056583d2dddec3a03c73e8e34151566f432deb6eaa4fc6ff59f04"
+    },
+    {
+      "id": "trail_bird_nest",
+      "name": "鸟巢",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/trail_bird_nest.svg",
+      "sha256": "37bade410fc6958dc313cc4be0e879560010a08da3bce7ecb3fc47c31547613a"
+    },
+    {
+      "id": "trail_beehive",
+      "name": "蜂巢",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/trail_beehive.svg",
+      "sha256": "dda9f3378ccacec7d81b1d70a83172559af9fc01cce0f3447cb948df0fd0f425"
+    },
+    {
+      "id": "trail_traveler_remains",
+      "name": "旅人遗骸",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/trail_traveler_remains.svg",
+      "sha256": "ac8bc02f59d605a8323d34b46120615f421914173a8626c8db41f9d9f92fac22"
+    },
+    {
+      "id": "trail_hunter_camp",
+      "name": "猎人营地",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/trail_hunter_camp.svg",
+      "sha256": "cb6aa7bee2781e02b0fd848f06990e343586c68c5db136c3246bc9cb8ff0db13"
+    },
+    {
+      "id": "trail_herb_patch",
+      "name": "药草",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/trail_herb_patch.svg",
+      "sha256": "f9cd1f9e38e236424513ff62d6eaab1bc2ba969791e87c969cf58a455b60dcf4"
+    },
+    {
+      "id": "trail_wolf_den_bag",
+      "name": "狼巢猎袋",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/trail_wolf_den_bag.svg",
+      "sha256": "c8a959353671efa3fb09fdda1e0f6c4d8f7ca53418c5b90d63536075e6e25958"
+    },
+    {
+      "id": "temple_offering_box",
+      "name": "供奉匣",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/temple_offering_box.svg",
+      "sha256": "b3e95a84ccca7cc4166d268f729db7409aef0e96127c64f005369ec542871177"
+    },
+    {
+      "id": "temple_shrine_cache",
+      "name": "神龛夹层",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/temple_shrine_cache.svg",
+      "sha256": "2ad316e0fe52e0e0f5c3c29feca7dccf19b867c7710b37feae80e2d8b1ea4f55"
+    },
+    {
+      "id": "temple_side_sarcophagus",
+      "name": "石棺",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/temple_side_sarcophagus.svg",
+      "sha256": "c269d04c39237ab8ef34bf8073138eeb31a3be67fb3be6e0bd677f502ad27d8e"
+    },
+    {
+      "id": "temple_priest_sarcophagus",
+      "name": "祭司棺",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/temple_priest_sarcophagus.svg",
+      "sha256": "e7856b7973d424a196dc59d9799f9ba6f316c7cc98f3cf1801b6e2b0c26c6398"
+    },
+    {
+      "id": "temple_herb_casket",
+      "name": "药草匣",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/temple_herb_casket.svg",
+      "sha256": "83fa17869d45673e324db6514bd911a6c9437902d9590df6e86a111f7d52a920"
+    },
+    {
+      "id": "temple_cistern",
+      "name": "水池",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/temple_cistern.svg",
+      "sha256": "13161022cb79aeaf85900644251f92989481fe0147e73f67e33ab69f92f8c168"
+    },
+    {
+      "id": "temple_ember_niche",
+      "name": "祭火石龛",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/temple_ember_niche.svg",
+      "sha256": "4fddef76024c2cdca01b05b29199b1dd765376ff882cf9862e79578e7a00b596"
+    },
+    {
+      "id": "temple_root_chest",
+      "name": "根须箱",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/temple_root_chest.svg",
+      "sha256": "f7b45439f8c087fef4c4bc3be5d582084dddacd6d76a151eed11c3629388d734"
+    },
+    {
+      "id": "temple_warden_remains",
+      "name": "守林人遗骸",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/temple_warden_remains.svg",
+      "sha256": "609ee8c5f8a49b6953b6e3d16ef99ab563df616d075910cb76b2bf72d8ebe475"
+    },
+    {
+      "id": "tower_guard_box",
+      "name": "守卫箱",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/tower_guard_box.svg",
+      "sha256": "5cdc57b6f921a3ae3354dc40c200df63618270cec3804fb48debbd8e4ba339e2"
+    },
+    {
+      "id": "tower_book_cabinet",
+      "name": "藏书柜",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/tower_book_cabinet.svg",
+      "sha256": "63ae619a393609e3fad07a192da7e8c776975261db909a5d3b350f41f46bf492"
+    },
+    {
+      "id": "tower_repair_box",
+      "name": "工具箱",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/tower_repair_box.svg",
+      "sha256": "b1d8cc6722069cec5d3b993dcab3ae472837d638f5139e33f10187a4ddcc1329"
+    },
+    {
+      "id": "tower_bird_nest",
+      "name": "檐下鸟巢",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/tower_bird_nest.svg",
+      "sha256": "2ab82b563cb545df680a48a531cecc6e887ef5d749bf18073d4d2ac2a1f58bef"
+    },
+    {
+      "id": "tower_lamp_box",
+      "name": "灯火箱",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/tower_lamp_box.svg",
+      "sha256": "886c8f27a016722f3c88517f1179820bfd6cad8e4ab85b45ba2f3cf3495f61fa"
+    },
+    {
+      "id": "tower_bell_cache",
+      "name": "铃器箱",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/tower_bell_cache.svg",
+      "sha256": "86621dee6d032826022d467e44c5e61d2553888331e132e7ff893041fdd2e1e7"
+    },
+    {
+      "id": "tower_sealed_cache",
+      "name": "封印匣",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/tower_sealed_cache.svg",
+      "sha256": "6e22b2544ed87182193e1f9078b7284e3fa4853cab868e637d9246eb0592e0c8"
+    },
+    {
+      "id": "tower_worker_bag",
+      "name": "维修行囊",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/tower_worker_bag.svg",
+      "sha256": "63a4fb974e9ad338f7ff9cdeed976262e5fed719f968742084201a89c5baae88"
+    },
+    {
+      "id": "camp_supply_crate",
+      "name": "物资箱",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/camp_supply_crate.svg",
+      "sha256": "e94b9674d8282a0e6b7ceeff60501c5c0b2efb2c6c0a756c0e9c614df182bf1a"
+    },
+    {
+      "id": "camp_weapon_rack",
+      "name": "武器架",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/camp_weapon_rack.svg",
+      "sha256": "ec8a2f77a5acf16a4556bd24e1cbdd73f2aa4eb0fd8402fcc41f33608d86043e"
+    },
+    {
+      "id": "camp_caravan_crate",
+      "name": "商队封箱",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/camp_caravan_crate.svg",
+      "sha256": "753c41d0bed567aaf39d6f406aa55d37d07ebcbf1a4b3ccddc66ec814fd824fc"
+    },
+    {
+      "id": "camp_medicine_box",
+      "name": "药箱",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/camp_medicine_box.svg",
+      "sha256": "03fe6cba64b36146217bfaadadae727460e01b20708cb7a67df521f359418d9b"
+    },
+    {
+      "id": "camp_kiln_gel_nest",
+      "name": "炉旁胶巢",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/camp_kiln_gel_nest.svg",
+      "sha256": "5bdde5f77ef5e860b5a1793d7d42fe8d96434b757710afcdfee4ee5b42e2f22b"
+    },
+    {
+      "id": "camp_hunting_rack",
+      "name": "猎货架",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/camp_hunting_rack.svg",
+      "sha256": "228971ebf574f88cb21bbe85dda8da40c280359c2f9363f92ff722b660ffdb42"
+    },
+    {
+      "id": "camp_stump_stash",
+      "name": "树桩私藏",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/camp_stump_stash.svg",
+      "sha256": "6717020cd7db6cafdb40f5b30da82f42569a1f075de5e28095eca855d99ba6d4"
+    },
+    {
+      "id": "camp_captain_chest",
+      "name": "头目箱",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/camp_captain_chest.svg",
+      "sha256": "6097ab68f79be8ecdefbe484688654dbcf7160e14a20206f76afa6bb10337d71"
+    },
+    {
+      "id": "wetland_glowcap_patch",
+      "name": "菌丛",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/wetland_glowcap_patch.svg",
+      "sha256": "754d034718c7868d03c96da2a865e0bd70f0136024a5004aa4888f730196bb7d"
+    },
+    {
+      "id": "wetland_herb_roots",
+      "name": "根下草药",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/wetland_herb_roots.svg",
+      "sha256": "73b53be49e917628bb152ea6495f88e44f53a6a294243943d6eb1ee19aa8bf41"
+    },
+    {
+      "id": "wetland_sunken_crate",
+      "name": "沉箱",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/wetland_sunken_crate.svg",
+      "sha256": "c3ade6ecb82d641e8c3c08f805613b9552417c93822e9622a55c71527603e2c9"
+    },
+    {
+      "id": "wetland_abandoned_raft",
+      "name": "舟筏",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/wetland_abandoned_raft.svg",
+      "sha256": "fc058d4a69a60680080b93ac6e55f19a9c5cff4d8cde7471c6a0c9ea321d5208"
+    },
+    {
+      "id": "wetland_web_bundle",
+      "name": "蛛网包",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/wetland_web_bundle.svg",
+      "sha256": "563c7b7b797e0eeb98f3f597f5ef316b8a1f0090e7a200b604b56c0e97aa805a"
+    },
+    {
+      "id": "wetland_gel_pool",
+      "name": "胶洼",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/wetland_gel_pool.svg",
+      "sha256": "84b88a5a861fadd4cd3e05f06f19f89045b297483f6948de58b948fe2a753acb"
+    },
+    {
+      "id": "wetland_fallen_hive",
+      "name": "倒塌蜂树",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/wetland_fallen_hive.svg",
+      "sha256": "9ddb8097522bb6bb88041a0741a62c42060f6a7763f4613a42d1b72d0dbb867e"
+    },
+    {
+      "id": "wetland_fungal_bag",
+      "name": "菌丝货袋",
+      "kind": "props",
+      "path": "res://assets/chapter_one/props/wetland_fungal_bag.svg",
+      "sha256": "8a6f5d36a6971825948ef33303a1f33dd82f58127e9423a773e68cb6d066d76b"
+    },
+    {
+      "id": "copper_shortsword",
+      "name": "铜短剑",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/copper_shortsword.svg",
+      "sha256": "8615cf25d53231c29b4be0cdc5b824a833731bb7e86c5a5a5d84f39b46162d1b"
+    },
+    {
+      "id": "forest_goblin_bow",
+      "name": "哥布林短弓",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_goblin_bow.svg",
+      "sha256": "5ae782f0a4d2fd6e963c1f784057fef233aeb15a970d6f23c451cd6f639994b9"
+    },
+    {
+      "id": "reinforced_shield",
+      "name": "加固盾",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/reinforced_shield.svg",
+      "sha256": "c71c247c62a5a3edd49d970ecc3a8da5f2a7b8dff8267a434efc8f8c2d5541bf"
+    },
+    {
+      "id": "forest_bone_dagger",
+      "name": "猎骨匕首",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_bone_dagger.svg",
+      "sha256": "f4b8bb6c0d7f1754a7c6fe49affcd230e1c435f4cc4362a66e2eb0703c35bec8"
+    },
+    {
+      "id": "forest_logging_axe",
+      "name": "伐木斧",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_logging_axe.svg",
+      "sha256": "2d9e7c85e3d98059f013f7d3b970f7e03c6c2daa3380eeb45540d87bacbc4396"
+    },
+    {
+      "id": "forest_resin_armor",
+      "name": "树脂护甲",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_resin_armor.svg",
+      "sha256": "086b323ab60cef21c93d55e3b516a179bf90e3134aba31c63d42d0e9f431a8af"
+    },
+    {
+      "id": "forest_bat_mantle",
+      "name": "蝠纹披肩",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_bat_mantle.svg",
+      "sha256": "76d83bdc94b16be677ba3b395f6ac8a4b6600730777e3b03f5b206fa8a936fc0"
+    },
+    {
+      "id": "forest_ritual_bellstaff",
+      "name": "祭铃杖",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_ritual_bellstaff.svg",
+      "sha256": "4eb8f80d2a14d77dfaa39a6ddd5cd4be26289398a3f9d6e1ce39aef564c0bdad"
+    },
+    {
+      "id": "forest_runic_wand",
+      "name": "刻符短杖",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_runic_wand.svg",
+      "sha256": "235309a6841053b2b20c37be27343a40d1b8d7aaa265378251a02404ed722c08"
+    },
+    {
+      "id": "forest_feather_charm",
+      "name": "斑羽饰",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_feather_charm.svg",
+      "sha256": "9555645ae888ce442bce2c85c0e2274427eb1f88b869ff905d348cf53b278395"
+    },
+    {
+      "id": "forest_hunting_horn",
+      "name": "猎人号角",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_hunting_horn.svg",
+      "sha256": "ba6d3edd05a33f98106b787acb67d78969373549ceffd3225f09cf5cf86bc05e"
+    },
+    {
+      "id": "forest_green_gel",
+      "name": "绿凝胶",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_green_gel.svg",
+      "sha256": "76cf5367de1cefbf4936de6ebe0cef352d7f1f443c94b8eb19df21fb54c033a8"
+    },
+    {
+      "id": "forest_fire_gel_sac",
+      "name": "赤凝胶囊",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_fire_gel_sac.svg",
+      "sha256": "1b9d10864889d3803a328ff9b8e85b47928027cd50704eae2e6ec262df30af61"
+    },
+    {
+      "id": "forest_frost_gel_sac",
+      "name": "蓝凝胶囊",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_frost_gel_sac.svg",
+      "sha256": "3921ecc70dd7d9f046b188963f009d62f1f418abdd84b4a675a013bd4b0a0d9c"
+    },
+    {
+      "id": "forest_honey_chunk",
+      "name": "蜂蜜块",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_honey_chunk.svg",
+      "sha256": "ac3453c5946d01c74da868810a05d24ed225a3fc28d833a8403765be1d74e380"
+    },
+    {
+      "id": "forest_healing_moss",
+      "name": "敷伤苔",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_healing_moss.svg",
+      "sha256": "8bd8234b3a41cbe29d9122efb3579655cbd1c1815b75f966ab6fe8c49180c6be"
+    },
+    {
+      "id": "forest_sting_sac",
+      "name": "蜂针囊",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_sting_sac.svg",
+      "sha256": "cff5b97038813733c5e145b7d517c60b0baeeb999bf1125b3f8c552ba84781b2"
+    },
+    {
+      "id": "forest_resin_torch",
+      "name": "树脂火把",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_resin_torch.svg",
+      "sha256": "3b29ae0511d38a0db7b9de8f12e20eeac75f2053136d1c899819479a8eabaab5"
+    },
+    {
+      "id": "forest_old_lantern",
+      "name": "旧提灯",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_old_lantern.svg",
+      "sha256": "292a880157280690c846de9b42c92f9bfe2b530711580eda6c6b96ec20a5899d"
+    },
+    {
+      "id": "forest_rope_net",
+      "name": "绳网",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_rope_net.svg",
+      "sha256": "5006397723d82b892f1a9098ad6047547938e303ccd5cb1f63eefdf6eff3743a"
+    },
+    {
+      "id": "forest_silverleaf_seed",
+      "name": "银叶草种子",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_silverleaf_seed.svg",
+      "sha256": "5366c50511479a810562845fe269061bd5fb6aed01f2e6cc645aa90a79dde78e"
+    },
+    {
+      "id": "forest_glowcap_spawn",
+      "name": "萤菇孢种",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_glowcap_spawn.svg",
+      "sha256": "1e0146348ffc5d7fae548165e8b22b2ad879afcc44148faf091f14f83e7eaa29"
+    },
+    {
+      "id": "forest_resin_chunk",
+      "name": "树脂块",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_resin_chunk.svg",
+      "sha256": "cf77bb98a3bda8dc105998903f6d8d1ef5c1ba233d7fd63420c6e6aa91b886c1"
+    },
+    {
+      "id": "forest_clean_linen",
+      "name": "干净麻布",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_clean_linen.svg",
+      "sha256": "134e5aef29c006d2d9bc484be198513d35dbd45fc32ad731accb9aea77c3ba66"
+    },
+    {
+      "id": "copper_scrap",
+      "name": "铜片",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/copper_scrap.svg",
+      "sha256": "c44541eb76bcab170e4b53e981e43848601c8ef8878e62af99b6b07d0fbe96e0"
+    },
+    {
+      "id": "forest_hide_roll",
+      "name": "兽皮卷",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_hide_roll.svg",
+      "sha256": "da4f289cabfc7ab41399c573c38dd7b774631044479437ee17dfd01cfb8c379c"
+    },
+    {
+      "id": "forest_antique_silver",
+      "name": "古银器",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_antique_silver.svg",
+      "sha256": "513e91f4caea39e36752714a321e9ea93e665f49fa41c3f88b92d2984afdd7b4"
+    },
+    {
+      "id": "glow_crystal",
+      "name": "微光晶石",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/glow_crystal.svg",
+      "sha256": "ddf280c1d3229a3f5fb4d846c2e706a444dce050b7dccb669867ea37d68c0b75"
+    },
+    {
+      "id": "forest_prayer_carving",
+      "name": "祈愿木雕",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_prayer_carving.svg",
+      "sha256": "419e0d94292640a969047522751bd2776732bf528d6dc7d1b3191fccc9236f24"
+    },
+    {
+      "id": "forest_warden_badge",
+      "name": "守林徽记",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_warden_badge.svg",
+      "sha256": "389d9e6beb6772d99603009ba10832b3dcaa3539ff7914a477240a15973aa729"
+    },
+    {
+      "id": "forest_bell_ring",
+      "name": "碎钟铜环",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_bell_ring.svg",
+      "sha256": "adfa5062e2b43a7021aa94c934969c336a49ff75540171896cfad8a24d68ec95"
+    },
+    {
+      "id": "forest_rot_spore_sac",
+      "name": "腐菌囊",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_rot_spore_sac.svg",
+      "sha256": "b6101d8082f09cb87cbfc7fa66938389397bd556587f01c7c28c8eb92fa49c0f"
+    },
+    {
+      "id": "forest_bat_wing",
+      "name": "蝠翼",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_bat_wing.svg",
+      "sha256": "960479bc6e95539cf9d412087dd05fc09082cc746dcfd5c54d0deeb77377bdae"
+    },
+    {
+      "id": "fiber_clump",
+      "name": "纤维团",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/fiber_clump.svg",
+      "sha256": "7b79081ed977e04af6c3d07f8f0b907c6e518ee69b79a89941d788df2049357a"
+    },
+    {
+      "id": "forest_salvaged_spear",
+      "name": "拼装长矛",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_salvaged_spear.svg",
+      "sha256": "cf4e74e245adac6e10b07b14f19e4601e2bf1a2292da4b3804edf5ca09e2e184"
+    },
+    {
+      "id": "forest_hunting_crossbow",
+      "name": "旧猎弩",
+      "kind": "items",
+      "path": "res://assets/chapter_one/items/forest_hunting_crossbow.svg",
+      "sha256": "ff8320f1fb9710b7a837849b3a24ad812952661903888ebe02d603113757b81b"
+    },
+    {
+      "id": "forest_shoot",
+      "name": "射击",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_shoot.svg",
+      "sha256": "d76143e124be3e25d754c6201f984ce187e9ca26e8058f3471cb4a981eacdf13"
+    },
+    {
+      "id": "forest_thrust",
+      "name": "突刺",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_thrust.svg",
+      "sha256": "8d70eb8f9e828b705c2d037807e9226af33d1809927848606577d4dc3fb14c0e"
+    },
+    {
+      "id": "forest_power_shot",
+      "name": "强射",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_power_shot.svg",
+      "sha256": "e06c197e4f90bcf8f2ec2285bd144a969e3b7cf97b1a955e06532411f1d06741"
+    },
+    {
+      "id": "forest_bell_strike",
+      "name": "敲击",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_bell_strike.svg",
+      "sha256": "e47a8962c9efcf672c0e70e5372f7e17738aabe866f016f24621784e8274c954"
+    },
+    {
+      "id": "forest_rest_bell",
+      "name": "安息铃",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_rest_bell.svg",
+      "sha256": "8edddd9b22811806999238955ff9cb5efb23d9131fb641422bd5b84337eec8b1"
+    },
+    {
+      "id": "forest_guard_bell",
+      "name": "守护铃",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_guard_bell.svg",
+      "sha256": "6cc5d5ce67b7fbfe33741d0889257303c01c5cfaee8ee171ac1bb1ce2b2bc9c4"
+    },
+    {
+      "id": "forest_glow_bolt",
+      "name": "微光弹",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_glow_bolt.svg",
+      "sha256": "b4ac393655f80087ea79521bde447d20be8373cf9c47ff6fc5ca3bcdb8d9dde7"
+    },
+    {
+      "id": "forest_apply_gel",
+      "name": "凝胶敷药",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_apply_gel.svg",
+      "sha256": "7902c0c0c3a3adea7486d77918dc3af1028a6c9d0f77c64caa92ee8333521277"
+    },
+    {
+      "id": "forest_throw_fire_sac",
+      "name": "投掷火囊",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_throw_fire_sac.svg",
+      "sha256": "87538dab88711fec0109c3595b78d1e870bde9fc1b53788c4d1e1378f6b1f00c"
+    },
+    {
+      "id": "forest_throw_frost_sac",
+      "name": "投掷冰囊",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_throw_frost_sac.svg",
+      "sha256": "2acfd6355b6afa3de51f68eada56d98e4516027059ecc4bf8c0a525aeb3e93a8"
+    },
+    {
+      "id": "forest_eat_honey",
+      "name": "食蜜",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_eat_honey.svg",
+      "sha256": "df21e228002fb9cd4be11055744b7fda2ecffbe39dd7a6447d87b9320568f58e"
+    },
+    {
+      "id": "forest_scatter_stings",
+      "name": "撒蜂针",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_scatter_stings.svg",
+      "sha256": "819f868ac497fe193c1bc85304558f683c7224a7bd4fe81ed767180c416c346e"
+    },
+    {
+      "id": "forest_torch_strike",
+      "name": "火把挥击",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_torch_strike.svg",
+      "sha256": "bfa14682239c67abf5ba9a35a7c300c589653f47392de31163d53514cf331dcb"
+    },
+    {
+      "id": "forest_smoke_screen",
+      "name": "烟幕",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_smoke_screen.svg",
+      "sha256": "2abdfc3ef6cb260c884ed31f9a9ffa27c80cdc5a84767c6f8af28a718a4644cc"
+    },
+    {
+      "id": "forest_throw_net",
+      "name": "投网",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_throw_net.svg",
+      "sha256": "362c207b14c82029734928cc882c5d23cde2a0c1cae4d7b6fecfce60c1024ef2"
+    },
+    {
+      "id": "forest_throw_spores",
+      "name": "抛孢",
+      "kind": "cards",
+      "path": "res://assets/chapter_one/cards/forest_throw_spores.svg",
+      "sha256": "aa1fe42f6699d055bdcc5cede8a2b43c850bb2a6a18d0962edda64bda6b118a3"
+    }
+  ]
+}

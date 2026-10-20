@@ -148,7 +148,7 @@ func _build_test_toggle() -> void:
 	corner.add_child(stack)
 	var forest_button := _menu_button("森林预览", 36, 16)
 	forest_button.name = "ForestPreviewButton"
-	forest_button.tooltip_text = "苔冠森林五区占位一览（开发预览，不影响存档）。"
+	forest_button.tooltip_text = "查看苔冠森林的区域、敌人、搜索物、物品与卡牌插图。"
 	forest_button.pressed.connect(_on_forest_preview)
 	stack.add_child(forest_button)
 	test_mode_button = _menu_button("", 36, 16)

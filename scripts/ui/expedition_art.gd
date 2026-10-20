@@ -1,6 +1,6 @@
 class_name ExpeditionArt
 extends Control
-## 可缩放的原生矢量插画；不需要外部贴图，所有敌人都有对应形象。
+## 共用插图控件：登记资源优先使用 SVG，旧洞窟与缺失资源保留原生几何回退。
 
 var subject := "crystal"
 var tint := ExpeditionUI.SAGE
@@ -8,6 +8,21 @@ var layer_id := "moss_stone_shallow"
 var stage_scene := false
 var fallen := false
 var show_shadow := true
+var _texture_key := ""
+var _art_texture: Texture2D
+
+func _resolve_texture() -> Texture2D:
+	var key := subject + ":" + layer_id
+	if key != _texture_key:
+		_texture_key = key
+		var art_id := subject
+		if subject == "cave" and layer_id.begins_with("forest_ch1."):
+			art_id = "bg." + layer_id
+		elif ChapterOneDefs.ENEMIES.has(subject):
+			art_id = "enemy." + subject
+		# 保留强引用：只在 _draw 内加载会让纹理在提交绘制前被释放。
+		_art_texture = ChapterArtRegistry.texture(ChapterArtRegistry.resolve(art_id))
+	return _art_texture
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -21,6 +36,24 @@ func _poly(points: Array, color: Color) -> void:
 
 func _draw() -> void:
 	if size.x <= 0 or size.y <= 0:
+		return
+	var texture := _resolve_texture()
+	if texture != null:
+		if subject == "cave":
+			# 居中裁切，保持树木、建筑的比例；背景铺满各种窗口尺寸。
+			var cover := maxf(size.x / texture.get_width(), size.y / texture.get_height())
+			var extent := texture.get_size() * cover
+			draw_texture_rect(texture, Rect2((size - extent) / 2.0, extent), false)
+			draw_rect(Rect2(Vector2.ZERO, size), Color(ExpeditionUI.INK, 0.18))
+		else:
+			if stage_scene:
+				_draw_cave()
+			var extent := texture.get_size() * minf(size.x / texture.get_width(), size.y / texture.get_height())
+			if fallen:
+				draw_set_transform(size / 2.0, -0.9, Vector2.ONE * 0.75)
+				draw_texture_rect(texture, Rect2(-extent / 2.0, extent), false)
+			else:
+				draw_texture_rect(texture, Rect2((size - extent) / 2.0, extent), false)
 		return
 	if subject == "cave":
 		_draw_cave()

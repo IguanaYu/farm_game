@@ -1,0 +1,3 @@
+# Keep manifest content hashes stable on Windows checkouts.
+*.svg text eol=lf
+manifest.json text eol=lf

@@ -491,3 +491,21 @@ UI 只提交来源、区域、实例和目标位置；权威端验证当前节�
 | `ui/chapter_preview_panel.gd` `scenes/chapter_preview.tscn` | 新增：五区开发预览 | P5 起并入森林开发入口 |
 | `domain/search_loot_game.gd` `environment_loot_game.gd` `chapter_route_game.gd` `chapter_progress_game.gd` | 未创建（按 §4.1 目标名预留） | P3/P4 |
 | `ui/exploration_scene_panel.gd` `ui/chapter_journal_panel.gd` | 未创建 | P3/P4 |
+
+### C2. 简洁几何风插图（2026-10-20）
+
+用户确认沿用当前运行中游戏的简洁几何风。按 §6 图片可独立推进的安排，新增 `assets/chapter_one/`：5 张区域背景、23 个敌人、43 个搜索对象、36 件物品、16 张新增来源牌插图，合计 123 件独立 SVG；完整尺寸与使用方式见[资源说明](../../assets/chapter_one/README.md)。手绘古道概念参考图保留，未覆盖。
+
+`ChapterArtRegistry` 为已导入资源返回 `ready=true` 与纹理路径，并扩展 `item.`／`card.` 解析；未知 ID 和缺图继续回退。森林预览改为插图图鉴，展示五区横幅、敌人全身图、搜索物、物品及来源牌，原控件 ID 与返回入口保留。源造型通过 `tools/build_forest_art.py` 生成并维护，`manifest.json` 记录路径与摘要。
+
+验证：Godot 4.6.1 导入通过；新增 `forest_art_smoke.gd` 通过，覆盖 123 张真实纹理、尺寸、透明边缘、缺图回退、1024×640 无横向溢出及背景不遮挡搜索物；既有 `forest_defs_smoke.gd` 通过。`capture_forest_art.gd` 已生成[实际渲染截图](../../screenshots/forest_art_2026-10-20/README.md)。测试存档与正式存档隔离，本次未重跑全量回归。
+
+范围：图片已制作并在开发图鉴中接入；P1 物品／卡牌数值、P2 敌人行为及 P3～P7 正式玩法与合作链路依然待实施，`DEPARTURE_ENABLED=false` 保持不变。P8 仍需在正式探索／战斗场景落地后验收缩放、透明边缘、命中区及资源内存。
+
+### C3. 游戏内美术试玩与共用显示接入（2026-10-21）
+
+共用 `ExpeditionArt` 已接入登记纹理，保留旧几何回退；实际战斗卡牌使用专图或来源物品插图，战后遗骸、搜索、背包与物品详情接入同一资源映射。
+
+新增 `ForestPlaytest` / `scenes/forest_playtest.tscn`，从「测试功能」→「森林预览」进入。支持五区背景、23 种敌人外观、43 个可点击查看的物件，并通过现有 `CardPlaytest` 的真实战斗、搜索、装包、携带装备续战逻辑验收。该场景明确标注沿用骷髅规则，展示覆盖不更改敌人定义或掉落，临时数据不落正式档；不替代 P1～P7 正式玩法交付。
+
+验证：`forest_gameplay_art_smoke.gd` 无头 119 项、窗口 133 项检查通过；全量规则回归 74 项、失败 0 项。测试在独立用户目录运行，测试项目客户端信任证书与本机测试服对齐；正式存档和项目证书保持不变。Windows 包重新导出并通过主菜单启动；加载实际导出包再跑森林流程，119 项检查通过。[14 张实机截图与测试记录](../../screenshots/forest_gameplay_2026-10-21/README.md)。

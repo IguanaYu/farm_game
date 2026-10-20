@@ -9,6 +9,8 @@ var content: VBoxContainer
 var layer_id := "moss_stone_shallow"
 var loot_owner: Control
 var leave_text := "继续探索 · 离开本节点 →"
+var visual_layer_id := ""
+var enemy_art_overrides: Dictionary = {}
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -25,7 +27,7 @@ func _ready() -> void:
 func display(run: Dictionary, sources: Array) -> void:
 	if not is_node_ready():
 		return
-	(get_child(0) as ExpeditionArt).layer_id = str(run.get("layer_id", "moss_stone_shallow"))
+	(get_child(0) as ExpeditionArt).layer_id = visual_layer_id if visual_layer_id != "" else str(run.get("layer_id", "moss_stone_shallow"))
 	get_child(0).queue_redraw()
 	ExpeditionUI.clear(content)
 	var header := HBoxContainer.new()
@@ -66,11 +68,14 @@ func display(run: Dictionary, sources: Array) -> void:
 		column.alignment = BoxContainer.ALIGNMENT_CENTER
 		margin.add_child(column)
 		var art := ExpeditionArt.new()
-		art.subject = str(source["enemy_id"])
+		art.subject = str(enemy_art_overrides.get(str(source["id"]), source["enemy_id"]))
 		art.fallen = true
 		art.custom_minimum_size = Vector2(140, 160)
 		column.add_child(art)
-		var label := ExpeditionUI.label(str(source["name"]), 19, ExpeditionUI.PAPER)
+		var display_name := str(source["name"])
+		if enemy_art_overrides.has(str(source["id"])):
+			display_name = str(ChapterArtRegistry.resolve(art.subject).get("name", display_name))
+		var label := ExpeditionUI.label(display_name, 19, ExpeditionUI.PAPER)
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		column.add_child(label)
 		var state := ExpeditionUI.label(status(source, run), 14, ExpeditionUI.GOLD)
