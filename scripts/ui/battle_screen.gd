@@ -4,12 +4,14 @@ var layer_id := "moss_stone_shallow"
 ## 仅独立美术试玩使用；不修改 CombatGame 的敌人定义、数值或掉落。
 var enemy_art_overrides: Dictionary = {}
 var presentation_caption := ""
+var cutout_motion_enabled := false
 ## 战斗界面（2.2 设计 D2.2-01/02/06）。规则裁定全部走 CombatGame；本脚本只消费事件、
 ## 展示状态、出牌轨迹、护盾/命中/恢复特效与浮动数字，不做第二次结算或阻塞输入。
 
 signal battle_closed
 signal inventory_mutated
 signal settings_requested
+signal presentation_refreshed
 
 const FOREST := Color("#294f3c")
 const CREAM := ExpeditionUI.TEXT
@@ -379,6 +381,7 @@ func _inventory() -> InventoryGame:
 
 
 func _on_close() -> void:
+	_clear_feedback()
 	_close_inspector()
 	visible = false
 	last_combat = combat
@@ -527,6 +530,7 @@ func _on_end_turn() -> void:
 
 
 func _refresh() -> void:
+	_clear_feedback()
 	ExpeditionUI.set_layer(self,layer_id)
 	if combat == null or combat.state.is_empty() or not combat.state["players"].has(player_key):
 		return
@@ -563,6 +567,7 @@ func _refresh() -> void:
 		_close_inspector()
 		_show_outcome()
 		carried_hp = int(player["hp"]) if combat.state["outcome"] == "won" else -1
+	presentation_refreshed.emit()
 
 
 func _refresh_enemies() -> void:
@@ -865,8 +870,17 @@ func _present_events(events: Array, generation: int) -> void:
 	if generation != feedback_generation or not is_visible_in_tree():
 		return
 	for event in events:
+		if generation != feedback_generation or not is_visible_in_tree():
+			return
 		var kind := str(event.get("type", ""))
 		var unit := str(event.get("target", event.get("who", event.get("owner", ""))))
+		var motion: BattleCutoutMotion
+		if kind == "damage" and cutout_motion_enabled and not SettingsStore.get_reduce_motion():
+			motion = _animate_attack(str(event.get("source", "")), unit)
+			if motion != null:
+				await get_tree().create_timer(BattleCutoutMotion.IMPACT_TIME).timeout
+				if generation != feedback_generation or not is_visible_in_tree():
+					return
 		if kind in ["card_played", "damage", "block", "heal", "poison", "draw", "rescue", "status"]:
 			_spawn_effect(kind, unit)
 		match str(event.get("type", "")):
@@ -887,6 +901,31 @@ func _present_events(events: Array, generation: int) -> void:
 			"outcome":
 				AudioKit.play(self, "victory" if str(event["outcome"]) == "won" else "defeat")
 				_popup_center("胜利！" if str(event["outcome"]) == "won" else "失败……", WARN_GOLD)
+		if is_instance_valid(motion):
+			await get_tree().create_timer(BattleCutoutMotion.DURATION - BattleCutoutMotion.IMPACT_TIME).timeout
+
+
+func _unit_art(key: String) -> ExpeditionArt:
+	var anchor := _unit_anchor(key)
+	if anchor != null:
+		for child in anchor.get_children():
+			if child is ExpeditionArt:
+				return child
+	return null
+
+
+func _animate_attack(source: String, target: String) -> BattleCutoutMotion:
+	var source_art := _unit_art(source)
+	var target_art := _unit_art(target)
+	if source_art == null or target_art == null or source_art == target_art:
+		return null
+	var motion := BattleCutoutMotion.new()
+	motion.source_art = source_art
+	motion.target_art = target_art
+	motion.ranged = "archer" in source_art.subject
+	motion.add_to_group("battle_feedback_%d" % get_instance_id())
+	add_child(motion)
+	return motion
 
 
 func _popup_on_unit(unit_key: String, text: String, color: Color) -> void:

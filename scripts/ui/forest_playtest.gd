@@ -48,6 +48,10 @@ func _build() -> void:
 		area_picker.add_item(str(ChapterOneDefs.area(str(key))["name"]))
 	area_picker.item_selected.connect(select_area)
 	header.add_child(area_picker)
+	var animation_study := ExpeditionUI.button("攻击动画样稿")
+	animation_study.name = "ForestAnimationStudyButton"
+	animation_study.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/forest_animation_playtest.tscn"))
+	header.add_child(animation_study)
 	var home := ExpeditionUI.button("返回首页")
 	home.name = "ForestHomeButton"
 	home.pressed.connect(_go_home)
@@ -165,6 +169,7 @@ func _inspect_prop(key: String) -> void:
 	inspection.popup_centered(Vector2i(340, 360))
 
 func _begin_battle() -> void:
+	battle.cutout_motion_enabled = true
 	if exploration != null:
 		exploration.hide()
 	battle.layer_id = "forest_ch1." + area_id
