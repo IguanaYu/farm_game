@@ -45,7 +45,8 @@ func _run() -> void:
 	# 实际试玩洗牌随机；通过真实回合抽到攻击牌再开始录制，不假定首手牌序。
 	for turn in range(4):
 		for card in screen.combat.state["players"]["p1"]["hand"]:
-			if str(CardDefs.get_card(str(card["card_id"]))["target"]) == "enemy":
+			var definition := screen._card_definition(str(card["card_id"]))
+			if str(definition["target"]) == "enemy" and str(definition.get("motion", "")) != "projectile":
 				uid = int(card["uid"])
 				break
 		if uid != -1:

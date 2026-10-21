@@ -143,6 +143,10 @@ var inventory: InventoryGame = null
 ## 双人：各成员的消耗品实体走自己的库存视图（键＝玩家键）。
 var member_inventories: Dictionary = {}
 
+## 表现试玩可在独立会话子类提供样例牌；正式战斗仍只读取 CardDefs。
+func card_definition(card_id: String) -> Dictionary:
+	return CardDefs.get_card(card_id)
+
 
 ## players：[{key: "p1", name: "农夫", max_hp: 40, deck: [{card_id, source_instance_id, source_seq, join_round}…]}]
 ## deck 来源在 2.3 由 DeckBuilder 从背包布局生成；2.2 演示入口直接给固定牌表。
@@ -270,7 +274,7 @@ func play_card(owner_key: String, uid: int, target_key: String) -> Dictionary:
 	var card := _hand_card(owner_key, uid)
 	if card.is_empty():
 		return _deny("这张牌已不在手牌中", events)
-	var def := CardDefs.get_card(str(card["card_id"]))
+	var def := card_definition(str(card["card_id"]))
 	if def.is_empty():
 		return _deny("未知牌型", events)
 	var target := _resolve_target(def["target"], target_key, owner_key)
@@ -286,7 +290,7 @@ func play_card(owner_key: String, uid: int, target_key: String) -> Dictionary:
 			_purge_source_cards(owner_key, int(card["source_instance_id"]), events)
 	player["energy"] = int(player["energy"]) - int(def["cost"])
 	_remove_from_hand(owner_key, uid)
-	events.append({"type": "card_played", "owner": owner_key, "card": str(def["name"]), "cost": int(def["cost"]), "target": target_key})
+	events.append({"type": "card_played", "owner": owner_key, "card": str(def["name"]), "card_id": str(card["card_id"]), "cost": int(def["cost"]), "target": target_key})
 	for effect in def["effects"]:
 		_apply_effect(owner_key, target_key, effect, events)
 	# 出牌去向：弃牌／移除（exhaust_source 的关联牌清理由 2.3 的实体耗尽联动补全）。
@@ -305,7 +309,7 @@ func preview_play(owner_key: String, uid: int, target_key: String) -> Dictionary
 	var card := _hand_card(owner_key, uid)
 	if player.is_empty() or card.is_empty():
 		return {"ok": false}
-	var def := CardDefs.get_card(str(card["card_id"]))
+	var def := card_definition(str(card["card_id"]))
 	var target := _resolve_target(def.get("target", ""), target_key, owner_key)
 	if target.is_empty():
 		return {"ok": false, "reason": "目标不合法"}

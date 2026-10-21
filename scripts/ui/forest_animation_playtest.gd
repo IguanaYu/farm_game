@@ -18,6 +18,17 @@ class ContactShadows extends Control:
 
 var shadows: ContactShadows
 
+func _begin_battle() -> void:
+	super._begin_battle()
+	if battle.combat == null:
+		return
+	var session := ForestCardStudyCombat.create_study(str(battle.combat.state["encounter_id"]), 20261021, expedition.run_inventory())
+	for pile in ["hand", "draw_pile"]:
+		for card in session.state["players"]["p1"][pile]:
+			card["preview_source_name"] = ForestCardStudyCombat.SOURCES.get(str(card["card_id"]), "样稿牌组")
+	battle.presentation_caption = "森林新卡样稿 · 敌人沿用样例规则"
+	battle.open_run(session)
+
 func _ready() -> void:
 	super._ready()
 	battle.presentation_refreshed.connect(_apply_study)

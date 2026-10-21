@@ -82,7 +82,7 @@ class CardButton extends Button:
 		screen._update_targets()
 		screen._refresh_detail()
 		var preview := ExpeditionUI.panel(ExpeditionUI.PAPER, ExpeditionUI.GOLD)
-		preview.add_child(ExpeditionUI.label(CardDefs.get_card(str(screen._hand_card(card_uid).get("card_id", ""))).get("name", "卡牌"), 18, ExpeditionUI.INK))
+		preview.add_child(ExpeditionUI.label(screen._card_definition(str(screen._hand_card(card_uid).get("card_id", ""))).get("name", "卡牌"), 18, ExpeditionUI.INK))
 		set_drag_preview(preview)
 		return {"battle_card_uid": card_uid, "screen_id": screen.get_instance_id()}
 
@@ -650,7 +650,7 @@ func _refresh_hand() -> void:
 	var index := 0
 	for card in player["hand"]:
 		index += 1
-		var def := CardDefs.get_card(str(card["card_id"]))
+		var def := _card_definition(str(card["card_id"]))
 		var uid := int(card["uid"])
 		var button := CardButton.new()
 		button.screen = self
@@ -711,7 +711,7 @@ func _refresh_hand() -> void:
 		var hotkey := _label(str(index % 10), 11, Color("#837a67"))
 		footer.add_child(hotkey)
 		ExpeditionUI.ignore_tree(margin)
-		button.tooltip_text = CardPresentation.full_text(def) + "\n来自：" + str(ItemDefs.get_item(str(source.get("def_id", ""))).get("name", "基础牌组")) + " · " + ItemDefs.quality_name(ItemDefs.quality_of(source))
+		button.tooltip_text = CardPresentation.full_text(def) + "\n来自：" + str(card.get("preview_source_name", ItemDefs.get_item(str(source.get("def_id", ""))).get("name", "基础牌组"))) + " · " + ItemDefs.quality_name(ItemDefs.quality_of(source))
 		button.set_meta("source_quality", ItemDefs.quality_of(source))
 		if int(def["cost"]) > int(player["energy"]):
 			button.tooltip_text += "\n能量不足"
@@ -817,7 +817,7 @@ func _refresh_detail() -> void:
 	if card.is_empty():
 		detail_label.text = ""
 		return
-	var def := CardDefs.get_card(str(card["card_id"]))
+	var def := _card_definition(str(card["card_id"]))
 	var target := hovered_target
 	if target == "" and str(def["target"]) == "self":
 		target = player_key
@@ -869,14 +869,17 @@ func _present_events(events: Array, generation: int) -> void:
 	await get_tree().process_frame
 	if generation != feedback_generation or not is_visible_in_tree():
 		return
+	var attack_card := ""
 	for event in events:
 		if generation != feedback_generation or not is_visible_in_tree():
 			return
 		var kind := str(event.get("type", ""))
 		var unit := str(event.get("target", event.get("who", event.get("owner", ""))))
+		if kind == "card_played":
+			attack_card = str(event.get("card_id", ""))
 		var motion: BattleCutoutMotion
 		if kind == "damage" and cutout_motion_enabled and not SettingsStore.get_reduce_motion():
-			motion = _animate_attack(str(event.get("source", "")), unit)
+			motion = _animate_attack(str(event.get("source", "")), unit, attack_card)
 			if motion != null:
 				await get_tree().create_timer(BattleCutoutMotion.IMPACT_TIME).timeout
 				if generation != feedback_generation or not is_visible_in_tree():
@@ -914,7 +917,7 @@ func _unit_art(key: String) -> ExpeditionArt:
 	return null
 
 
-func _animate_attack(source: String, target: String) -> BattleCutoutMotion:
+func _animate_attack(source: String, target: String, card_id := "") -> BattleCutoutMotion:
 	var source_art := _unit_art(source)
 	var target_art := _unit_art(target)
 	if source_art == null or target_art == null or source_art == target_art:
@@ -922,7 +925,7 @@ func _animate_attack(source: String, target: String) -> BattleCutoutMotion:
 	var motion := BattleCutoutMotion.new()
 	motion.source_art = source_art
 	motion.target_art = target_art
-	motion.ranged = "archer" in source_art.subject
+	motion.ranged = "archer" in source_art.subject or str(_card_definition(card_id).get("motion", "")) == "projectile"
 	motion.add_to_group("battle_feedback_%d" % get_instance_id())
 	add_child(motion)
 	return motion
@@ -1010,7 +1013,7 @@ func _immediate_target(uid: int) -> String:
 	var card := _hand_card(uid)
 	if card.is_empty():
 		return ""
-	var rule := str(CardDefs.get_card(str(card["card_id"])).get("target", ""))
+	var rule := str(_card_definition(str(card["card_id"])).get("target", ""))
 	if rule == "self":
 		return player_key if _legal_target(uid, player_key) else ""
 	if rule == "ally":
@@ -1084,7 +1087,7 @@ func _playable_card(uid: int) -> bool:
 	var card := _hand_card(uid)
 	if card.is_empty() or not _can_act():
 		return false
-	return int(CardDefs.get_card(str(card["card_id"]))["cost"]) <= int(combat.state["players"][player_key]["energy"])
+	return int(_card_definition(str(card["card_id"]))["cost"]) <= int(combat.state["players"][player_key]["energy"])
 
 func _legal_target(uid: int, key: String) -> bool:
 	return _playable_card(uid) and bool(combat.preview_play(player_key, uid, key).get("ok", false))
@@ -1194,19 +1197,23 @@ func _target_preview(uid: int, key: String) -> String:
 	if preview.has("draw"):
 		parts.append("抽牌 %d" % int(preview["draw"]))
 	if preview.has("status"):
-		for effect in CardDefs.get_card(str(_hand_card(uid).get("card_id", ""))).get("effects", []):
+		for effect in _card_definition(str(_hand_card(uid).get("card_id", ""))).get("effects", []):
 			if str(effect.get("kind", "")) == "status":
 				parts.append("%s %d" % [CardDefs.STATUS_DISPLAY.get(str(effect["status"]), ""), int(effect.get("stacks", 1))])
-	if str(CardDefs.get_card(str(_hand_card(uid).get("card_id", ""))).get("target", "")) == "rescue":
+	if str(_card_definition(str(_hand_card(uid).get("card_id", ""))).get("target", "")) == "rescue":
 		parts.append("救起队友")
 	return " / ".join(parts) if not parts.is_empty() else "整理货物，本场移除"
 
+func _card_definition(id: String) -> Dictionary:
+	return combat.card_definition(id) if combat != null else CardDefs.get_card(id)
+
 func _card_subject(id: String) -> String:
-	if CardDefs.is_attack_card(id):
-		return "attack"
-	if CardDefs.is_defense_card(id):
-		return "shield"
-	for effect in CardDefs.get_card(id).get("effects", []):
+	for effect in _card_definition(id).get("effects", []):
+		if str(effect["kind"]) == "damage":
+			return "attack"
+		if str(effect["kind"]) == "block":
+			return "shield"
+	for effect in _card_definition(id).get("effects", []):
 		if str(effect["kind"]) in ["heal", "rescue"]:
 			return "heal"
 	return "cargo" if id == "heavy_cargo" else "draw"
@@ -1237,7 +1244,7 @@ func _open_pile(key: String, caption: String) -> void:
 	list.add_theme_constant_override("separation", 8)
 	scroll.add_child(list)
 	for id in counts:
-		var def := CardDefs.get_card(str(id))
+		var def := _card_definition(str(id))
 		var line := _label("%s ×%d · %d 能量\n%s" % [def["name"], counts[id], int(def["cost"]), CardPresentation.effect_text(def)], 16, ExpeditionUI.TEXT)
 		line.mouse_filter = Control.MOUSE_FILTER_PASS
 		line.tooltip_text = CardPresentation.full_text(def)

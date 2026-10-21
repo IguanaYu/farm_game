@@ -73,6 +73,10 @@ func _pose() -> void:
 
 func _draw() -> void:
 	if ranged:
+		if attacker.subject == "farmer":
+			var hand := attacker.position + attacker.size / 2 + Vector2(direction * 42, 8)
+			draw_arc(hand, 29, -PI / 2 if direction > 0 else PI / 2, PI / 2 if direction > 0 else PI * 1.5, 20, Color("#927453"), 5, true)
+			draw_line(hand + Vector2(0, -29), hand + Vector2(0, 29), Color("#d7c8a6"), 2, true)
 		if elapsed < 0.18 or elapsed > IMPACT_TIME + 0.06:
 			return
 		var p := clampf((elapsed - 0.18) / (IMPACT_TIME - 0.18), 0, 1)
