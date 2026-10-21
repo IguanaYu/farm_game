@@ -18,6 +18,8 @@ class ContactShadows extends Control:
 		draw_set_transform(Vector2.ZERO)
 
 var shadows: ContactShadows
+var appearance_picker: OptionButton
+var star_appearance := false
 
 func _begin_battle() -> void:
 	super._begin_battle()
@@ -38,13 +40,36 @@ func _ready() -> void:
 	shadows.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	battle.battlefield.add_child(shadows)
 	battle.battlefield.move_child(shadows, 0)
+	appearance_picker = OptionButton.new()
+	appearance_picker.name = "HeroAppearancePicker"
+	appearance_picker.add_item("红格帽")
+	appearance_picker.add_item("星星发饰")
+	appearance_picker.custom_minimum_size.x = 136
+	appearance_picker.item_selected.connect(_select_appearance)
+	var top := battle.round_label.get_parent().get_parent()
+	top.add_child(appearance_picker)
+	top.move_child(appearance_picker, top.get_child_count() - 2)
 	select_enemy(ChapterOneDefs.ENEMIES.keys().find("forest_goblin_archer"))
 	_begin_battle()
 
+func _select_appearance(index: int) -> void:
+	battle._clear_feedback()
+	star_appearance = index == 1
+	appearance_picker.select(index)
+	_apply_study()
+
+func _battle_closed() -> void:
+	super._battle_closed()
+	_apply_study.call_deferred()
+
 func _apply_study() -> void:
-	for art in _art_nodes(battle):
+	for art in _art_nodes(self):
+		if art.subject == "farmer":
+			art._texture_key = art.subject + ":" + art.layer_id
+			art._art_texture = load("res://assets/characters/farmer_star.svg" if star_appearance else "res://assets/characters/farmer_cute.svg") as Texture2D
+			art.queue_redraw()
 		if art.subject.begins_with("card.forest_"):
-			var card_path := CUTE_CARDS + art.subject.trim_prefix("card.") + ".svg"
+			var card_path := CUTE_CARDS + ("star/" if star_appearance else "") + art.subject.trim_prefix("card.") + ".svg"
 			if ResourceLoader.exists(card_path):
 				art._texture_key = art.subject + ":" + art.layer_id
 				art._art_texture = load(card_path) as Texture2D
