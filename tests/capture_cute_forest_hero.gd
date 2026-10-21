@@ -1,7 +1,7 @@
 extends SceneTree
 ## 实机与资源设计板：新主角、六张角色动作卡、小窗口和动作复制。
 
-const OUT := "res://screenshots/cute_forest_hero"
+const OUT := "res://screenshots/cute_forest_girl"
 const CARDS := "res://assets/art_studies/cute_adventurer_v03/"
 var checks := 0
 var failed := false
@@ -33,10 +33,10 @@ func _art_board() -> Control:
 	paper.color = Color("#f1eadf")
 	paper.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	board.add_child(paper)
-	var title := ExpeditionUI.label("草帽小旅人", 38, Color("#506353"))
+	var title := ExpeditionUI.label("草帽小姑娘", 38, Color("#506353"))
 	title.position = Vector2(54, 37)
 	board.add_child(title)
-	var subtitle := ExpeditionUI.label("圆脸、短靴、叶芽别针 · 同一位主角走进每张卡", 18, Color("#75836c"))
+	var subtitle := ExpeditionUI.label("棕色双辫、草帽丝带、叶芽围裙 · 同一位主角走进每张卡", 18, Color("#75836c"))
 	subtitle.position = Vector2(56, 89)
 	board.add_child(subtitle)
 	var portrait := ExpeditionArt.new()
@@ -44,7 +44,7 @@ func _art_board() -> Control:
 	portrait.position = Vector2(40, 168)
 	portrait.size = Vector2(350, 350)
 	board.add_child(portrait)
-	var caption := ExpeditionUI.label("草帽与绿色衣服保留\n大头、小身体、软乎乎的表情", 20, Color("#75836c"))
+	var caption := ExpeditionUI.label("草帽丝带与棕色双辫\n绿色背带裙、小靴子、小挎包", 20, Color("#75836c"))
 	caption.position = Vector2(63, 568)
 	board.add_child(caption)
 	var index := 0

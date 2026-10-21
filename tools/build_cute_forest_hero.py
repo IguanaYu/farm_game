@@ -7,6 +7,7 @@ HERO = ROOT / "assets/characters"
 CARDS = ROOT / "assets/art_studies/cute_adventurer_v03"
 SKIN, CHEEK, INK = "#f0d6b2", "#dfa89b", "#506353"
 GREEN, DARK_GREEN, HAT, WOOD = "#9cac7e", "#758b66", "#eddaa5", "#a27c59"
+HAIR, HAIR_LIGHT, RIBBON, BLOUSE = "#8c694f", "#ae8864", "#c78e7d", "#eee3bf"
 
 
 def sprout(x, y, scale=1):
@@ -15,30 +16,38 @@ def sprout(x, y, scale=1):
 
 def hero(pose="idle"):
     """200-unit art; boots stay at y=188, so existing contacts/animation pivots align."""
-    s = rect(61, 118, 31, 43, WOOD, 10)  # Little travelling satchel.
-    s += rect(76, 156, 20, 29, "#b29a76", 8) + rect(105, 156, 20, 29, "#b29a76", 8)
+    # Chestnut braids frame the face and remain legible at actual card size.
+    s = path("M67 86Q48 95 54 111Q46 120 57 128Q54 141 68 146L77 133Q67 126 72 116Q63 108 78 98Z", HAIR)
+    s += path("M134 86Q151 95 146 110Q156 121 144 128Q149 141 135 146L124 133Q135 125 129 116Q139 107 124 98Z", HAIR)
+    s += path("M61 105Q70 109 64 117M61 123Q70 126 66 134M139 104Q130 109 136 117M139 123Q130 126 135 134", stroke=HAIR_LIGHT, sw=4)
+    s += path("M64 135 55 133 58 142 67 140 74 145 77 137 68 135Z", RIBBON)
+    s += path("M135 135 126 137 129 145 137 140 145 143 147 134 138 135Z", RIBBON)
+    s += rect(61, 122, 31, 39, WOOD, 10)  # Little travelling satchel.
+    s += rect(77, 157, 18, 28, BLOUSE, 8) + rect(107, 157, 18, 28, BLOUSE, 8)
     s += rect(71, 169, 27, 19, WOOD, 8) + rect(104, 169, 27, 19, WOOD, 8)
     s += path("M80 173H91M113 173H124", stroke="#c5a77d", sw=3)
-    s += path("M77 115Q100 107 125 117L135 158Q138 173 120 173H79Q64 173 67 159Z", GREEN)
-    s += path("M117 121Q126 141 124 163H75Q74 174 86 174H121Q138 174 135 158L125 117Z", DARK_GREEN, opacity=".32")
+    s += path("M79 116Q100 109 123 117L135 155Q139 166 133 170Q100 181 66 170Q61 168 65 157Z", GREEN)
+    s += path("M118 122Q127 145 124 166Q98 172 68 165L66 170Q100 181 133 170Q139 166 135 155L123 117Z", DARK_GREEN, opacity=".32")
     s += path("M81 121 76 153M120 121 124 153", stroke="#c3cd9a", sw=5)
     s += rect(85, 141, 30, 22, "#b2be8c", 7)
     s += circle(88, 140, 2.5, HAT) + circle(112, 140, 2.5, HAT)
-    s += path("M75 119Q91 132 109 123L122 115", stroke="#ead7a4", sw=6)
-    s += path("M104 124 116 132 109 140 101 127Z", "#d5ac6e")
+    s += path("M83 118Q91 127 100 121Q108 128 118 118", stroke=BLOUSE, sw=7)
+    s += path("M99 122 92 124 96 131 102 126 107 132 111 125 104 122Z", RIBBON)
+    s += sprout(100, 154, .3)
     # Stubby sleeves and mitten hands. Each card has an actual small gesture.
     left = {"guard": "M76 129 63 119", "smoke": "M76 130 62 143"}.get(pose, "M76 129 61 145")
     right = {"shoot": "M125 130 143 119", "power_shot": "M124 130 144 137", "thrust": "M125 131 145 135", "bell": "M124 128 140 109", "guard": "M125 129 141 111", "smoke": "M124 128 140 114"}.get(pose, "M124 129 139 145")
-    s += path(left, stroke=GREEN, sw=17) + path(right, stroke=GREEN, sw=17)
+    s += path(left, stroke=BLOUSE, sw=17) + path(right, stroke=BLOUSE, sw=17)
     left_hand = (63,119) if pose == "guard" else ((62,143) if pose == "smoke" else (61,145))
     right_hand = {"shoot": (143,119), "power_shot": (144,137), "thrust": (145,135), "bell": (140,109), "guard": (141,111), "smoke": (140,114)}.get(pose, (139,145))
     s += circle(*left_hand, 8, SKIN) + circle(*right_hand, 8, SKIN)
     # Big soft face, side curls, a small smile and barely-there rosy cheeks.
     s += ellipse(59, 89, 8, 12, SKIN) + ellipse(142, 89, 8, 12, SKIN)
-    s += path("M59 72Q58 36 99 37Q141 35 143 74L139 98H62Z", "#927453")
+    s += path("M59 72Q58 36 99 37Q141 35 143 74L141 103H60Z", HAIR)
     s += path("M62 66Q100 46 139 67L140 88Q140 119 101 122Q63 121 61 91Z", SKIN)
-    s += path("M64 65Q76 52 89 57L80 76 73 69 67 78Z", "#927453")
-    s += path("M131 64 139 67 139 86 132 78Z", "#927453")
+    s += path("M62 68Q72 52 96 59Q91 74 78 81L80 71Q73 82 63 84Z", HAIR)
+    s += path("M127 62Q139 65 141 80L139 104Q130 102 131 90L129 77Z", HAIR)
+    s += path("M68 71Q77 62 88 63", stroke=HAIR_LIGHT, sw=3)
     s += ellipse(77, 103, 8, 4.5, CHEEK, opacity=".65") + ellipse(124, 103, 8, 4.5, CHEEK, opacity=".65")
     if pose == "guard":
         s += path("M79 93Q84 86 89 93M112 93Q117 86 122 93", stroke=INK, sw=3.5)
@@ -49,9 +58,12 @@ def hero(pose="idle"):
     # Soft, slightly lopsided straw hat + sprout pin are the repeatable identity.
     s += path("M59 58 64 33Q65 24 78 24H118Q131 24 134 36L140 60Z", "#dfc68f")
     s += path("M69 34Q88 24 118 30L126 52H65Z", HAT)
-    s += path("M62 49Q101 56 136 49L139 62H59Z", "#bd9769")
+    s += path("M62 49Q101 56 136 49L139 62H59Z", RIBBON)
     s += path("M43 56Q100 45 151 56Q160 60 154 70Q129 82 96 76Q62 81 43 72Q33 65 43 56Z", HAT)
     s += path("M47 70Q85 78 122 72Q141 71 153 66", stroke="#d1b785", sw=3)
+    s += path("M51 65Q36 53 37 68Q39 77 51 70Q59 80 64 69Q65 58 51 65Z", RIBBON)
+    s += path("M48 70 43 88 51 85 55 72", RIBBON)
+    s += circle(51, 68, 3, "#dfb2a0")
     s += sprout(128, 48, .62)
     return s
 
