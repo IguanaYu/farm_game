@@ -16,6 +16,9 @@ func _resolve_texture() -> Texture2D:
 	if key != _texture_key:
 		_texture_key = key
 		var art_id := subject
+		if subject == "farmer":
+			_art_texture = load("res://assets/characters/farmer_cute.svg") as Texture2D
+			return _art_texture
 		if subject == "cave" and layer_id.begins_with("forest_ch1."):
 			art_id = "bg." + layer_id
 		elif ChapterOneDefs.ENEMIES.has(subject):

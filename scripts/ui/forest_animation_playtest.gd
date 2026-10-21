@@ -2,6 +2,7 @@ extends ForestPlaytest
 ## 单场景的纸片动作样稿；仍然消费真实卡牌试玩的裁定事件。
 
 const STUDY := "res://assets/art_studies/forest_cohesion_v02/"
+const CUTE_CARDS := "res://assets/art_studies/cute_adventurer_v03/"
 
 class ContactShadows extends Control:
 	var screen: BattleScreen
@@ -42,6 +43,12 @@ func _ready() -> void:
 
 func _apply_study() -> void:
 	for art in _art_nodes(battle):
+		if art.subject.begins_with("card.forest_"):
+			var card_path := CUTE_CARDS + art.subject.trim_prefix("card.") + ".svg"
+			if ResourceLoader.exists(card_path):
+				art._texture_key = art.subject + ":" + art.layer_id
+				art._art_texture = load(card_path) as Texture2D
+				art.queue_redraw()
 		var filename: String = {"cave": "trail", "enemy.forest_goblin_archer": "goblin_archer", "item.copper_shortsword": "copper_sword"}.get(art.subject, "")
 		if filename != "":
 			art._texture_key = art.subject + ":" + art.layer_id
