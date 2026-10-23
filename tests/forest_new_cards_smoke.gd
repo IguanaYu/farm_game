@@ -1,7 +1,7 @@
 extends SceneTree
 ## 独立样稿的六张新卡：真实点击、数值、纹理、牌堆、动画及小窗口。
 
-const OUT := "res://screenshots/forest_new_cards"
+const OUT := "res://screenshots/card_story_v05/gameplay"
 var checks := 0
 var failed := false
 
@@ -22,7 +22,22 @@ func _shot(name: String) -> void:
 	await _frames()
 	if DisplayServer.get_name() != "headless":
 		await RenderingServer.frame_post_draw
-		root.get_texture().get_image().save_png(OUT.path_join(name + ".png"))
+		_check(root.get_texture().get_image().save_png(OUT.path_join(name + ".png")) == OK, "保存截图 " + name)
+
+func _check_layout(screen: BattleScreen, width: float) -> void:
+	for button in screen.hand_row.get_children():
+		if not button is BattleScreen.CardButton:
+			continue
+		_check(button.get_global_rect().end.x <= width, "卡牌没有越过窗口右侧")
+		_check(button.size.x <= 149, "长牌名没有撑宽卡牌")
+		var title := button.find_child("CardTitle", true, false) as Label
+		_check(title != null and title.get_line_count() <= 2, "牌名至多两行")
+		if title != null:
+			_check(button.get_global_rect().encloses(title.get_global_rect()), "牌名位于卡内")
+		var kind := button.find_child("CardKind", true, false) as Label
+		_check(kind != null and kind.text in ["攻击", "防御"], "攻防文字标签明确")
+		var effect := button.find_child("CardEffect", true, false) as Label
+		_check(effect != null and button.get_global_rect().encloses(effect.get_global_rect()), "全部效果文字位于卡内")
 
 func _fingerprints() -> Dictionary:
 	var result := {}
@@ -42,16 +57,25 @@ func _run() -> void:
 	var screen := game.battle
 	_check(screen.combat is ForestCardStudyCombat, "入口自动使用新卡样稿")
 	_check(screen.combat.state["players"]["p1"]["hand"].size() == 5, "首手五张")
+	for card_id in ForestCardStudyCombat.CARDS:
+		var record := ChapterArtRegistry.card(card_id)
+		_check(record.get("texture_path", "") == "res://assets/chapter_one/cards/" + card_id + ".png", "共享登记表使用情境卡图 " + card_id)
+		_check(record.name == screen._card_definition(card_id).name, "图鉴与实战牌名一致 " + card_id)
+		_check(Vector2i(ChapterArtRegistry.texture(record).get_size()) == Vector2i(640, 400), "游戏纹理尺寸 " + card_id)
+	_check(screen._unit_art("p1")._resolve_texture() == load("res://assets/characters/farmer_cute.svg"), "主角仍为草帽双辫形象")
 	for button in screen.hand_row.get_children():
 		var arts := button.find_children("*", "Control", true, false)
 		var found := false
 		for art in arts:
 			if art is ExpeditionArt:
-				found = art.subject.begins_with("card.forest_") and art._resolve_texture() != null
+				var id := art.subject.trim_prefix("card.") as String
+				found = art.subject.begins_with("card.forest_") and art._resolve_texture() == load("res://assets/chapter_one/cards/" + id + ".png")
 		_check(found, "首手卡牌都使用森林新插图")
+	_check_layout(screen, 1280)
 	await _shot("01_first_hand")
 	screen._on_end_turn()
 	await _frames()
+	_check_layout(screen, 1280)
 	await _shot("02_second_hand")
 	screen._open_pile("discard_pile", "弃牌")
 	await _shot("03_card_rules")
@@ -82,9 +106,17 @@ func _run() -> void:
 			_check(int(screen.combat.state["enemies"][0]["hp"]) == int(snapshot["enemies"][0]["hp"]) - int(effect["value"]), "真实扣血 " + card_id)
 		else:
 			_check(int(screen.combat.state["players"]["p1"]["block"]) == int(effect["value"]), "真实格挡 " + card_id)
+		if card_id == "forest_bell_strike":
+			_check(int(screen.combat.state["players"]["p1"]["block"]) == int(snapshot["players"]["p1"]["block"]) + 3, "敲壳混合牌同时给自己 3 格挡")
 		_check(int(screen.combat.state["players"]["p1"]["energy"]) == int(snapshot["players"]["p1"]["energy"]) - int(definition["cost"]), "费用匹配 " + card_id)
 		_check(screen._hand_card(uid).is_empty(), "已使用牌离开手牌 " + card_id)
 		await _frames()
+		if card_id == "forest_guard_bell":
+			await _shot("06_guard_block")
+		elif card_id == "forest_smoke_screen":
+			await _shot("07_smoke_block")
+		elif card_id == "forest_bell_strike":
+			await _shot("08_bell_strike")
 		if str(definition.get("motion", "")) == "projectile" and not SettingsStore.get_reduce_motion():
 			var ranged := false
 			for child in screen.get_children():
@@ -98,13 +130,20 @@ func _run() -> void:
 	root.content_scale_size = root.size
 	DisplayServer.window_set_size(root.size)
 	await _frames(8)
+	_check_layout(screen, 1024)
 	for button in screen.hand_row.get_children():
 		_check(button.get_global_rect().end.x <= root.size.x, "小窗口卡牌可见")
 	await _shot("04_small_window")
+	screen._on_end_turn()
+	await _frames(8)
+	_check_layout(screen, 1024)
+	await _shot("09_small_window_mixed_card")
 	var legacy_cards := ["slash", "heavy_strike", "shield_up", "cover", "brace", "deep_breath", "observe", "expose", "venom_stab", "drink_potion", "heavy_cargo", "first_aid", "drink_soup", "drink_elixir", "slash7", "heavy_strike15", "slash8", "heavy_strike17", "rescue_signal"]
 	_check(legacy_cards.all(func(id): return CardDefs.CARDS.has(id)), "森林样稿仍保留全部 19 张旧正式牌的兼容 ID")
 	_check(not ChapterOneDefs.DEPARTURE_ENABLED, "森林正式出发开关维持原状态")
 	_check(_fingerprints() == before, "样稿没有写入农场存档")
+	# 等待第二手敌方反馈结束，避免退出时仍有动画协程持有对象。
+	await create_timer(1.0).timeout
 	game.queue_free()
 	await _frames()
 	print("FOREST_NEW_CARDS: %d checks, %s" % [checks, "FAIL" if failed else "PASS"])

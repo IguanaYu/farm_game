@@ -179,12 +179,12 @@ const ITEM_MAPPING := {
 ## 16 个新增牌（附录 A4）：card_id 已登记；牌定义本体与效果实现是 P1/P2 的工作，
 ## 本表只保证 ID 稳定与实现方式归类，不提前声明数值。
 const NEW_CARDS := {
-	"forest_shoot": {"name": "射击", "impl": "伤害模板"},
-	"forest_thrust": {"name": "突刺", "impl": "伤害模板"},
-	"forest_power_shot": {"name": "强射", "impl": "伤害模板"},
-	"forest_bell_strike": {"name": "敲击", "impl": "伤害模板"},
+	"forest_shoot": {"name": "谁扎我啦！", "impl": "伤害模板"},
+	"forest_thrust": {"name": "不许过来！", "impl": "伤害模板"},
+	"forest_power_shot": {"name": "哎呀，太用力！", "impl": "伤害模板"},
+	"forest_bell_strike": {"name": "借你的壳敲一下", "impl": "伤害模板"},
 	"forest_rest_bell": {"name": "安息铃", "impl": "新净化效果"},
-	"forest_guard_bell": {"name": "守护铃", "impl": "格挡模板"},
+	"forest_guard_bell": {"name": "躲我后面", "impl": "格挡模板"},
 	"forest_glow_bolt": {"name": "微光弹", "impl": "新部分穿透效果"},
 	"forest_apply_gel": {"name": "凝胶敷药", "impl": "治疗＋消耗来源"},
 	"forest_throw_fire_sac": {"name": "投掷火囊", "impl": "伤害＋灼烧＋消耗来源"},
@@ -192,7 +192,7 @@ const NEW_CARDS := {
 	"forest_eat_honey": {"name": "食蜜", "impl": "治疗＋抽牌＋消耗来源"},
 	"forest_scatter_stings": {"name": "撒蜂针", "impl": "伤害＋中毒＋消耗来源"},
 	"forest_torch_strike": {"name": "火把挥击", "impl": "伤害＋灼烧"},
-	"forest_smoke_screen": {"name": "烟幕", "impl": "格挡模板"},
+	"forest_smoke_screen": {"name": "藏好了吗？", "impl": "格挡模板"},
 	"forest_throw_net": {"name": "投网", "impl": "伤害＋虚弱＋消耗来源"},
 	"forest_throw_spores": {"name": "抛孢", "impl": "中毒＋消耗来源"},
 }

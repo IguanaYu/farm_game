@@ -2,7 +2,6 @@ extends ForestPlaytest
 ## 单场景的纸片动作样稿；仍然消费真实卡牌试玩的裁定事件。
 
 const STUDY := "res://assets/art_studies/forest_cohesion_v02/"
-const CUTE_CARDS := "res://assets/art_studies/cute_adventurer_v03/"
 
 class ContactShadows extends Control:
 	var screen: BattleScreen
@@ -27,7 +26,7 @@ func _begin_battle() -> void:
 	for pile in ["hand", "draw_pile"]:
 		for card in session.state["players"]["p1"][pile]:
 			card["preview_source_name"] = ForestCardStudyCombat.SOURCES.get(str(card["card_id"]), "样稿牌组")
-	battle.presentation_caption = "森林新卡样稿 · 敌人沿用样例规则"
+	battle.presentation_caption = "森林情境卡牌 · 敌人沿用样例规则"
 	battle.open_run(session)
 
 func _ready() -> void:
@@ -51,12 +50,6 @@ func _apply_study() -> void:
 			art._texture_key = art.subject + ":" + art.layer_id
 			art._art_texture = load("res://assets/characters/farmer_cute.svg") as Texture2D
 			art.queue_redraw()
-		if art.subject.begins_with("card.forest_"):
-			var card_path := CUTE_CARDS + art.subject.trim_prefix("card.") + ".svg"
-			if ResourceLoader.exists(card_path):
-				art._texture_key = art.subject + ":" + art.layer_id
-				art._art_texture = load(card_path) as Texture2D
-				art.queue_redraw()
 		var filename: String = {"cave": "trail", "enemy.forest_goblin_archer": "goblin_archer", "item.copper_shortsword": "copper_sword"}.get(art.subject, "")
 		if filename != "":
 			art._texture_key = art.subject + ":" + art.layer_id

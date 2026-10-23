@@ -48,7 +48,7 @@ func _build() -> void:
 		area_picker.add_item(str(ChapterOneDefs.area(str(key))["name"]))
 	area_picker.item_selected.connect(select_area)
 	header.add_child(area_picker)
-	var animation_study := ExpeditionUI.button("攻击动画样稿")
+	var animation_study := ExpeditionUI.button("情境卡牌试玩")
 	animation_study.name = "ForestAnimationStudyButton"
 	animation_study.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/forest_animation_playtest.tscn"))
 	header.add_child(animation_study)

@@ -2,7 +2,7 @@ class_name ChapterArtRegistry
 extends RefCounted
 ## 表现资源查找与统一占位回退（森林第一章，开发计划 §3/§4.1）。
 ## 玩法存档只记录定义/实例 ID，不保存图片路径；本表把资源 ID 解析为当前可用的表现参数。
-## 简洁几何插图以 SVG 独立入库，ready=true 并带纹理路径，不改玩法 ID 与命中区；
+## 简洁几何插图以 SVG / PNG 独立入库，ready=true 并带纹理路径，不改玩法 ID 与命中区；
 ## 任何未登记的资源 ID 都回落到统一占位，不允许整块界面空白。
 
 
@@ -12,6 +12,7 @@ const FALLBACK := {
 }
 
 const ART_ROOT := "res://assets/chapter_one/"
+const STORY_CARD_IDS := ["forest_shoot", "forest_thrust", "forest_power_shot", "forest_bell_strike", "forest_guard_bell", "forest_smoke_screen"]
 
 
 ## 区域背景：1280×640 横幅，图片未就绪时仍保留原占位参数。
@@ -78,7 +79,8 @@ static func card(card_id: String) -> Dictionary:
 	var record: Dictionary = ChapterOneDefs.NEW_CARDS.get(card_id, {})
 	if record.is_empty():
 		return _placeholder(card_id, FALLBACK)
-	return _with_texture(_placeholder(card_id, FALLBACK, str(record["name"])), "cards/%s.svg" % card_id)
+	var extension := "png" if card_id in STORY_CARD_IDS else "svg"
+	return _with_texture(_placeholder(card_id, FALLBACK, str(record["name"])), "cards/%s.%s" % [card_id, extension])
 
 
 ## 资源 ID → 当前表现；未知 ID 和缺失图片始终有占位回退。

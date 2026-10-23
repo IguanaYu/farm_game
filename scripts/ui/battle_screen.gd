@@ -753,7 +753,11 @@ func _refresh_hand() -> void:
 		cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		cost_badge.add_child(cost)
 		var name_label := _label(str(def["name"]), 15, ExpeditionUI.INK)
+		name_label.name = "CardTitle"
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		name_label.max_lines_visible = 2
+		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 		title.add_child(name_label)
 		var art := ExpeditionArt.new()
@@ -773,6 +777,10 @@ func _refresh_hand() -> void:
 		content.add_child(desc)
 		var footer := HBoxContainer.new()
 		content.add_child(footer)
+		var kind_text: String = {"attack": "攻击", "shield": "防御", "heal": "恢复", "draw": "技巧", "cargo": "负重"}.get(_card_subject(str(card["card_id"])), "技巧")
+		var kind := _label(kind_text, 11, accent.darkened(0.2))
+		kind.name = "CardKind"
+		footer.add_child(kind)
 		var rule := _label(CardPresentation.special_rule(def), 11, Color("#655e50"))
 		rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		footer.add_child(rule)

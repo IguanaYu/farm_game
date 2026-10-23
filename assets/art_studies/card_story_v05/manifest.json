@@ -1,0 +1,75 @@
+{
+  "status": "concept-preview",
+  "date": "2026-10-22",
+  "tool": "built-in image_gen",
+  "reference": "screenshots/cute_forest_girl/03_character_and_cards.png",
+  "note": "六张情境卡面样稿；候选名称仅供预览，数值沿用当前森林样稿，未更改运行时映射。",
+  "cards": [
+    {
+      "id": "forest_shoot",
+      "name": "谁扎我啦！",
+      "cost": 1,
+      "value": 6,
+      "type": "attack",
+      "hook": "威风的大老虎屁股挨了一箭，尾巴一下立起来。",
+      "source": "C:\\Users\\haoyu\\.codex\\generated_images\\01a159c6-05ad-7033-ada3-49de4b571a86\\exec-840f74df-1efe-4237-aaa8-8545402ed959.png",
+      "prompt": "Edit this illustration with one precise composition correction: move the arrow contact to the OUTER SIDE of the tiger's rounded left hip cheek, far away from the base of the tail and far away from the central rear crease. This is a playful arrow hitting the broad fleshy SIDE of a hip, never an arrow in an anus. Arrow shaft enters at the left outer edge of the hip around x=52%, y=63%, well LEFT of the tail base. Keep exactly one arrow, its pale fletching extending diagonally down-left. Keep the raised tail and the tiger's funny startled face. Simplify the forest to very few flat shapes and remove gradients/textures so it matches the flat geometric cut-paper game reference. Preserve the heroine's straw hat, pink bow, brown twin braids, cream blouse, sage pinafore. No text, no blood. One 8:5 landscape illustration.",
+      "file": "forest_shoot.png"
+    },
+    {
+      "id": "forest_thrust",
+      "name": "不许过来！",
+      "cost": 1,
+      "value": 6,
+      "type": "attack",
+      "hook": "凶巴巴的大鼻子，被小矛戳得皱成一团。",
+      "source": "C:\\Users\\haoyu\\.codex\\generated_images\\01a159c6-05ad-7033-ada3-49de4b571a86\\exec-cd754364-6089-4b36-a58c-83bc0fa85f5c.png",
+      "prompt": "Use case: illustration-story. Asset: one landscape 8:5 game-card illustration, edge-to-edge, no card frame and absolutely no text, letters, numbers, UI, panels or watermark. Reference image is ONLY the approved character identity and the game's visual style, NOT its sheet layout or standing compositions. Preserve this heroine exactly whenever she appears: very small cute girl, brown twin braids, pale yellow broad straw hat with dusty pink ribbon bow and small green sprout pin, cream blouse, sage green pinafore, brown little boots. Style: simple flat geometric cut-paper shapes, softly rounded silhouettes, muted warm woodland palette, only 2-3 flat value levels, clean edges, NO realistic painting, no heavy ink outlines, no detailed textures, no 3D lighting. Playful, readable, one clear action at a single instant, strong large silhouettes that survive reduction to 128x80. No more than one focal impact, background minimal broad color fields. Card concept \"Don't come any closer!\" Playful single-target spear ATTACK. Extreme close-up: a huge round dark brown boar's pink fleshy SNOUT fills right half of frame; eyes near upper right, one eyebrow surprised, only small side tusks if needed. One long wooden spear travels from lower left to center-right, small broad pale blue-gray tip presses into the SIDE of the snout near the center and makes a visible comic dent and tiny cream impact burst. No blood, no wound, harmless cartoon squash. Tiny approved strawhat girl at far lower left pushes the spear FORWARD with both hands, body leaning right, twin braids behind, determined cheeks. Cropped boar head much larger than girl, long diagonal thrust unobstructed on simple peach/sage background. The spear is thrusting and contacting, not a horizontal barrier and not being held vertically. Focal point is spear tip denting big nose, not full standing heroine portrait.",
+      "file": "forest_thrust.png"
+    },
+    {
+      "id": "forest_power_shot",
+      "name": "哎呀，太用力！",
+      "cost": 2,
+      "value": 13,
+      "type": "attack",
+      "hook": "箭冲了出去，小靴子却被后坐力掀离了地。",
+      "source": "C:\\Users\\haoyu\\.codex\\generated_images\\01a159c6-05ad-7033-ada3-49de4b571a86\\exec-fa400ec3-91aa-4bf0-947a-208fe4482e8c.png",
+      "prompt": "Use case: illustration-story. Asset: one landscape 8:5 game-card illustration, edge-to-edge, no card frame and absolutely no text, letters, numbers, UI, panels or watermark. Reference image is ONLY the approved character identity and the game's visual style, NOT its sheet layout or standing compositions. Preserve this heroine exactly whenever she appears: very small cute girl, brown twin braids, pale yellow broad straw hat with dusty pink ribbon bow and small green sprout pin, cream blouse, sage green pinafore, brown little boots. Style: simple flat geometric cut-paper shapes, softly rounded silhouettes, muted warm woodland palette, only 2-3 flat value levels, clean edges, NO realistic painting, no heavy ink outlines, no detailed textures, no 3D lighting. Playful, readable, one clear action at a single instant, strong large silhouettes that survive reduction to 128x80. No more than one focal impact, background minimal broad color fields. Card concept \"Oops, too much force!\" One single powerful crossbow ATTACK, playful recoil. Chunky old wooden crossbow across center frame, one thick arrow just leaving it toward upper right, arrow clear on right half and tip near right edge. Heroine on left/lower left is leaning backward with BOTH little boot soles lifted off the ground by recoil, her cream sleeves holding the crossbow and her straw hat tilted back but still on her head. Her twin braids follow her backward motion. Her body and boots move lower-left, the single arrow moves upper-right: two opposing directions connected by the crossbow. Cute surprised expression, not hurt. Simple warm ochre/peach backdrop, few light motion accents, no detailed forest. Arrow is strongest focal contrast; boots second comic detail. Only ONE arrow, no blast cloud, no explosion, no alternate outfit. Single coherent scene, not a sequence.",
+      "file": "forest_power_shot.png"
+    },
+    {
+      "id": "forest_bell_strike",
+      "name": "借你的壳敲一下",
+      "cost": 1,
+      "value": 4,
+      "type": "attack",
+      "hook": "硬壳小怪刚探头，就被铃杖咚地敲了回去。",
+      "source": "C:\\Users\\haoyu\\.codex\\generated_images\\01a159c6-05ad-7033-ada3-49de4b571a86\\exec-6e0c2443-5299-400c-98a9-feba08581daf.png",
+      "prompt": "Use case: illustration-story. Asset: one landscape 8:5 game-card illustration, edge-to-edge, no card frame and absolutely no text, letters, numbers, UI, panels or watermark. Reference image is ONLY the approved character identity and the game's visual style, NOT its sheet layout or standing compositions. Preserve this heroine exactly whenever she appears: very small cute girl, brown twin braids, pale yellow broad straw hat with dusty pink ribbon bow and small green sprout pin, cream blouse, sage green pinafore, brown little boots. Style: simple flat geometric cut-paper shapes, softly rounded silhouettes, muted warm woodland palette, only 2-3 flat value levels, clean edges, NO realistic painting, no heavy ink outlines, no detailed textures, no 3D lighting. Playful, readable, one clear action at a single instant, strong large silhouettes that survive reduction to 128x80. No more than one focal impact, background minimal broad color fields. Card concept \"Let me knock on your shell\". Comic light melee ATTACK. A large round moss-green turtle-like forest creature's domed shell fills lower half of frame, tiny round timid head protrudes at lower right, neck retracting into shell. A wooden bell staff enters diagonally from upper left, a large round golden brass bell head at its tip has JUST BONKED the TOP of shell at image center. The bell and shell are separate clearly readable silhouettes with a small cream flattened impact shape at their contact. Bell shape is classic hanging brass handbell with a flared mouth and tiny clapper, attached firmly to staff. Only heroine's small cream-sleeved hand and a cropped pink-ribbon straw hat edge at far left, no full standing figure. One short downward arc behind staff shows falling motion. Shell dark sage, bell warm ochre, quiet cream and muted forest ground background. Cute creature startled and shrinking back. No stars circling head, no blood, no spell shield, no written sound effects.",
+      "file": "forest_bell_strike.png"
+    },
+    {
+      "id": "forest_guard_bell",
+      "name": "躲我后面",
+      "cost": 1,
+      "value": 5,
+      "type": "defense",
+      "hook": "把发抖的小伙伴拢在身后，撑住迎面冲击。",
+      "source": "C:\\Users\\haoyu\\.codex\\generated_images\\01a159c6-05ad-7033-ada3-49de4b571a86\\exec-197709b8-d69e-4ab7-aba9-6229cbea51dd.png",
+      "prompt": "Use case: illustration-story. Asset: one landscape 8:5 game-card illustration, edge-to-edge, no card frame and absolutely no text, letters, numbers, UI, panels or watermark. Reference image is ONLY the approved character identity and the game's visual style, NOT its sheet layout or standing compositions. Preserve this heroine exactly whenever she appears: very small cute girl, brown twin braids, pale yellow broad straw hat with dusty pink ribbon bow and small green sprout pin, cream blouse, sage green pinafore, brown little boots. Style: simple flat geometric cut-paper shapes, softly rounded silhouettes, muted warm woodland palette, only 2-3 flat value levels, clean edges, NO realistic painting, no heavy ink outlines, no detailed textures, no 3D lighting. Playful, readable, one clear action at a single instant, strong large silhouettes that survive reduction to 128x80. No more than one focal impact, background minimal broad color fields. Card concept \"Hide behind me\". Warm protective DEFENSE, not an attack. A HUGE broad mint-green LEAF-SHAPED magical shield arches from lower left to upper right across two thirds of frame; its thick continuous outer curve faces LEFT. One chunky incoming wooden branch from left is STOPPED at the shield's outer surface at center-left: a small flattened impact notch and pale contact mark, branch DOES NOT cross barrier. Inside at right, approved strawhat girl crouches, holds a small brass bell in her LEFT-facing raised hand to maintain the shield; her other arm gathers a tiny round timid fluffy woodland chick behind her. Chick peeks from lower right and clutches green skirt. One heroine and one small chick only. Dark desaturated teal outside the shield, light quiet mint/cream inside. Barrier and stopped impact FIRST, two protected cuddled silhouettes SECOND. Large readable enclosing protective shape, no projectiles emerging from girl, no cross symbol, no text.",
+      "file": "forest_guard_bell.png"
+    },
+    {
+      "id": "forest_smoke_screen",
+      "name": "藏好了吗？",
+      "cost": 1,
+      "value": 4,
+      "type": "defense",
+      "hook": "缩进软烟团，外面的硬枝被厚烟接住。",
+      "source": "C:\\Users\\haoyu\\.codex\\generated_images\\01a159c6-05ad-7033-ada3-49de4b571a86\\exec-1ead5fef-995b-49ad-9470-b9060f5cddc4.png",
+      "prompt": "Use case: illustration-story. Asset: one landscape 8:5 game-card illustration, edge-to-edge, no card frame and absolutely no text, letters, numbers, UI, panels or watermark. Reference image is ONLY the approved character identity and the game's visual style, NOT its sheet layout or standing compositions. Preserve this heroine exactly whenever she appears: very small cute girl, brown twin braids, pale yellow broad straw hat with dusty pink ribbon bow and small green sprout pin, cream blouse, sage green pinafore, brown little boots. Style: simple flat geometric cut-paper shapes, softly rounded silhouettes, muted warm woodland palette, only 2-3 flat value levels, clean edges, NO realistic painting, no heavy ink outlines, no detailed textures, no 3D lighting. Playful, readable, one clear action at a single instant, strong large silhouettes that survive reduction to 128x80. No more than one focal impact, background minimal broad color fields. Card concept \"All tucked away?\" Soft-smoke DEFENSE illustration, NOT fire attack and NOT just background fog. A huge thick round smoke cocoon fills middle three quarters of frame, soft overlapping slate-blue and pale lavender geometric cloud lobes. One incoming chunky bare wooden branch enters from LEFT and is visibly STOPPED and cushioned at center-left OUTER edge: cloud lobes there compress flat and bulge around the branch tip, a subtle pale contact notch, branch does not reach heroine. At right INSIDE the smoke cocoon the tiny heroine is mostly concealed, but her pale yellow straw hat with pink bow and sprout, round face peeking, and two brown braids clearly show through a small safe opening. A small resin torch with one very tiny amber ember at bottom right implies source of smoke, not a large flame. Outside background dark muted blue-green, protected interior light mist. The main visual is hard impact stopped by thick soft smoke, second detail cute little peeking hat. No bright orange fire cloud, no enemy searching, no invisibility icon, no shield-shaped outline. One single quiet safe scene.",
+      "file": "forest_smoke_screen.png"
+    }
+  ]
+}

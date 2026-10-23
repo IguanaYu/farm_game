@@ -2,7 +2,7 @@ extends SceneTree
 ## 实机与资源设计板：新主角、六张角色动作卡、小窗口和动作复制。
 
 const OUT := "res://screenshots/cute_forest_girl"
-const CARDS := "res://assets/art_studies/cute_adventurer_v03/"
+const CARDS := "res://assets/chapter_one/cards/"
 var checks := 0
 var failed := false
 
@@ -56,7 +56,7 @@ func _art_board() -> Control:
 		art.position = Vector2(x, y)
 		art.size = Vector2(240, 150)
 		art._texture_key = art.subject + ":" + art.layer_id
-		art._art_texture = load(CARDS + str(id) + ".svg") as Texture2D
+		art._art_texture = load(CARDS + str(id) + ".png") as Texture2D
 		board.add_child(art)
 		var definition: Dictionary = ForestCardStudyCombat.CARDS[id]
 		var label := ExpeditionUI.label(str(definition["name"]), 23, Color("#506353"))
@@ -84,7 +84,7 @@ func _run() -> void:
 		for child in button.find_children("*", "Control", true, false):
 			if child is ExpeditionArt:
 				var key := child.subject.trim_prefix("card.") as String
-				_check(child._resolve_texture() == load(CARDS + key + ".svg"), "卡面使用同一位新主角 " + key)
+				_check(child._resolve_texture() == load(CARDS + key + ".png"), "卡面使用草帽小姑娘情境插图 " + key)
 	await _shot("01_in_game")
 	_check(screen.combat.state == snapshot, "更换插图不改变战斗状态")
 	var motion := screen._animate_attack("p1", "e1")

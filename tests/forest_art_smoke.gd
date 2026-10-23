@@ -21,7 +21,8 @@ func _run() -> void:
 	for record in ChapterOneDefs.ITEM_MAPPING.values():
 		_check_texture(ChapterArtRegistry.resolve("item." + str(record["def_id"])), Vector2i(256, 256), true)
 	for card_id in ChapterOneDefs.NEW_CARDS:
-		_check_texture(ChapterArtRegistry.resolve("card." + str(card_id)), Vector2i(320, 200), false)
+		var extent := Vector2i(640, 400) if card_id in ChapterArtRegistry.STORY_CARD_IDS else Vector2i(320, 200)
+		_check_texture(ChapterArtRegistry.resolve("card." + str(card_id)), extent, false)
 	_check(checked == 123, "五类插图应合计 123 件")
 	for missing in ["bg.forest_ch1.missing", "enemy.missing", "prop.missing", "item.missing", "card.missing", "unknown"]:
 		var fallback := ChapterArtRegistry.resolve(missing)

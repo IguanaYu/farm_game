@@ -51,6 +51,10 @@ func _build() -> void:
 	play.name = "ForestPlaytestButton"
 	play.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/forest_playtest.tscn"))
 	header.add_child(play)
+	var story_play := ExpeditionUI.button("情境卡牌试玩", true)
+	story_play.name = "ForestStoryPlaytestButton"
+	story_play.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/forest_animation_playtest.tscn"))
+	header.add_child(story_play)
 	var back := ExpeditionUI.button("返回主菜单")
 	back.name = "BackButton"
 	back.pressed.connect(func() -> void: get_tree().change_scene_to_file(MENU_SCENE))
