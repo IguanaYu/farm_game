@@ -16,20 +16,20 @@ func _initialize() -> void:
 
 	_play(combat, "slash")
 	_play(combat, "slash")
-	_check(int(slime["hp"]) == 6, "算例一：切击×2 后泥团 18→12→6")
+	_check(int(slime["hp"]) == 8, "算例一：初始切击×2 后泥团 18→13→8")
 	_check(int(player["energy"]) == 1, "算例一：两张 1 费牌后剩 1 能量")
 	_play(combat, "shield_up")
 	_check(int(player["energy"]) == 0, "算例一：架盾耗最后 1 能量")
 	_play(combat, "brace")
-	_check(int(player["block"]) == 9, "算例一：架盾 6＋稳住 3＝9 格挡")
+	_check(int(player["block"]) == 8, "算例一：初始架盾 5＋稳住 3＝8 格挡")
 	var turn := combat.end_turn("p1")
 	_check(int(player["hp"]) == 40, "算例一：敌人攻击 5 全被格挡吸收")
 	var absorbed := false
 	for entry in combat.state["log"]:
 		if str(entry).find("格挡抵消 5") >= 0:
 			absorbed = true
-	_check(absorbed, "算例一：日志记录格挡抵消 5（9→4）")
-	_check(int(combat.state["round"]) == 2 and int(player["block"]) == 0, "算例一：下回合开始残余 4 格挡清除、能量恢复 3")
+	_check(absorbed, "算例一：日志记录格挡抵消 5（8→3）")
+	_check(int(combat.state["round"]) == 2 and int(player["block"]) == 0, "算例一：下回合开始残余 3 格挡清除、能量恢复 3")
 
 	# —— 算例二：敌人 6 格挡 → 破绽 → 切击（易伤 ×1.5 只取整一次）——
 	var order2 := _order(["expose", "slash", "slash", "slash", "slash", "slash", "slash", "slash"])
@@ -41,7 +41,7 @@ func _initialize() -> void:
 	_play(crab, "expose")
 	_check(int(enemy["block"]) == 2 and int(enemy["hp"]) == 26, "算例二：破绽 4 伤害被格挡吸收（6→2），不追溯易伤")
 	_play(crab, "slash")
-	_check(int(enemy["hp"]) == 19, "算例二：切击 ⌊6×1.5⌋=9，扣 2 格挡后生命 -7")
+	_check(int(enemy["hp"]) == 21, "算例二：切击 ⌊5×1.5⌋=7，扣 2 格挡后生命 -5")
 	_check(int(enemy["max_hp"]) == 26, "算例二：碎石蟹上限 26")
 
 	if failed:

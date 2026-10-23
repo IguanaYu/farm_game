@@ -52,7 +52,8 @@ func _run() -> void:
 		_check(CardDefs.CARDS.has(card_id), "复用牌 %s 已存在" % card_id)
 	for card_id in ChapterOneDefs.NEW_CARDS:
 		_check(not CardDefs.CARDS.has(card_id), "新增牌 %s 未提前写入 CardDefs（P1 落地）" % card_id)
-	_check(CardDefs.CARDS.size() == 19, "旧牌表未被 P0 改动：仍为 19 个模板")
+	var legacy_cards := ["slash", "heavy_strike", "shield_up", "cover", "brace", "deep_breath", "observe", "expose", "venom_stab", "drink_potion", "heavy_cargo", "first_aid", "drink_soup", "drink_elixir", "slash7", "heavy_strike15", "slash8", "heavy_strike17", "rescue_signal"]
+	_check(legacy_cards.all(func(id): return CardDefs.CARDS.has(id)), "P0 登记仍兼容全部 19 张旧正式牌")
 
 	# —— 内容开关与版本检查 ————————————
 	_check(ChapterOneDefs.departure_problem("") == "", "出发检查：空内容集（旧洞窟）放行")

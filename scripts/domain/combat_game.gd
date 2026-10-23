@@ -3,10 +3,14 @@ extends RefCounted
 ## 单人卡牌战斗规则层（2.2 详细设计）。玩家状态按玩家键索引（2.6 加键即可支持双人）；
 ## 敌人与意图共享。所有方法返回结果字典并输出事件列表，UI 只消费事件，不参与裁定。
 ## 时序（设计 §3）：回合开始清格挡→加入到期物品牌→能量重置→抽 5→出牌→结束弃牌→
-## 敌人逐个行动（各自先清旧格挡、结算中毒）→玩家结算中毒→胜负判定。
+## 敌人逐个行动（各自先清旧格挡、结算中毒）→玩家行动开始结算中毒→发放资源。
 
 
 const ENEMIES := {
+	# 数值专项入口使用的固定压力场；不加入正式地图遭遇池。
+	"anchor_dummy_7": {"name": "压力样例 · 7点轻击", "hp": 72, "cycle": [{"kind": "attack", "value": 7}]},
+	"anchor_dummy_10": {"name": "压力样例 · 10点轻击", "hp": 72, "cycle": [{"kind": "attack", "value": 10}]},
+	"anchor_dummy_15": {"name": "压力样例 · 15点重击", "hp": 72, "cycle": [{"kind": "attack", "value": 15}]},
 	# 人形敌人带 equipment：尸体顶部生成掉落装备槽区（主武→副武→头盔→护甲）。
 	# equipment 键：weapon→主武器槽、offhand→副武器槽、helmet→头盔槽、armor→护甲槽。
 	# 可选 drop_odds：按键独立掷掉落概率（默认 1.0 必掉；当前内容先必掉，概率留接口）。
@@ -109,6 +113,9 @@ const ENEMIES := {
 const HP_SCALE_2P := 1.6
 
 const ENCOUNTERS := {
+	"anchor_pressure_7": {"name": "费用锚点：7点轻击", "enemies": ["anchor_dummy_7"]},
+	"anchor_pressure_10": {"name": "费用锚点：10点轻击", "enemies": ["anchor_dummy_10"]},
+	"anchor_pressure_15": {"name": "费用锚点：15点重击", "enemies": ["anchor_dummy_15"]},
 	"skeleton_patrol": {"name": "骷髅巡逻兵", "enemies": ["skeleton_scout"]},
 	"tutorial": {"name": "教学场（单只小泥团）", "enemies": ["slime"]},
 	"normal": {"name": "普通验证场（泥团＋蝠）", "enemies": ["slime", "cave_bat"]},
@@ -255,8 +262,9 @@ func start() -> Dictionary:
 	if not state.is_empty() and state["phase"] == "player" and state["round"] == 0:
 		for enemy in state["enemies"]:
 			_roll_intent(enemy)
-		_begin_player_round()
-		return {"ok": true, "events": _round_events(1)}
+		var events: Array = _round_events(1)
+		_begin_player_round(events)
+		return {"ok": true, "events": events}
 	return {"ok": false, "reason": "战斗已在进行", "events": []}
 
 
@@ -271,6 +279,8 @@ func play_card(owner_key: String, uid: int, target_key: String) -> Dictionary:
 	var player: Dictionary = state["players"].get(owner_key)
 	if player.is_empty() or int(player.get("hp", 0)) <= 0:
 		return _deny("倒地的玩家不能出牌", events)
+	if bool(player.get("ended", false)):
+		return _deny("已经结束行动", events)
 	var card := _hand_card(owner_key, uid)
 	if card.is_empty():
 		return _deny("这张牌已不在手牌中", events)
@@ -280,6 +290,9 @@ func play_card(owner_key: String, uid: int, target_key: String) -> Dictionary:
 	var target := _resolve_target(def["target"], target_key, owner_key)
 	if target.is_empty():
 		return _deny("目标不合法", events)
+	for effect in def["effects"]:
+		if _effect_target(owner_key, target_key, effect).is_empty():
+			return _deny("效果目标不合法", events)
 	if int(player["energy"]) < int(def["cost"]):
 		return _deny("能量不足", events)
 	if str(def["after"]) == "exhaust_source":
@@ -292,7 +305,13 @@ func play_card(owner_key: String, uid: int, target_key: String) -> Dictionary:
 	_remove_from_hand(owner_key, uid)
 	events.append({"type": "card_played", "owner": owner_key, "card": str(def["name"]), "card_id": str(card["card_id"]), "cost": int(def["cost"]), "target": target_key})
 	for effect in def["effects"]:
-		_apply_effect(owner_key, target_key, effect, events)
+		var effect_target := _effect_target(owner_key, target_key, effect)
+		if effect_target.is_empty():
+			continue
+		_apply_effect(owner_key, _unit_id(effect_target), effect, events)
+		_events_check_outcome(events)
+		if is_over():
+			break
 	# 出牌去向：弃牌／移除（exhaust_source 的关联牌清理由 2.3 的实体耗尽联动补全）。
 	if str(def["after"]) == "discard":
 		player["discard_pile"].append(card)
@@ -313,19 +332,33 @@ func preview_play(owner_key: String, uid: int, target_key: String) -> Dictionary
 	var target := _resolve_target(def.get("target", ""), target_key, owner_key)
 	if target.is_empty():
 		return {"ok": false, "reason": "目标不合法"}
-	var preview := {"ok": true}
 	for effect in def.get("effects", []):
-		match str(effect.get("kind", "")):
-			"damage":
-				preview["damage"] = _outgoing_damage(owner_key, target, int(effect["value"]))
-			"block":
-				preview["block"] = int(effect["value"])
-			"heal":
-				preview["heal"] = maxi(0, mini(int(effect["value"]), int(target["max_hp"]) - int(target["hp"])))
-			"draw":
-				preview["draw"] = int(effect["value"])
-			"status":
-				preview["status"] = CardDefs.STATUS_DISPLAY.get(str(effect.get("status", "")), str(effect.get("status", "")))
+		if _effect_target(owner_key, target_key, effect).is_empty():
+			return {"ok": false, "reason": "效果目标不合法"}
+	# 在独立状态与 RNG 上调用同一效果入口，顺序、格挡与死亡中断均与实战一致。
+	var simulation := CombatGame.new()
+	simulation.load_dict(to_dict())
+	var preview := {"ok": true, "effects": []}
+	for effect in def.get("effects", []):
+		var effect_target := simulation._effect_target(owner_key, target_key, effect)
+		if effect_target.is_empty():
+			continue
+		var events: Array = []
+		simulation._apply_effect(owner_key, simulation._unit_id(effect_target), effect, events)
+		for event in events:
+			var kind := str(event.get("type", ""))
+			if kind in ["damage", "block", "heal", "draw", "status", "rescue"]:
+				var detail: Dictionary = event.duplicate(true)
+				detail["kind"] = kind
+				detail["times"] = 1
+				preview["effects"].append(detail)
+				if kind == "status":
+					preview["status"] = CardDefs.STATUS_DISPLAY.get(str(event["status"]), str(event["status"]))
+				else:
+					preview[kind] = int(preview.get(kind, 0)) + int(event.get("amount", event.get("count", 0)))
+		simulation._events_check_outcome(events)
+		if simulation.is_over():
+			break
 	return preview
 
 
@@ -334,7 +367,9 @@ func end_turn(owner_key: String) -> Dictionary:
 	var events: Array = []
 	if state["phase"] != "player":
 		return _deny("当前不是玩家回合", events)
-	var player: Dictionary = state["players"][owner_key]
+	var player: Dictionary = state["players"].get(owner_key, {})
+	if player.is_empty() or int(player["hp"]) <= 0 or bool(player.get("ended", false)):
+		return _deny("当前玩家无法结束行动", events)
 	player["ended"] = true
 	## 共同回合：全部可行动玩家（未倒地）都结束才进入敌方阶段；倒地者不计入。
 	for key in state["players"]:
@@ -346,8 +381,8 @@ func end_turn(owner_key: String) -> Dictionary:
 	_run_enemy_phase(events)
 	if state["outcome"] != "":
 		return {"ok": true, "events": events, "outcome": state["outcome"]}
-	_begin_player_round()
-	return {"ok": true, "events": events, "outcome": ""}
+	_begin_player_round(events)
+	return {"ok": true, "events": events, "outcome": state["outcome"]}
 
 
 # —— 查询 ————————————————————————————————————————————————————————
@@ -372,7 +407,7 @@ func enemy_intents() -> Array:
 		result.append({
 			"enemy_id": enemy["id"],
 			"name": enemy["name"],
-			"text": _intent_text(intent),
+			"text": intent_text(enemy),
 		})
 	return result
 
@@ -398,6 +433,9 @@ func load_dict(snapshot: Dictionary) -> bool:
 	if int(snapshot.get("fmt", -1)) != 1:
 		return false
 	state = snapshot.duplicate(true)
+	for unit in state.get("players", {}).values() + state.get("enemies", []):
+		if not unit.has("statuses"):
+			unit["statuses"] = {}
 	rng.seed = int(state.get("seed", 0))
 	rng.state = int(state.get("rng_state", "0"))
 	return true
@@ -406,7 +444,7 @@ func load_dict(snapshot: Dictionary) -> bool:
 # —— 内部：回合流程 ————————————————————————————————————————————
 
 
-func _begin_player_round() -> void:
+func _begin_player_round(events: Array = []) -> void:
 	state["round"] = int(state["round"]) + 1
 	state["phase"] = "player"
 	for key in state["players"]:
@@ -417,16 +455,14 @@ func _begin_player_round() -> void:
 			## 倒地者不清手牌与能量（保留），但不发新资源；被救起时按标记补发。
 			player["missed_round_start"] = true
 			continue
-		# 加入本回合到期的物品牌（洗入抽牌堆；延后加入只代表进入抽牌堆，不保证抽到）。
-		var join_round := int(state["round"])
-		var due: Array = player["pending_join"].get(str(join_round), [])
-		if not due.is_empty():
-			if bool(state.get("fixed_deck", false)):
-				# 测试注入的固定牌序不洗牌，保证算例可手算复现。
-				player["draw_pile"].append_array(due)
-			else:
-				_shuffle_into_draw(player, due)
-			player["pending_join"][str(join_round)] = []
+		_apply_poison(player, events)
+		_events_check_outcome(events)
+		if is_over():
+			return
+		if int(player["hp"]) <= 0:
+			player["missed_round_start"] = true
+			continue
+		_join_due_cards(player)
 		player["energy"] = ExpeditionBaseline.ENERGY_PER_TURN
 		_draw_cards(player, ExpeditionBaseline.DRAW_PER_TURN)
 		state["log"].append("—— 第 %d 回合开始：能量 %d，抽 %d 张 ——" % [int(state["round"]), ExpeditionBaseline.ENERGY_PER_TURN, ExpeditionBaseline.DRAW_PER_TURN])
@@ -438,11 +474,14 @@ func _begin_player_round() -> void:
 func _run_discard_phase(events: Array) -> void:
 	for key in state["players"]:
 		var player: Dictionary = state["players"][key]
+		if int(player["hp"]) <= 0:
+			continue
 		for card in player["hand"].duplicate():
 			player["discard_pile"].append(card)
 		player["hand"] = []
 		# 易伤/虚弱在受影响单位完成自身行动阶段后减 1（设计 §4）：玩家阶段在此结束。
-		_decrement_own_statuses(player)
+		if int(player["hp"]) > 0:
+			_decrement_own_statuses(player)
 	events.append({"type": "discarded"})
 
 
@@ -453,21 +492,16 @@ func _run_enemy_phase(events: Array) -> void:
 			continue
 		# 每个敌人行动开始先清自己的旧格挡，再结算自己的持续伤害。
 		enemy["block"] = 0
-		_decrement_own_statuses(enemy)
 		_apply_poison(enemy, events)
+		_events_check_outcome(events)
+		if is_over():
+			return
 		if not bool(enemy["alive"]):
 			continue
 		_execute_intent(enemy, events)
 		_decrement_own_statuses(enemy)
 		if state["outcome"] != "":
 			return
-	# 敌方阶段结束，玩家结算自己的持续伤害；全部倒地才失败（2.6 设计 §5）。
-	for key in state["players"]:
-		var player: Dictionary = state["players"][key]
-		_apply_poison(player, events)
-	if _all_players_downed():
-		_set_outcome("lost", events)
-		return
 	_events_check_outcome(events)
 
 
@@ -490,6 +524,8 @@ func _events_check_outcome(events: Array) -> void:
 
 
 func _set_outcome(outcome: String, events: Array) -> void:
+	if is_over():
+		return
 	if outcome == "won":
 		## 战斗胜利：倒地但队伍未失败的玩家恢复到 4 生命（2.6 设计 §5）。
 		for key in state["players"]:
@@ -499,6 +535,11 @@ func _set_outcome(outcome: String, events: Array) -> void:
 				player["downed"] = false
 				events.append({"type": "revived_at_victory", "player": key})
 				state["log"].append("%s 在胜利后恢复到 %d 生命" % [player["name"], int(player["hp"])])
+	# 状态仅属于当前战斗，终局与新建战斗都不保留。
+	for player in state["players"].values():
+		player["statuses"] = {}
+	for enemy in state["enemies"]:
+		enemy["statuses"] = {}
 	state["outcome"] = outcome
 	state["phase"] = "finished"
 	state["log"].append("战斗%s（第 %d 回合）" % ["胜利" if outcome == "won" else "失败", int(state["round"])])
@@ -509,14 +550,23 @@ func _set_outcome(outcome: String, events: Array) -> void:
 
 
 func _apply_effect(owner_key: String, target_key: String, effect: Dictionary, events: Array) -> void:
+	var recipient := _find_unit(target_key)
+	if recipient.is_empty():
+		return
+	if int(recipient.get("hp", 0)) <= 0 and str(effect.get("kind", "")) not in ["rescue", "draw"]:
+		return
 	match str(effect.get("kind", "")):
 		"damage":
 			var target := _find_unit(target_key)
-			var amount := _outgoing_damage(owner_key, target, int(effect["value"]))
-			_deal_damage(owner_key, target, amount, events)
+			for strike in range(maxi(1, int(effect.get("times", 1)))):
+				if int(target.get("hp", 0)) <= 0 or is_over():
+					break
+				var amount := _outgoing_damage(owner_key, target, int(effect["value"]))
+				_deal_damage(owner_key, target, amount, events)
+				_events_check_outcome(events)
 		"block":
 			var target := _find_unit(target_key)
-			var amount := int(effect["value"])
+			var amount := _block_gain(owner_key, int(effect["value"]))
 			target["block"] = int(target["block"]) + amount
 			events.append({"type": "block", "target": target_key, "amount": amount})
 			state["log"].append("%s 获得 %d 格挡" % [_unit_name(target), amount])
@@ -542,12 +592,15 @@ func _apply_effect(owner_key: String, target_key: String, effect: Dictionary, ev
 				target["rescued_once"] = true
 				if bool(target.get("missed_round_start", false)):
 					target["missed_round_start"] = false
+					_join_due_cards(target)
 					target["energy"] = ExpeditionBaseline.ENERGY_PER_TURN
 					_draw_cards(target, ExpeditionBaseline.DRAW_PER_TURN)
 				events.append({"type": "rescue", "target": target_key, "hp": int(target["hp"])})
 				state["log"].append("%s 被救起，恢复到 %d 生命" % [target["name"], int(target["hp"])])
 		"status":
 			var target := _find_unit(target_key)
+			if int(target.get("hp", 0)) <= 0:
+				return
 			var status := str(effect.get("status", ""))
 			var stacks := int(effect.get("stacks", 1))
 			_add_status(target, status, stacks)
@@ -555,18 +608,33 @@ func _apply_effect(owner_key: String, target_key: String, effect: Dictionary, ev
 			state["log"].append("%s 获得 %s ×%d" % [_unit_name(target), CardDefs.STATUS_DISPLAY.get(status, status), stacks])
 
 
-## 伤害计算（设计 §4）：基础值 ×易伤(×1.5，受击方) ×虚弱(×0.75，攻击方)，向下取整且≥0。
+## 基础值先加力量，再乘虚弱与易伤；中间保留精度，最后统一向下取整。
 func _outgoing_damage(attacker_key: String, target: Dictionary, base: int) -> int:
-	var amount := base
-	if _has_status(target, "vulnerable"):
-		amount = int(amount * 1.5)
 	var attacker := _find_unit(attacker_key)
-	if not attacker.is_empty() and _has_status(attacker, "weak"):
-		amount = int(amount * 0.75)
-	return maxi(0, amount)
+	return _attack_amount(attacker, target, base)
+
+
+func _attack_amount(attacker: Dictionary, target: Dictionary, base: int) -> int:
+	var amount := float(maxi(0, base + _status_stacks(attacker, "strength")))
+	if _has_status(attacker, "weak"):
+		amount *= 0.75
+	if _has_status(target, "vulnerable"):
+		amount *= 1.5
+	return int(floor(amount))
+
+
+func _block_gain(caster_key: String, base: int) -> int:
+	return maxi(0, base + _status_stacks(_find_unit(caster_key), "dexterity"))
+
+
+func _status_stacks(unit: Dictionary, status: String) -> int:
+	return maxi(0, int(unit.get("statuses", {}).get(status, {}).get("stacks", 0)))
 
 
 func _deal_damage(attacker_key: String, target: Dictionary, amount: int, events: Array) -> void:
+	if int(target.get("hp", 0)) <= 0:
+		return
+	amount = maxi(0, amount)
 	var blocked := mini(amount, int(target["block"]))
 	target["block"] = int(target["block"]) - blocked
 	var to_hp := amount - blocked
@@ -588,7 +656,9 @@ func _deal_damage(attacker_key: String, target: Dictionary, amount: int, events:
 
 
 func _apply_poison(unit: Dictionary, events: Array) -> void:
-	var stacks := int(unit["statuses"].get("poison", {}).get("stacks", 0))
+	if int(unit.get("hp", 0)) <= 0:
+		return
+	var stacks := _status_stacks(unit, "poison")
 	if stacks <= 0:
 		return
 	# 中毒绕过格挡（设计 §4）。
@@ -613,13 +683,15 @@ func _apply_poison(unit: Dictionary, events: Array) -> void:
 
 
 func _add_status(unit: Dictionary, status: String, stacks: int) -> void:
+	if stacks <= 0 or not CardDefs.STATUS_DISPLAY.has(status):
+		return
 	var current: Dictionary = unit["statuses"].get(status, {"stacks": 0})
 	current["stacks"] = int(current["stacks"]) + stacks
 	unit["statuses"][status] = current
 
 
 func _has_status(unit: Dictionary, status: String) -> bool:
-	return int(unit["statuses"].get(status, {}).get("stacks", 0)) > 0
+	return _status_stacks(unit, status) > 0
 
 
 ## 易伤/虚弱在受影响单位完成自身行动阶段后减 1 回合（设计 §4 状态表）。
@@ -657,16 +729,21 @@ func _execute_intent(enemy: Dictionary, events: Array) -> void:
 					break
 				var amount := _outgoing_damage(enemy["id"], victim, int(intent["value"]))
 				_deal_damage(enemy["id"], victim, amount, events)
-				if str(intent.get("status", "")) != "":
+				if str(intent.get("status", "")) != "" and int(victim["hp"]) > 0:
 					_add_status(victim, str(intent["status"]), int(intent.get("status_stacks", 1)))
+					events.append({"type": "status", "target": _unit_id(victim), "status": str(intent["status"]), "stacks": int(intent.get("status_stacks", 1))})
 					state["log"].append("%s 获得 %s ×%d" % [victim["name"], CardDefs.STATUS_DISPLAY.get(str(intent["status"]), str(intent["status"])), int(intent.get("status_stacks", 1))])
 				if _all_players_downed():
 					_set_outcome("lost", events)
 					return
 		"block":
-			enemy["block"] = int(enemy["block"]) + int(intent["value"])
-			events.append({"type": "enemy_block", "enemy_id": enemy["id"], "amount": int(intent["value"])})
-			state["log"].append("%s 获得 %d 格挡" % [enemy["name"], int(intent["value"])])
+			var amount := _block_gain(str(enemy["id"]), int(intent["value"]))
+			enemy["block"] = int(enemy["block"]) + amount
+			events.append({"type": "enemy_block", "enemy_id": enemy["id"], "amount": amount})
+			state["log"].append("%s 获得 %d 格挡" % [enemy["name"], amount])
+		"status":
+			_add_status(enemy, str(intent.get("status", "")), int(intent.get("status_stacks", 1)))
+			events.append({"type": "status", "target": enemy["id"], "status": str(intent.get("status", "")), "stacks": int(intent.get("status_stacks", 1))})
 	events.append({"type": "enemy_acted", "enemy_id": enemy["id"]})
 
 
@@ -685,6 +762,65 @@ func _intent_victim(enemy: Dictionary) -> Dictionary:
 
 func intent_target(enemy: Dictionary) -> String:
 	return str(enemy.get("target_key", "p1"))
+
+
+## 预告敌人即将执行的数值：玩家共同阶段结束的减层也计入，不改变真实目标或状态。
+func intent_preview(enemy: Dictionary) -> Dictionary:
+	var preview: Dictionary = enemy.get("intent", {}).duplicate(true)
+	preview["target"] = intent_target(enemy)
+	if not bool(enemy.get("alive", false)) or _status_stacks(enemy, "poison") >= int(enemy.get("hp", 0)):
+		return {"kind": "none", "value": 0, "times": 0, "strikes": [], "target": intent_target(enemy), "text": "行动开始中毒倒下"}
+	var simulation := CombatGame.new()
+	simulation.load_dict(to_dict())
+	if str(state.get("phase", "")) == "player":
+		for player in simulation.state["players"].values():
+			if int(player["hp"]) > 0:
+				simulation._decrement_own_statuses(player)
+		# 同一阶段内，前一个敌人的附加状态、击倒和中毒死亡也影响后续意图。
+		for preceding in simulation.state["enemies"]:
+			if str(preceding["id"]) == str(enemy["id"]):
+				break
+			if not bool(preceding["alive"]):
+				continue
+			var prior_events: Array = []
+			preceding["block"] = 0
+			simulation._apply_poison(preceding, prior_events)
+			simulation._events_check_outcome(prior_events)
+			if not simulation.is_over() and bool(preceding["alive"]):
+				simulation._execute_intent(preceding, prior_events)
+				simulation._decrement_own_statuses(preceding)
+			if simulation.is_over():
+				return {"kind": "none", "value": 0, "times": 0, "strikes": [], "target": intent_target(enemy), "text": "队伍已倒地"}
+	var simulated_enemy := simulation._find_unit(str(enemy["id"]))
+	simulated_enemy["block"] = 0
+	var events: Array = []
+	simulation._apply_poison(simulated_enemy, events)
+	simulation._execute_intent(simulated_enemy, events)
+	var strikes: Array = []
+	for event in events:
+		if str(event.get("type", "")) == "damage":
+			strikes.append(event.duplicate(true))
+		elif str(event.get("type", "")) == "enemy_block":
+			preview["value"] = int(event["amount"])
+	preview["strikes"] = strikes
+	preview["times"] = maxi(1, int(preview.get("times", 1)))
+	if str(preview.get("kind", "")) == "attack" and not strikes.is_empty():
+		preview["value"] = int(strikes[0]["amount"])
+		preview["target"] = str(strikes[0]["target"])
+		preview["times"] = strikes.size()
+		var uniform := true
+		var parts: Array[String] = []
+		for strike in strikes:
+			uniform = uniform and int(strike["amount"]) == int(preview["value"]) and str(strike["target"]) == str(preview["target"])
+			parts.append("%d→%s" % [int(strike["amount"]), str(state["players"].get(str(strike["target"]), {}).get("name", strike["target"]))])
+		preview["text"] = _intent_text(preview) if uniform else "攻击 " + " + ".join(parts)
+	else:
+		preview["text"] = _intent_text(preview)
+	return preview
+
+
+func intent_text(enemy: Dictionary) -> String:
+	return str(intent_preview(enemy).get("text", "—"))
 
 
 func _all_players_downed() -> bool:
@@ -711,6 +847,21 @@ func _intent_text(intent: Dictionary) -> String:
 
 
 # —— 内部：牌堆 —————————————————————————————————————————————————
+
+
+## 救援补发也接收此前错过的到期牌；只清空已加入的槽，不重复发牌或结算中毒。
+func _join_due_cards(player: Dictionary) -> void:
+	for round_key in player["pending_join"]:
+		if int(round_key) > int(state["round"]):
+			continue
+		var due: Array = player["pending_join"][round_key]
+		if due.is_empty():
+			continue
+		if bool(state.get("fixed_deck", false)):
+			player["draw_pile"].append_array(due)
+		else:
+			_shuffle_into_draw(player, due)
+		player["pending_join"][round_key] = []
 
 
 func _hand_card(owner_key: String, uid: int) -> Dictionary:
@@ -812,6 +963,16 @@ func _resolve_target(target_rule: String, target_key: String, owner_key: String)
 				return state["players"][target_key]
 			return {}
 	return {}
+
+
+## 默认沿用整张牌所选目标；self 显式指向施放者，enemy/ally 检查所选目标类型。
+func _effect_target(owner_key: String, selected_key: String, effect: Dictionary) -> Dictionary:
+	var rule := str(effect.get("target", "selected"))
+	if rule == "self":
+		return _resolve_target("self", owner_key, owner_key)
+	if rule == "selected":
+		return _find_unit(selected_key)
+	return _resolve_target(rule, selected_key, owner_key)
 
 
 func _find_unit(unit_key: String) -> Dictionary:

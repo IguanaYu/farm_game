@@ -23,6 +23,7 @@ var checks := 0
 
 
 func _initialize() -> void:
+	preload("res://tests/support/local_tls_fixture.gd").install(self)
 	_setup_server()
 	await _check_timeout_releases_client()
 	await _check_kicked_ends_immediately()

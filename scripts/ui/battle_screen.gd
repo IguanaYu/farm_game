@@ -18,6 +18,14 @@ const CREAM := ExpeditionUI.TEXT
 const BAD_RED := Color("#a4543f")
 const GOOD_GREEN := Color("#3f7048")
 const WARN_GOLD := Color("#9b713a")
+const STATUS_ORDER := ["vulnerable", "weak", "poison", "strength", "dexterity"]
+const STATUS_RULES := {
+	"vulnerable": "受到的攻击伤害 ×1.5。层数表示持续时间，重复施加只延长时间。持有者行动阶段结束时减 1 层。",
+	"weak": "造成的攻击伤害 ×0.75。层数表示持续时间，重复施加只延长时间。持有者行动阶段结束时减 1 层。",
+	"poison": "持有者行动开始时受到当前层数点伤害，然后减 1 层。绕过格挡，不受力量、虚弱或易伤影响。3 层依次造成 3、2、1 点。",
+	"strength": "每次攻击增加当前层数点基础伤害，多段攻击逐段增加。本场战斗持续，不自动衰减。",
+	"dexterity": "每次普通格挡增加当前层数点。给队友格挡使用施放者的敏捷。本场战斗持续，不自动衰减。",
+}
 
 var combat: CombatGame
 var last_combat: CombatGame
@@ -94,6 +102,38 @@ class TargetButton extends Button:
 	func _drop_data(_position: Vector2, data: Variant) -> void:
 		screen.selected_uid = int(data["battle_card_uid"])
 		screen._on_target_clicked(unit_key)
+
+class StatusGlyph extends Control:
+	var kind := "vulnerable"
+	var tint := Color.WHITE
+	func _ready() -> void:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+	func _draw() -> void:
+		var scale_factor := minf(size.x, size.y) / 20.0
+		draw_set_transform(Vector2.ZERO, 0, Vector2.ONE * scale_factor)
+		match kind:
+			"vulnerable":
+				draw_polyline(PackedVector2Array([Vector2(9, 2), Vector2(2, 9), Vector2(7, 14)]), tint, 2, true)
+				draw_polyline(PackedVector2Array([Vector2(12, 3), Vector2(18, 10), Vector2(10, 18)]), tint, 2, true)
+				draw_line(Vector2(12, 5), Vector2(7, 11), tint, 2, true)
+				draw_line(Vector2(7, 11), Vector2(12, 13), tint, 2, true)
+			"weak":
+				draw_line(Vector2(5, 3), Vector2(5, 10), tint, 2, true)
+				draw_line(Vector2(5, 10), Vector2(14, 10), tint, 2, true)
+				draw_line(Vector2(14, 10), Vector2(14, 17), tint, 2, true)
+				draw_polyline(PackedVector2Array([Vector2(10, 13), Vector2(14, 17), Vector2(18, 13)]), tint, 2, true)
+			"poison":
+				draw_colored_polygon(PackedVector2Array([Vector2(10, 1), Vector2(4, 10), Vector2(16, 10)]), tint)
+				draw_circle(Vector2(10, 11), 6, tint)
+				draw_circle(Vector2(8, 11), 1.4, tint.darkened(0.65))
+				draw_circle(Vector2(12, 11), 1.4, tint.darkened(0.65))
+			"strength":
+				draw_colored_polygon(PackedVector2Array([Vector2(10, 1), Vector2(4, 8), Vector2(8, 8), Vector2(8, 15), Vector2(12, 15), Vector2(12, 8), Vector2(16, 8)]), tint)
+				draw_line(Vector2(4, 18), Vector2(16, 18), tint, 2, true)
+			"dexterity":
+				draw_colored_polygon(PackedVector2Array([Vector2(10, 2), Vector2(18, 5), Vector2(16, 13), Vector2(10, 19), Vector2(4, 13), Vector2(2, 5)]), tint)
+				draw_line(Vector2(10, 6), Vector2(10, 14), tint.darkened(0.65), 2, true)
+				draw_line(Vector2(6, 10), Vector2(14, 10), tint.darkened(0.65), 2, true)
 
 class BattlefieldGround extends Control:
 	var screen: BattleScreen
@@ -587,25 +627,41 @@ func _refresh_enemies() -> void:
 		intent_row.custom_minimum_size.y = 28
 		intent_row.alignment = BoxContainer.ALIGNMENT_CENTER
 		intent_row.add_theme_constant_override("separation", 6)
-		var intent: Dictionary = enemy.get("intent", {})
+		var intent: Dictionary = combat.intent_preview(enemy)
 		var intent_kind := str(intent.get("kind", ""))
 		var intent_color := ExpeditionUI.RED if intent_kind == "attack" else ExpeditionUI.TEAL
-		if alive and not intent.is_empty():
+		if alive and not intent.is_empty() and intent_kind != "none":
 			intent_row.add_child(BattleGlyph.make(intent_kind, intent_color, 20))
+			var variable_strikes := _intent_varies(intent)
 			var intent_value := str(int(intent.get("value", 0)))
-			if int(intent.get("times", 1)) > 1:
+			if variable_strikes:
+				intent_value = str(intent.get("text", "")).trim_prefix("攻击 ").replace(" + ", "\n")
+			elif int(intent.get("times", 1)) > 1:
 				intent_value += "×%d" % int(intent["times"])
-			intent_row.add_child(_label(intent_value, 21, intent_color))
-			if str(intent.get("status", "")) != "":
+			var value_label := _label(intent_value, 12 if variable_strikes else 21, intent_color)
+			value_label.name = "IntentValue_" + key
+			if variable_strikes:
+				value_label.custom_minimum_size.x = _actor_width() - 28
+				value_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				value_label.max_lines_visible = 2
+				value_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+			intent_row.add_child(value_label)
+			if str(intent.get("status", "")) != "" and not variable_strikes:
 				intent_row.add_child(_label(str(CardDefs.STATUS_DISPLAY.get(str(intent["status"]), "")), 13, Color("#c5b5e4")))
-			if combat.state["players"].size() > 1:
-				intent_row.add_child(_label("→ 你" if combat.intent_target(enemy) == player_key else "→ 队友", 13, ExpeditionUI.MUTED))
-			intent_row.tooltip_text = combat._intent_text(intent) + "\n结束回合后执行。"
+			if combat.state["players"].size() > 1 and intent_kind == "attack" and not variable_strikes:
+				intent_row.add_child(_label("→ 你" if str(intent.get("target", "")) == player_key else "→ 队友", 13, ExpeditionUI.MUTED))
+			intent_row.tooltip_text = combat.intent_text(enemy) + "\n按当前状态预览；× 表示每段伤害与攻击段数。\n结束玩家共同行动阶段后执行；已计入届时的易伤衰减。"
+			if variable_strikes and str(intent.get("status", "")) != "":
+				intent_row.tooltip_text += "\n每段攻击后附带%s %d 层。" % [CardDefs.STATUS_DISPLAY.get(str(intent["status"]), "状态"), int(intent.get("status_stacks", 1))]
 		else:
-			intent_row.add_child(_label("已击败" if not alive else "—", 16, ExpeditionUI.MUTED))
+			var reason := str(intent.get("text", "—"))
+			if reason.contains("中毒"):
+				reason = "中毒倒下"
+			intent_row.add_child(_label("已击败" if not alive else reason, 16, ExpeditionUI.MUTED))
+			intent_row.tooltip_text = str(intent.get("text", ""))
 		card.add_child(intent_row)
 		var target := _target_button(key)
-		target.custom_minimum_size = Vector2(_actor_width(), 86 if size.y < 680 else 185)
+		target.custom_minimum_size = Vector2(_actor_width(), 80 if size.y < 680 else 185)
 		target.disabled = not alive
 		card.add_child(target)
 		var art := ExpeditionArt.new()
@@ -624,16 +680,27 @@ func _refresh_enemies() -> void:
 		card.add_child(name_label)
 		card.add_child(ExpeditionUI.bar(int(enemy["hp"]), int(enemy["max_hp"]), ExpeditionUI.RED))
 		card.add_child(_unit_stats(enemy, true))
-		var statuses := _label(_status_text(enemy["statuses"]), 12, Color("#c5b5e4"))
-		statuses.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		statuses.custom_minimum_size.y = 18
-		card.add_child(statuses)
+		card.add_child(_status_chips(enemy["statuses"], key))
 		var preview := _label("", 12, ExpeditionUI.GOLD)
 		preview.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		preview.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		preview.custom_minimum_size.y = 20
+		preview.max_lines_visible = 2
+		preview.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		card.add_child(preview)
 		target_previews[key] = preview
+
+
+func _intent_varies(intent: Dictionary) -> bool:
+	var strikes: Array = intent.get("strikes", [])
+	if strikes.size() < 2:
+		return false
+	var first: Dictionary = strikes[0]
+	for strike in strikes:
+		if int(strike.get("amount", 0)) != int(first.get("amount", 0)) or str(strike.get("target", "")) != str(first.get("target", "")):
+			return true
+	return false
+
 
 func _actor_width() -> float:
 	var count: int = combat.state["players"].size() + combat.state["enemies"].size()
@@ -699,9 +766,10 @@ func _refresh_hand() -> void:
 		art.custom_minimum_size.y = 42 if size.y < 680 else 78
 		art.size_flags_vertical = Control.SIZE_EXPAND_FILL
 		content.add_child(art)
-		var desc := _label(_short_effect(def).replace(" · ", "\n"), 17, ExpeditionUI.INK)
+		var desc := _label(_short_effect(def).replace(" · ", "\n"), 15 if size.y < 680 else 17, ExpeditionUI.INK)
 		desc.name = "CardEffect"
 		desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		content.add_child(desc)
 		var footer := HBoxContainer.new()
 		content.add_child(footer)
@@ -718,6 +786,7 @@ func _refresh_hand() -> void:
 		var source_inventory := _inventory()
 		if source_inventory != null and int(card.get("source_instance_id", 0)) > 0:
 			button.tooltip_text += "\n" + DeckBuilder.source_summary(source_inventory, int(card["source_instance_id"]))
+		button.set_meta("base_tooltip", button.tooltip_text)
 		button.pressed.connect(_on_card_clicked.bind(uid))
 		button.mouse_entered.connect(func() -> void:
 			hovered_uid = uid
@@ -732,6 +801,7 @@ func _refresh_hand() -> void:
 		hand_row.add_child(button)
 	if player["hand"].is_empty():
 		hand_row.add_child(_label("手牌用尽", 16, ExpeditionUI.MUTED))
+	_refresh_card_values()
 
 
 func _refresh_piles() -> void:
@@ -794,13 +864,14 @@ func _open_help() -> void:
 	inspector_panel.custom_minimum_size.x = 520
 	ExpeditionUI.clear(inspector_column)
 	inspector_column.add_child(_label("战斗指南", 25, CREAM))
-	for entry in [["attack", "攻击 · 拖向敌人，或点牌后选择目标。"], ["shield", "格挡 · 抵消伤害，下回合开始清空。"], ["heart", "恢复 · 自身牌点击即用，友方牌可选队友。"], ["energy", "能量 · 左上角是费用，每回合恢复。"]]:
+	for entry in [["attack", "攻击 · 拖向敌人，或点牌后选择目标。"], ["shield", "格挡 · 抵消攻击伤害，持有者下次行动开始清空。"], ["heart", "恢复 · 自身牌点击即用，友方牌可选队友。"], ["energy", "能量 · 左上角是费用，每回合恢复。"]]:
 		var row := HBoxContainer.new()
 		row.add_theme_constant_override("separation", 12)
 		row.add_child(BattleGlyph.make(str(entry[0]), ExpeditionUI.GOLD, 22))
 		row.add_child(_label(str(entry[1]), 16, ExpeditionUI.TEXT))
 		inspector_column.add_child(row)
 	inspector_column.add_child(_label("敌人头顶：下一次行动。悬停卡牌：来源与完整规则。", 14, ExpeditionUI.MUTED))
+	inspector_column.add_child(_label("状态图标悬停可查看层数、效果和衰减时机。\n易伤 / 虚弱在持有者行动结束减层；中毒在行动开始先伤害再减层。\n力量 / 敏捷持续本场战斗；所有状态在战斗结束清除。", 13, ExpeditionUI.MUTED))
 	inspector_column.add_child(_label("1–0 选牌 · E 结束回合 · 右键取消 · Esc 取消 / 设置", 14, ExpeditionUI.MUTED))
 	var close_button := ExpeditionUI.button("返回战斗")
 	close_button.pressed.connect(_close_inspector)
@@ -812,6 +883,8 @@ func _open_help() -> void:
 
 
 func _refresh_detail() -> void:
+	_refresh_card_values()
+	_update_targets()
 	var uid := selected_uid if selected_uid >= 0 else hovered_uid
 	var card := _hand_card(uid)
 	if card.is_empty():
@@ -890,7 +963,7 @@ func _present_events(events: Array, generation: int) -> void:
 			"damage":
 				_popup_on_unit(unit, "-%d 生命" % int(event.get("to_hp", 0)) if int(event.get("to_hp", 0)) > 0 else "格挡 %d" % int(event["amount"]), Color("#ff9d85") if int(event.get("to_hp", 0)) > 0 else Color("#b3daff"))
 			"block":
-				_popup_on_unit(unit, "+%d 护甲" % int(event["amount"]), Color("#a4dbff"))
+				_popup_on_unit(unit, "+%d 格挡" % int(event["amount"]), Color("#a4dbff"))
 			"heal":
 				_popup_on_unit(unit, "+%d 生命" % int(event["amount"]), Color("#a7f0ae"))
 			"draw":
@@ -1042,9 +1115,45 @@ func _status_text(statuses: Dictionary) -> String:
 	if statuses.is_empty():
 		return ""
 	var parts: Array = []
-	for status in statuses:
-		parts.append("%s×%d" % [CardDefs.STATUS_DISPLAY.get(status, status), int(statuses[status]["stacks"])])
+	for status in STATUS_ORDER:
+		var stacks := int(statuses.get(status, {}).get("stacks", 0))
+		if stacks > 0:
+			parts.append("%s×%d" % [CardDefs.STATUS_DISPLAY.get(status, status), stacks])
 	return " · ".join(parts)
+
+
+func _status_chips(statuses: Dictionary, unit_key: String) -> CenterContainer:
+	var center := CenterContainer.new()
+	center.name = "UnitStatuses_" + unit_key
+	center.custom_minimum_size.y = 20
+	var grid := GridContainer.new()
+	grid.columns = clampi(int(_actor_width() / 38.0), 1, 5)
+	grid.add_theme_constant_override("h_separation", 4)
+	grid.add_theme_constant_override("v_separation", 2)
+	center.add_child(grid)
+	for status in STATUS_ORDER:
+		var stacks := int(statuses.get(status, {}).get("stacks", 0))
+		if stacks <= 0:
+			continue
+		var tint: Color = {"vulnerable": Color("#edaa90"), "weak": Color("#d4c18c"), "poison": Color("#b4cb84"), "strength": Color("#e8b270"), "dexterity": Color("#99c8d9")}.get(status, Color("#c5b5e4"))
+		var chip := PanelContainer.new()
+		chip.name = "Status_" + unit_key + "_" + str(status)
+		chip.add_theme_stylebox_override("panel", ExpeditionUI.style(Color(tint, 0.10), Color(tint, 0.35), 3, 2))
+		chip.tooltip_text = "%s · %d 层\n%s\n战斗结束时清除。" % [CardDefs.STATUS_DISPLAY.get(status, status), stacks, STATUS_RULES.get(status, "")]
+		chip.mouse_filter = Control.MOUSE_FILTER_STOP
+		grid.add_child(chip)
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 2)
+		chip.add_child(row)
+		var glyph := StatusGlyph.new()
+		glyph.kind = str(status)
+		glyph.tint = tint
+		glyph.custom_minimum_size = Vector2(16, 16)
+		glyph.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		row.add_child(glyph)
+		row.add_child(_label(str(stacks), 12, tint))
+		ExpeditionUI.ignore_tree(row)
+	return center
 
 
 func _target_display(rule: String) -> String:
@@ -1109,6 +1218,7 @@ func _target_button(key: String) -> TargetButton:
 	return button
 
 func _update_targets() -> void:
+	var context := _card_preview(selected_uid) if selected_uid >= 0 else {}
 	for key in target_controls:
 		var button: Button = target_controls[key]
 		var legal := selected_uid >= 0 and _legal_target(selected_uid, str(key))
@@ -1118,7 +1228,15 @@ func _update_targets() -> void:
 		button.add_theme_stylebox_override("disabled", ExpeditionUI.style(Color.TRANSPARENT, Color.TRANSPARENT, 14, 0))
 		button.tooltip_text = _target_preview(selected_uid, str(key)) if legal else "选择一张适用于这个目标的牌"
 		if target_previews.has(key):
-			target_previews[key].text = _target_preview(selected_uid, str(key)) if legal else ""
+			var preview: Dictionary = combat.preview_play(player_key, selected_uid, str(key)) if legal else context
+			var own_effects: Array = []
+			for effect in preview.get("effects", []):
+				if str(effect.get("target", effect.get("who", player_key))) == str(key):
+					own_effects.append(effect)
+			var own_lines := _preview_effect_lines({"effects": own_effects}, str(key), true, true)
+			target_previews[key].text = " / ".join(own_lines)
+			if not legal and not own_lines.is_empty():
+				button.tooltip_text = "本牌对%s的效果：%s" % [_preview_target_name(str(key)), " / ".join(own_lines)]
 
 func _refresh_player() -> void:
 	ExpeditionUI.clear(player_panel)
@@ -1139,7 +1257,7 @@ func _add_player_actor(key: String) -> void:
 	activity.custom_minimum_size.y = 28
 	card.add_child(activity)
 	var target := _target_button(key)
-	target.custom_minimum_size = Vector2(_actor_width(), 86 if size.y < 680 else 185)
+	target.custom_minimum_size = Vector2(_actor_width(), 80 if size.y < 680 else 185)
 	card.add_child(target)
 	var portrait := ExpeditionArt.new()
 	portrait.subject = "farmer"
@@ -1153,14 +1271,13 @@ func _add_player_actor(key: String) -> void:
 	card.add_child(caption)
 	card.add_child(ExpeditionUI.bar(int(player["hp"]), int(player["max_hp"])))
 	card.add_child(_unit_stats(player, true))
-	var statuses := _label(_status_text(player["statuses"]), 12, Color("#c5b5e4"))
-	statuses.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	statuses.custom_minimum_size.y = 18
-	card.add_child(statuses)
+	card.add_child(_status_chips(player["statuses"], key))
 	var preview := _label("", 12, ExpeditionUI.GOLD)
 	preview.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	preview.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	preview.custom_minimum_size.y = 20
+	preview.max_lines_visible = 2
+	preview.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 	card.add_child(preview)
 	target_previews[key] = preview
 
@@ -1174,7 +1291,7 @@ func _unit_stats(unit: Dictionary, centered := false) -> HBoxContainer:
 	if int(unit["block"]) > 0:
 		row.add_child(BattleGlyph.make("shield", Color("#99bdd5"), 16))
 		row.add_child(_label(str(int(unit["block"])), 16, Color("#99bdd5")))
-	row.tooltip_text = "生命 %d/%d · 格挡 %d" % [int(unit["hp"]), int(unit["max_hp"]), int(unit["block"])]
+	row.tooltip_text = "生命 %d/%d · 格挡 %d\n格挡在持有者下次行动开始时清除；中毒绕过格挡。" % [int(unit["hp"]), int(unit["max_hp"]), int(unit["block"])]
 	return row
 
 func _target_preview(uid: int, key: String) -> String:
@@ -1183,26 +1300,71 @@ func _target_preview(uid: int, key: String) -> String:
 	var preview := combat.preview_play(player_key, uid, key)
 	if not bool(preview.get("ok", false)):
 		return "目标不适用"
-	var parts: Array[String] = []
-	if preview.has("damage"):
-		var unit: Dictionary = combat._find_unit(key)
-		var damage := int(preview["damage"])
-		var blocked := mini(int(unit.get("block", 0)), damage)
-		var hp_loss := maxi(0, damage - blocked)
-		parts.append("生命 −%d%s%s" % [hp_loss, " · 格挡 %d" % blocked if blocked > 0 else "", " · 击败" if hp_loss >= int(unit.get("hp", 999)) else ""])
-	if preview.has("block"):
-		parts.append("格挡 +%d" % int(preview["block"]))
-	if preview.has("heal"):
-		parts.append("生命 +%d" % int(preview["heal"]))
-	if preview.has("draw"):
-		parts.append("抽牌 %d" % int(preview["draw"]))
-	if preview.has("status"):
-		for effect in _card_definition(str(_hand_card(uid).get("card_id", ""))).get("effects", []):
-			if str(effect.get("kind", "")) == "status":
-				parts.append("%s %d" % [CardDefs.STATUS_DISPLAY.get(str(effect["status"]), ""), int(effect.get("stacks", 1))])
-	if str(_card_definition(str(_hand_card(uid).get("card_id", ""))).get("target", "")) == "rescue":
-		parts.append("救起队友")
+	var parts := _preview_effect_lines(preview, key, true)
 	return " / ".join(parts) if not parts.is_empty() else "整理货物，本场移除"
+
+
+## 每个效果直接使用引擎模拟事件，避免混合牌把自身格挡算在敌人身上，
+## 也避免多段攻击在格挡抵扣、先加状态再攻击时出现第二套 UI 算法。
+func _preview_effect_lines(preview: Dictionary, selected_target: String, show_result: bool, compact := false) -> Array[String]:
+	var parts: Array[String] = []
+	var effects: Array = preview.get("effects", [])
+	var hp_losses := {}
+	var index := 0
+	while index < effects.size():
+		var effect: Dictionary = effects[index]
+		var kind := str(effect.get("kind", effect.get("type", "")))
+		var recipient := str(effect.get("target", effect.get("who", player_key)))
+		var amount := int(effect.get("amount", effect.get("count", 0)))
+		var line := ""
+		if kind == "damage":
+			var hits := 1
+			var hp_loss := int(effect.get("to_hp", 0))
+			var blocked := int(effect.get("blocked", 0))
+			# 相邻且同值的攻击展示每段 × 段数；不同值保留效果先后顺序。
+			while index + hits < effects.size():
+				var next: Dictionary = effects[index + hits]
+				if str(next.get("type", "")) != "damage" or str(next.get("target", "")) != recipient or int(next.get("amount", 0)) != amount:
+					break
+				hp_loss += int(next.get("to_hp", 0))
+				blocked += int(next.get("blocked", 0))
+				hits += 1
+			line = "%d%s 伤害" % [amount, "×%d" % hits if hits > 1 else ""]
+			if show_result:
+				if compact:
+					line = ("" if hits == 1 else "%d×%d · " % [amount, hits]) + "生命 −%d" % hp_loss
+				else:
+					line += " · 生命 −%d" % hp_loss
+				if blocked > 0 and not compact:
+					line += " · 格挡 %d" % blocked
+				hp_losses[recipient] = int(hp_losses.get(recipient, 0)) + hp_loss
+				if int(hp_losses[recipient]) >= int(combat._find_unit(recipient).get("hp", 999)):
+					line += " · 击败"
+			index += hits - 1
+		elif kind == "block":
+			line = "格挡 +%d" % amount
+		elif kind == "heal":
+			line = "生命 +%d" % amount
+		elif kind == "draw":
+			line = "抽牌 %d" % amount
+		elif kind == "status":
+			line = "%s +%d" % [CardDefs.STATUS_DISPLAY.get(str(effect.get("status", "")), "状态"), int(effect.get("stacks", 0))]
+		elif kind == "rescue":
+			line = "救起 · %d 生命" % int(effect.get("hp", 0))
+		if line != "":
+			if recipient != selected_target:
+				line = _preview_target_name(recipient) + "：" + line
+			parts.append(line)
+		index += 1
+	return parts
+
+
+func _preview_target_name(key: String) -> String:
+	if key == player_key:
+		return "自己"
+	if combat.state["players"].has(key):
+		return "队友"
+	return str(combat._find_unit(key).get("name", "目标"))
 
 func _card_definition(id: String) -> Dictionary:
 	return combat.card_definition(id) if combat != null else CardDefs.get_card(id)
@@ -1227,6 +1389,49 @@ func _card_color(id: String) -> Color:
 
 func _short_effect(def: Dictionary) -> String:
 	return CardPresentation.effect_text(def)
+
+
+func _card_preview(uid: int) -> Dictionary:
+	if combat == null:
+		return {}
+	var candidates: Array[String] = []
+	if hovered_target != "":
+		candidates.append(hovered_target)
+	candidates.append(player_key)
+	for enemy in combat.state["enemies"]:
+		if bool(enemy.get("alive", false)):
+			candidates.append(str(enemy["id"]))
+	for key in combat.state["players"]:
+		if str(key) != player_key:
+			candidates.append(str(key))
+	for key in candidates:
+		var preview := combat.preview_play(player_key, uid, key)
+		if bool(preview.get("ok", false)):
+			preview["selected_target"] = key
+			return preview
+	return {}
+
+
+func _refresh_card_values() -> void:
+	if hand_row == null or combat == null:
+		return
+	for button in hand_row.get_children():
+		if not button is CardButton:
+			continue
+		var card := _hand_card(button.card_uid)
+		if card.is_empty():
+			continue
+		var def := _card_definition(str(card["card_id"]))
+		var preview := _card_preview(button.card_uid)
+		var lines: Array[String] = []
+		if bool(preview.get("ok", false)):
+			lines = _preview_effect_lines(preview, str(preview["selected_target"]), false)
+		var desc := button.find_child("CardEffect", true, false) as Label
+		if desc != null:
+			desc.text = "\n".join(lines) if not lines.is_empty() else CardPresentation.effect_text(def).replace(" · ", "\n")
+		button.tooltip_text = str(button.get_meta("base_tooltip", CardPresentation.full_text(def)))
+		if bool(preview.get("ok", false)):
+			button.tooltip_text += "\n当前目标：%s\n当前效果：%s\n伤害已计入力量、虚弱和目标易伤；格挡已计入施放者敏捷。\n悬停目标可更新卡面数值，伤害在目标格挡抵扣前显示。" % [_preview_target_name(str(preview["selected_target"])), " / ".join(lines)]
 
 func _open_pile(key: String, caption: String) -> void:
 	inspector_panel.custom_minimum_size.x = 520

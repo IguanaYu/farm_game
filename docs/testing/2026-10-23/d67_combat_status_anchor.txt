@@ -1,0 +1,3 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+D67_COMBAT_STATUS_ANCHOR_PASS checks=160

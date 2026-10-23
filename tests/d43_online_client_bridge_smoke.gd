@@ -23,6 +23,7 @@ var _settings_backup: String = ""
 
 
 func _initialize() -> void:
+	preload("res://tests/support/local_tls_fixture.gd").install(self)
 	godot_exe = OS.get_executable_path()
 	project_dir = ProjectSettings.globalize_path("res://")
 	db_path = project_dir.path_join(".zcode/m1/run/d43_farm.db")

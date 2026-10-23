@@ -20,6 +20,7 @@ var server_pid := 0
 
 
 func _initialize() -> void:
+	preload("res://tests/support/local_tls_fixture.gd").install(self)
 	_run.call_deferred()
 
 

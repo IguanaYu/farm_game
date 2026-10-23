@@ -20,7 +20,7 @@ func _initialize() -> void:
 	p1["hp"] = 12
 	var cover := _play(combat, "p2", "cover", "p1")
 	_check(cover["ok"], "支援：p2 可给 p1 掩护")
-	_check(int(p1["block"]) >= 6, "支援：p1 获得 6 格挡")
+	_check(int(p1["block"]) == 5, "支援：p1 获得初始掩护 5 格挡")
 
 	# —— 共同回合：一人结束要等待另一人 ——
 	var waiting := combat.end_turn("p1")

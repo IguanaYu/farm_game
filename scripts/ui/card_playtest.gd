@@ -7,6 +7,9 @@ const ENCOUNTERS := [
 	{"name": "野怪", "row": 1, "col": 1},
 	{"name": "守门战", "row": 8, "col": 0},
 	{"name": "小泥团", "row": 1, "col": 0},
+	{"name": "费用锚点 · 7点轻击", "pressure": 7},
+	{"name": "费用锚点 · 10点轻击", "pressure": 10},
+	{"name": "费用锚点 · 15点重击", "pressure": 15},
 ]
 
 class PlaytestExpedition extends ExpeditionGame:
@@ -24,6 +27,9 @@ var battle: BattleScreen
 var loot: ExpeditionLootPanel
 var encounter_picker: OptionButton
 var quality_picker: OptionButton
+var anchor_tier_picker: OptionButton
+var anchor_tier_row: HBoxContainer
+var anchor_tier := "standard"
 var test_quality := 0
 var session_label: Label
 var pause_view: CenterContainer
@@ -131,6 +137,24 @@ func _build() -> void:
 		encounter_picker.add_item(encounter["name"])
 	encounter_picker.item_selected.connect(_select_encounter)
 	encounter_row.add_child(encounter_picker)
+	anchor_tier_row = HBoxContainer.new()
+	anchor_tier_row.name = "AnchorSampleTierRow"
+	anchor_tier_row.visible = false
+	test_options.add_child(anchor_tier_row)
+	var tier_caption := ExpeditionUI.label("固定牌组", 15, ExpeditionUI.MUTED)
+	tier_caption.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	anchor_tier_row.add_child(tier_caption)
+	anchor_tier_picker = OptionButton.new()
+	anchor_tier_picker.name = "AnchorSampleTierPicker"
+	anchor_tier_picker.custom_minimum_size = Vector2(180, 40)
+	for tier in AnchorSampleCombat.TIERS:
+		anchor_tier_picker.add_item(AnchorSampleCombat.TIER_NAMES[tier])
+	anchor_tier_picker.select(1)
+	anchor_tier_picker.tooltip_text = "只替换纯攻击与防御牌，保留相同的 15 张牌构成与首轮牌序。每场 40 生命、3 能量、抽 5 张。"
+	anchor_tier_picker.item_selected.connect(func(index: int) -> void:
+		anchor_tier = AnchorSampleCombat.TIERS[index]
+		_begin_battle())
+	anchor_tier_row.add_child(anchor_tier_picker)
 	var quality_row := HBoxContainer.new()
 	test_options.add_child(quality_row)
 	var quality_caption := ExpeditionUI.label("品质", 15, ExpeditionUI.MUTED)
@@ -211,12 +235,28 @@ func _reset_equipment() -> void:
 func _select_encounter(index: int) -> void:
 	encounter_index = clampi(index, 0, ENCOUNTERS.size() - 1)
 	encounter_picker.select(encounter_index)
+	anchor_tier_row.visible = _is_anchor_sample()
+	quality_picker.get_parent().visible = not _is_anchor_sample()
+	(find_child("ResetPlaytestButton", true, false) as Control).visible = not _is_anchor_sample()
 	_begin_battle()
+
+func _is_anchor_sample() -> bool:
+	return ENCOUNTERS[encounter_index].has("pressure")
 
 func _begin_battle() -> void:
 	_stop_search()
 	_close_settings()
 	loot.visible = false
+	if _is_anchor_sample():
+		battle_number += 1
+		var pressure := int(ENCOUNTERS[encounter_index]["pressure"])
+		battle.presentation_caption = "费用锚点 · %d 点来袭 · %s" % [pressure, AnchorSampleCombat.TIER_NAMES[anchor_tier]]
+		battle.open_run(AnchorSampleCombat.create_sample(pressure, anchor_tier))
+		session_label.text = "锚点 · %d点" % pressure
+		session_label.tooltip_text = "固定 15 张牌；40 生命／3 能量／每回合抽 5 张。样例结束直接重开，不产生掉落。"
+		battle.status_label.text = "设置 → 试玩选项：切换 7／10／15 点来袭与初始／标准／高质量牌组。"
+		return
+	battle.presentation_caption = ""
 	var carried: Dictionary = expedition.run["inventory"].duplicate(true) if expedition != null else {}
 	var next_id := int(expedition.run["next_instance_id"]) if expedition != null else 0
 	battle_number += 1
@@ -244,6 +284,9 @@ func _begin_battle() -> void:
 
 func _battle_closed() -> void:
 	if battle.last_combat == null:
+		return
+	if _is_anchor_sample():
+		_begin_battle()
 		return
 	var result := expedition.finish_battle(battle.last_combat)
 	if bool(result.get("ok", false)) and str(result.get("outcome", "")) == "won":

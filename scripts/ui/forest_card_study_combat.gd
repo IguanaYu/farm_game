@@ -1,14 +1,14 @@
 class_name ForestCardStudyCombat
 extends CombatGame
-## 独立样稿牌组，数值来自森林内容设计 §10.2；不写入正式牌表、物品或存档。
+## 独立样稿牌组，定位与新费用锚点对照；不写入正式物品或存档。
 
 const CARDS := {
-	"forest_shoot": {"name": "射击", "cost": 1, "target": "enemy", "after": "discard", "motion": "projectile", "effects": [{"kind": "damage", "value": 6}], "desc": "对一名敌人造成 6 点伤害。"},
-	"forest_thrust": {"name": "突刺", "cost": 1, "target": "enemy", "after": "discard", "effects": [{"kind": "damage", "value": 6}], "desc": "对一名敌人造成 6 点伤害。"},
-	"forest_power_shot": {"name": "强射", "cost": 2, "target": "enemy", "after": "discard", "motion": "projectile", "effects": [{"kind": "damage", "value": 13}], "desc": "对一名敌人造成 13 点伤害。"},
-	"forest_bell_strike": {"name": "敲击", "cost": 1, "target": "enemy", "after": "discard", "effects": [{"kind": "damage", "value": 4}], "desc": "对一名敌人造成 4 点伤害。"},
-	"forest_guard_bell": {"name": "守护铃", "cost": 1, "target": "ally", "after": "discard", "effects": [{"kind": "block", "value": 5}], "desc": "自己或一名队友获得 5 点格挡。"},
-	"forest_smoke_screen": {"name": "烟幕", "cost": 1, "target": "ally", "after": "discard", "effects": [{"kind": "block", "value": 4}], "desc": "自己或一名队友获得 4 点格挡。"},
+	"forest_shoot": {"name": "谁扎我啦！", "cost": 1, "target": "enemy", "after": "discard", "motion": "projectile", "effects": [{"kind": "damage", "value": 8}], "desc": "对一名敌人造成 8 点攻击伤害（标准档）。"},
+	"forest_thrust": {"name": "不许过来！", "cost": 1, "target": "enemy", "after": "discard", "effects": [{"kind": "damage", "value": 5}], "desc": "对一名敌人造成 5 点攻击伤害（拼装武器初始档）。"},
+	"forest_power_shot": {"name": "哎呀，太用力！", "cost": 2, "target": "enemy", "after": "discard", "motion": "projectile", "effects": [{"kind": "damage", "value": 16}], "desc": "对一名敌人造成 16 点攻击伤害（2 费标准档）。"},
+	"forest_bell_strike": {"name": "借你的壳敲一下", "cost": 1, "target": "enemy", "after": "discard", "effects": [{"kind": "damage", "value": 3, "target": "selected"}, {"kind": "block", "value": 3, "target": "self"}], "desc": "对选定敌人造成 3 点攻击伤害，自己获得 3 点格挡（初始混合档）。"},
+	"forest_guard_bell": {"name": "躲我后面", "cost": 1, "target": "ally", "after": "discard", "effects": [{"kind": "block", "value": 8}], "desc": "自己或一名队友获得 8 点格挡（标准档），使用出牌者敏捷。"},
+	"forest_smoke_screen": {"name": "藏好了吗？", "cost": 1, "target": "ally", "after": "discard", "effects": [{"kind": "block", "value": 5}], "desc": "自己或一名队友获得 5 点格挡（简易工具初始档），使用出牌者敏捷。"},
 }
 const SOURCES := {
 	"forest_shoot": "短弓", "forest_thrust": "长矛", "forest_power_shot": "旧猎弩",

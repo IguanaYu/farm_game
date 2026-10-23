@@ -101,7 +101,8 @@ func _run() -> void:
 	for button in screen.hand_row.get_children():
 		_check(button.get_global_rect().end.x <= root.size.x, "小窗口卡牌可见")
 	await _shot("04_small_window")
-	_check(CardDefs.CARDS.size() == 19, "正式旧牌表保持19张")
+	var legacy_cards := ["slash", "heavy_strike", "shield_up", "cover", "brace", "deep_breath", "observe", "expose", "venom_stab", "drink_potion", "heavy_cargo", "first_aid", "drink_soup", "drink_elixir", "slash7", "heavy_strike15", "slash8", "heavy_strike17", "rescue_signal"]
+	_check(legacy_cards.all(func(id): return CardDefs.CARDS.has(id)), "森林样稿仍保留全部 19 张旧正式牌的兼容 ID")
 	_check(not ChapterOneDefs.DEPARTURE_ENABLED, "森林正式出发开关维持原状态")
 	_check(_fingerprints() == before, "样稿没有写入农场存档")
 	game.queue_free()

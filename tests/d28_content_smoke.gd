@@ -9,10 +9,10 @@ var failed := false
 func _initialize() -> void:
 	# —— 内容预算核对（总计划 §10-2.8 ＋ 内容扩展轮）——
 	_check(ItemDefs.ITEMS.size() - 3 == 26, "预算：正式物品 26 种（20＋扩展轮 4＋三栏改版 2）")
-	_check(CardDefs.CARDS.size() == 19, "预算：牌效果模板 %d 个（17＋扩展轮 2）" % CardDefs.CARDS.size())
+	_check(CardDefs.CARDS.size() == 27, "预算：牌效果模板 %d 个（原 19＋费用锚点与状态来源 8）" % CardDefs.CARDS.size())
 	var enemy_count := 0
 	for def_id in CombatGame.ENEMIES:
-		if str(CombatGame.ENEMIES[def_id]["name"]).find("首领") < 0:
+		if not str(def_id).begins_with("anchor_dummy_") and str(CombatGame.ENEMIES[def_id]["name"]).find("首领") < 0:
 			enemy_count += 1
 	_check(enemy_count == 10, "预算：普通敌人 10 种（原 9 种＋装备骷髅）")
 	_check(ExpeditionDefs.DEEP_EVENTS.size() == 6 and ExpeditionDefs.EVENTS.size() == 3, "预算：事件 9 个（浅 3＋深 6）")

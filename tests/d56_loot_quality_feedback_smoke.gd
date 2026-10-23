@@ -162,7 +162,7 @@ func _run() -> void:
 	_check(shield_button != null and shield_button.tooltip_text.contains("木盾") and int(shield_button.get_meta("source_quality", 0)) == 5, "card inspection preserves actual red shield source")
 	_check(shield_button.get_theme_stylebox("normal").border_color.is_equal_approx(ItemDefs.quality_color(5).darkened(0.25)), "card border still communicates source quality")
 	await _click(screen.hand_row.find_child("Card_%d" % uid, true, false) as Control)
-	_check(int(battle.state["players"]["p1"]["block"]) == 6 and screen.selected_uid == -1 and screen._hand_card(uid).is_empty(), "one actual card click immediately stacks armor")
+	_check(int(battle.state["players"]["p1"]["block"]) == 5 and screen.selected_uid == -1 and screen._hand_card(uid).is_empty(), "one actual card click immediately grants initial-tier 5 block")
 	_check(_effect_count(screen, "block") == 1 and _effect_count(screen, "card_played") == 1, "committed self card generates shield and card effects")
 	await create_timer(0.18).timeout
 	await _shot("05_shield_effect")
@@ -175,7 +175,7 @@ func _run() -> void:
 	_check(_effect_count(screen, "damage") == 0, "selecting card has no speculative damage effect")
 	screen._on_target_clicked("e1")
 	await _frames()
-	_check(int(battle.state["enemies"][0]["hp"]) == before - 6 and _effect_count(screen, "damage") == 1, "confirmed attack generates real hit effect")
+	_check(int(battle.state["enemies"][0]["hp"]) == before - 5 and _effect_count(screen, "damage") == 1, "confirmed initial-tier 5 attack generates real hit effect")
 	await create_timer(0.16).timeout
 	await _shot("06_hit_effect")
 	screen._clear_feedback()
@@ -188,7 +188,7 @@ func _run() -> void:
 	_check(_effect_count(screen, "heal") == 0, "effects clean themselves up")
 	var cover := _card(screen, "cover")
 	screen._on_card_clicked(int(cover["uid"]))
-	_check(int(battle.state["players"]["p1"]["block"]) == 12, "single legal ally auto-targets self in solo")
+	_check(int(battle.state["players"]["p1"]["block"]) == 10, "single legal ally auto-targets self in solo; initial shield + cover give 5 + 5 block")
 	var coop := CombatGame.create([{"key": "p1", "name": "你", "deck": deck}, {"key": "p2", "name": "队友", "deck": deck}], "skeleton_patrol", 56, null, order)
 	coop.start()
 	screen.open_run(coop)
@@ -196,7 +196,7 @@ func _run() -> void:
 	screen._on_card_clicked(int(ally_cover["uid"]))
 	_check(screen.selected_uid == int(ally_cover["uid"]) and int(coop.state["players"]["p1"]["block"]) == 0, "coop cover retains explicit self or ally choice")
 	screen._on_target_clicked("p2")
-	_check(int(coop.state["players"]["p2"]["block"]) == 6 and int(coop.state["players"]["p1"]["block"]) == 0, "coop cover honors selected teammate")
+	_check(int(coop.state["players"]["p2"]["block"]) == 5 and int(coop.state["players"]["p1"]["block"]) == 0, "coop initial-tier cover gives 5 block to selected teammate")
 	await _frames()
 	var basic_deck := CombatGame.basic_kit_demo_deck()
 	var draw_order := [{"card_id": "observe"}, {"card_id": "shield_up"}, {"card_id": "slash"}, {"card_id": "brace"}, {"card_id": "deep_breath"}, {"card_id": "shield_up"}, {"card_id": "slash"}, {"card_id": "cover"}]

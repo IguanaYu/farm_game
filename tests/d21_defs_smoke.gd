@@ -50,7 +50,7 @@ func _initialize() -> void:
 	_check(demo_count >= 2, "演示物品：至少 2 件")
 	var big_demo := ItemDefs.get_item("demo_ore")
 	_check(big_demo["size"] == Vector2i(2, 2) and bool(big_demo["sellable"]), "演示货物：大体积且值钱（值钱但拖累战斗）")
-	_check(CardDefs.CARDS.size() == 19, "牌模板：19 个效果模板已注册（2.2 的 12＋2.5 的 5＋扩展轮 2）")
+	_check(CardDefs.CARDS.size() == 27, "牌模板：原 19 个模板＋费用锚点与状态来源 8 个")
 	for card_id in ["slash", "heavy_strike", "shield_up", "cover", "brace", "deep_breath", "observe", "expose", "venom_stab", "drink_potion", "heavy_cargo", "first_aid"]:
 		_check(CardDefs.CARDS.has(card_id), "牌模板：%s 存在" % card_id)
 

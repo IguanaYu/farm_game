@@ -33,7 +33,7 @@ const ITEMS := {
 	"demo_iron_sword": {
 		"name": "铁剑（演示）", "category": "weapon", "size": Vector2i(1, 3), "quality": 2,
 		"base_value": 30, "sellable": true, "basic_kit": false, "demo": true,
-		"safe_allowed": false, "cards": ["slash", "heavy_strike", "slash"],
+		"safe_allowed": false, "cards": ["slash7", "heavy_strike15", "slash7"],
 		"desc": "演示用：看看正式武器会提供什么样的牌。",
 	},
 	"demo_ore": {
@@ -58,8 +58,8 @@ const ITEMS := {
 	"reinforced_shield": {
 		"name": "加固盾", "category": "armor", "size": Vector2i(2, 2), "quality": 2,
 		"base_value": 50, "sellable": true, "basic_kit": false, "demo": false,
-		"safe_allowed": false, "cards": ["shield_up", "shield_up", "cover", "brace"],
-		"desc": "品质版防御：牌构成与木盾相同（后续品质提升改数值，不改占格规则）。",
+		"safe_allowed": false, "cards": ["guard_standard", "guard_standard", "cover_standard", "brace"],
+		"desc": "标准档防御：占 4 格，8 格挡架盾×2／8 格挡掩护／稳住。",
 	},
 	"leather_bracer": {
 		"name": "皮护腕", "category": "armor", "size": Vector2i(1, 2), "quality": 1,
@@ -144,7 +144,7 @@ const ITEMS := {
 		"name": "铁短剑", "category": "weapon", "size": Vector2i(1, 3), "quality": 2,
 		"base_value": 90, "sellable": true, "basic_kit": false, "demo": false,
 		"safe_allowed": false, "cards": ["slash7", "slash7", "heavy_strike15"],
-		"desc": "深层装备：切击(7)×2＋重击(15)。",
+		"desc": "标准档攻击：利刃斩(8)×2＋沉重一击(16)。",
 	},
 	"rescue_kit": {
 		"name": "救援包", "category": "supply", "size": Vector2i(1, 2), "quality": 2,
@@ -163,19 +163,19 @@ const ITEMS := {
 		"name": "辉晶刃", "category": "weapon", "size": Vector2i(1, 3), "quality": 2,
 		"base_value": 170, "sellable": true, "basic_kit": false, "demo": false,
 		"safe_allowed": false, "cards": ["slash8", "slash8", "heavy_strike17"],
-		"desc": "第三层装备：晶刃斩(8)×2＋裂石一击(17)。",
+		"desc": "高质量档攻击：晶刃斩(13)×2＋裂石一击(24)。",
 	},
 	"crystal_aegis": {
 		"name": "辉晶盾", "category": "armor", "size": Vector2i(2, 2), "quality": 2,
 		"base_value": 100, "sellable": true, "basic_kit": false, "demo": false,
-		"safe_allowed": false, "cards": ["shield_up", "shield_up", "cover", "brace"],
-		"desc": "第三层品质防具：牌构成与加固盾相同，价值更高。",
+		"safe_allowed": false, "cards": ["guard_quality", "guard_quality", "cover_quality", "brace"],
+		"desc": "高质量档防御：12 格挡架盾×2／12 格挡掩护／稳住。",
 	},
 	"iron_helm": {
 		"name": "铁盔", "category": "helmet", "size": Vector2i(2, 2), "quality": 2,
 		"base_value": 110, "sellable": true, "basic_kit": false, "demo": false,
-		"safe_allowed": false, "cards": ["shield_up", "shield_up", "cover", "brace"],
-		"desc": "第三层头盔：装备在头盔槽即生效，第 1 回合提供 架盾×2／掩护／稳住。",
+		"safe_allowed": false, "cards": ["guard_standard", "guard_standard", "cover_standard", "brace"],
+		"desc": "标准档头盔：装备在头盔槽即生效，第 1 回合提供 8 格挡架盾×2／8 格挡掩护／稳住。",
 	},
 	"star_bloom_seed": {
 		"name": "星瓣花种子", "category": "rare_seed", "size": Vector2i(1, 1), "quality": 1,

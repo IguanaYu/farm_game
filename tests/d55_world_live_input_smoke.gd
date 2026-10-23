@@ -218,11 +218,12 @@ func _battle_round() -> void:
 		var card: Dictionary = combat.state["players"]["p1"]["hand"][slash_index]
 		await _click_button(screen.hand_row.get_node_or_null("Card_%d" % int(card["uid"])) as Button, "手牌·挥砍卡")
 		_check(screen.selected_uid == int(card["uid"]), "真实点击手牌选中该卡")
-		# 与参考测试同口径：先给敌人 4 点格挡，挥砍 6 伤破挡后实际 -2（同时验证挡格参与结算）。
+		# 初始切击为 5；敌人 4 格挡后损失 1 生命，同时检查 UI 预览与真实点击一致。
 		combat.state["enemies"][0]["block"] = 4
 		var hp_before := int(combat.state["enemies"][0]["hp"])
+		_check(screen._target_preview(int(card["uid"]), "e1").contains("生命 −1"), "目标预览显示初始 5 攻击抵扣 4 格挡后损失 1 生命")
 		await _click_button(screen.target_controls["e1"], "目标·第一个敌人")
-		_check(int(combat.state["enemies"][0]["hp"]) == hp_before - 2, "真实点击目标结算预览伤害（生命 -2）")
+		_check(int(combat.state["enemies"][0]["hp"]) == hp_before - 1, "真实点击目标结算预览伤害（生命 -1）")
 		await _shot("live_13_strike_by_target_click", "出手后（真实点卡+真实点目标）")
 	# 数字键选中：用需指定目标的手牌验证（自指卡会即按即出、选中态复位，不适合此断言）。
 	var key_card := _hand_index(combat, "heavy_strike")
