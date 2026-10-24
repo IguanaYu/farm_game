@@ -152,9 +152,9 @@ func _run() -> void:
 	var item_cards := 0
 	for turn in range(4):
 		for card in game.battle.hand_row.get_children():
-			var art := card.get_child(0).get_child(0).get_child(1) as ExpeditionArt
-			if art != null and art.subject == "item.copper_shortsword":
-				item_cards += 1
+			for art in card.find_children("*", "Control", true, false):
+				if art is ExpeditionArt and art.subject == "item.copper_shortsword":
+					item_cards += 1
 		if item_cards > 0:
 			break
 		game.battle._on_end_turn()

@@ -32,6 +32,8 @@ var last_combat: CombatGame
 var run_mode := false
 var defeat_close_text := "查看结算"
 var compact_layout := false
+## 视觉对照脚本可关闭；正式手牌默认使用衬纸图框。
+var framed_cards := true
 var game: FarmGame
 var carried_hp := -1  # 两场之间生命延续（2.3 设计 §5：各场战斗生命延续，首场按出发状态）
 var selected_uid := -1
@@ -578,7 +580,7 @@ func _refresh() -> void:
 	var small := size.y < 680
 	battlefield.custom_minimum_size.y = 232 if small else 332
 	var hand_scroll := find_child("HandScroll", true, false) as ScrollContainer
-	hand_scroll.custom_minimum_size.y = 178 if small else 218
+	hand_scroll.custom_minimum_size.y = (208 if small else 240) if framed_cards else (178 if small else 218)
 	battle_column.add_theme_constant_override("separation", 8 if small else 12)
 	if selected_uid >= 0 and _hand_card(selected_uid).is_empty():
 		selected_uid = -1
@@ -723,7 +725,8 @@ func _refresh_hand() -> void:
 		button.screen = self
 		button.card_uid = uid
 		button.name = "Card_%d" % uid
-		button.custom_minimum_size = Vector2(132, 174) if size.y < 680 else Vector2(148, 216)
+		var small := size.y < 680
+		button.custom_minimum_size = (Vector2(132, 204) if small else Vector2(148, 236)) if framed_cards else (Vector2(132, 174) if small else Vector2(148, 216))
 		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		button.disabled = not _playable_card(uid)
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -736,29 +739,51 @@ func _refresh_hand() -> void:
 		button.add_theme_stylebox_override("pressed", ExpeditionUI.style(Color("#dfcec9"), ExpeditionUI.GOLD, 10, 0))
 		button.add_theme_stylebox_override("disabled", ExpeditionUI.style(Color("#b4abb5"), Color("#786a7b"), 10, 0))
 		button.add_theme_stylebox_override("focus", ExpeditionUI.style(Color.TRANSPARENT, ExpeditionUI.GOLD, 10, 0))
+		if framed_cards:
+			for state_name in ["normal", "hover", "pressed", "disabled"]:
+				var surface := button.get_theme_stylebox(state_name).duplicate() as StyleBoxFlat
+				surface.set_border_width_all(2)
+				surface.set_corner_radius_all(9)
+				surface.shadow_color = Color("#11101a", 0.30)
+				surface.shadow_size = 3
+				surface.shadow_offset = Vector2(0, 2)
+				if state_name == "normal":
+					surface.bg_color = Color("#f6eddd") if not selected else Color("#f8e6d9")
+					if not selected:
+						surface.border_color = quality_tint.darkened(0.15).lerp(Color("#8e8069"), 0.6)
+				button.add_theme_stylebox_override(state_name, surface)
 		var margin := MarginContainer.new()
 		margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		for side in ["left", "right", "top", "bottom"]:
-			margin.add_theme_constant_override("margin_" + side, 10)
+			margin.add_theme_constant_override("margin_" + side, 8 if framed_cards else 10)
 		button.add_child(margin)
 		var content := VBoxContainer.new()
-		content.add_theme_constant_override("separation", 6)
+		content.add_theme_constant_override("separation", 4 if framed_cards else 6)
 		margin.add_child(content)
 		var title := HBoxContainer.new()
+		if framed_cards:
+			title.custom_minimum_size.y = 36 if small else 40
 		content.add_child(title)
 		var cost_badge := ExpeditionUI.panel(accent.darkened(0.1), Color.TRANSPARENT, 0)
-		cost_badge.custom_minimum_size = Vector2(30, 30)
+		cost_badge.custom_minimum_size = Vector2(28, 28) if framed_cards else Vector2(30, 30)
+		if framed_cards:
+			var seal := ExpeditionUI.style(accent.darkened(0.06), accent.lightened(0.3), 14, 0)
+			seal.set_corner_radius_all(14)
+			cost_badge.add_theme_stylebox_override("panel", seal)
+			cost_badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		title.add_child(cost_badge)
-		var cost := _label(str(def["cost"]), 21, ExpeditionUI.PAPER)
+		var cost := _label(str(def["cost"]), 19 if framed_cards else 21, ExpeditionUI.PAPER)
 		cost.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		cost.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		cost_badge.add_child(cost)
-		var name_label := _label(str(def["name"]), 15, ExpeditionUI.INK)
+		var name_label := _label(str(def["name"]), (13 if small else 14) if framed_cards else 15, ExpeditionUI.INK)
 		name_label.name = "CardTitle"
 		name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		name_label.max_lines_visible = 2
 		name_label.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
 		name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		name_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		title.add_child(name_label)
 		var art := ExpeditionArt.new()
 		art.subject = _card_subject(str(card["card_id"]))
@@ -767,13 +792,27 @@ func _refresh_hand() -> void:
 		elif bool(ChapterArtRegistry.item(str(source.get("def_id", ""))).get("ready", false)):
 			art.subject = "item." + str(source["def_id"])
 		art.tint = accent
-		art.custom_minimum_size.y = 42 if size.y < 680 else 78
+		art.custom_minimum_size.y = 0 if framed_cards else (42 if small else 78)
 		art.size_flags_vertical = Control.SIZE_EXPAND_FILL
-		content.add_child(art)
-		var desc := _label(_short_effect(def).replace(" · ", "\n"), 15 if size.y < 680 else 17, ExpeditionUI.INK)
+		if framed_cards:
+			var illustration_frame := PanelContainer.new()
+			illustration_frame.name = "CardIllustrationFrame"
+			illustration_frame.custom_minimum_size.y = 76 if small else 86
+			var mat := ExpeditionUI.style(Color("#ded6c2"), Color("#a49376"), 4, 3)
+			mat.set_corner_radius_all(4)
+			illustration_frame.add_theme_stylebox_override("panel", mat)
+			content.add_child(illustration_frame)
+			illustration_frame.add_child(art)
+		else:
+			content.add_child(art)
+		var desc := _label(_short_effect(def).replace(" · ", "\n"), (14 if small else 16) if framed_cards else (15 if small else 17), ExpeditionUI.INK)
 		desc.name = "CardEffect"
 		desc.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		if framed_cards:
+			desc.custom_minimum_size.y = 36 if small else 44
+			desc.size_flags_vertical = Control.SIZE_EXPAND_FILL
+			desc.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 		content.add_child(desc)
 		var footer := HBoxContainer.new()
 		content.add_child(footer)
@@ -781,8 +820,12 @@ func _refresh_hand() -> void:
 		var kind := _label(kind_text, 11, accent.darkened(0.2))
 		kind.name = "CardKind"
 		footer.add_child(kind)
-		var rule := _label(CardPresentation.special_rule(def), 11, Color("#655e50"))
+		var rule_text := CardPresentation.special_rule(def)
+		if framed_cards:
+			rule_text = rule_text.replace("自己 / 队友", "友方").replace("本场移除", "移除").replace(" · ", "·")
+		var rule := _label(rule_text, 11, Color("#655e50"))
 		rule.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		rule.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		footer.add_child(rule)
 		var hotkey := _label(str(index % 10), 11, Color("#837a67"))
 		footer.add_child(hotkey)
@@ -978,6 +1021,8 @@ func _present_events(events: Array, generation: int) -> void:
 				_popup_on_unit(unit, "+%d 抽牌" % int(event["count"]), Color("#ffe5a0"))
 			"status":
 				_popup_on_unit(unit, "%s +%d" % [CardDefs.STATUS_DISPLAY.get(str(event["status"]), event["status"]), int(event["stacks"])], Color("#dac1ff"))
+			"cleanse":
+				_popup_on_unit(unit, "净化 %d 种" % int(event["amount"]), Color("#a7f0ae"))
 			"rescue":
 				_popup_on_unit(unit, "救起 · %d 生命" % int(event["hp"]), Color("#a7f0ae"))
 			"poison":
@@ -1338,6 +1383,8 @@ func _preview_effect_lines(preview: Dictionary, selected_target: String, show_re
 				blocked += int(next.get("blocked", 0))
 				hits += 1
 			line = "%d%s 伤害" % [amount, "×%d" % hits if hits > 1 else ""]
+			if int(effect.get("pierce", 0)) > 0 and not compact:
+				line += " · 穿透 %d" % int(effect["pierce"])
 			if show_result:
 				if compact:
 					line = ("" if hits == 1 else "%d×%d · " % [amount, hits]) + "生命 −%d" % hp_loss
@@ -1357,6 +1404,8 @@ func _preview_effect_lines(preview: Dictionary, selected_target: String, show_re
 			line = "抽牌 %d" % amount
 		elif kind == "status":
 			line = "%s +%d" % [CardDefs.STATUS_DISPLAY.get(str(effect.get("status", "")), "状态"), int(effect.get("stacks", 0))]
+		elif kind == "cleanse":
+			line = "净化 %d 种负面" % amount if amount > 0 else "净化负面状态"
 		elif kind == "rescue":
 			line = "救起 · %d 生命" % int(effect.get("hp", 0))
 		if line != "":

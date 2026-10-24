@@ -347,7 +347,7 @@ func preview_play(owner_key: String, uid: int, target_key: String) -> Dictionary
 		simulation._apply_effect(owner_key, simulation._unit_id(effect_target), effect, events)
 		for event in events:
 			var kind := str(event.get("type", ""))
-			if kind in ["damage", "block", "heal", "draw", "status", "rescue"]:
+			if kind in ["damage", "block", "heal", "draw", "status", "rescue", "cleanse"]:
 				var detail: Dictionary = event.duplicate(true)
 				detail["kind"] = kind
 				detail["times"] = 1
@@ -562,7 +562,7 @@ func _apply_effect(owner_key: String, target_key: String, effect: Dictionary, ev
 				if int(target.get("hp", 0)) <= 0 or is_over():
 					break
 				var amount := _outgoing_damage(owner_key, target, int(effect["value"]))
-				_deal_damage(owner_key, target, amount, events)
+				_deal_damage(owner_key, target, amount, events, int(effect.get("pierce", 0)))
 				_events_check_outcome(events)
 		"block":
 			var target := _find_unit(target_key)
@@ -606,6 +606,15 @@ func _apply_effect(owner_key: String, target_key: String, effect: Dictionary, ev
 			_add_status(target, status, stacks)
 			events.append({"type": "status", "target": target_key, "status": status, "stacks": stacks})
 			state["log"].append("%s 获得 %s ×%d" % [_unit_name(target), CardDefs.STATUS_DISPLAY.get(status, status), stacks])
+		"cleanse":
+			var removed: Array[String] = []
+			# 净化只移除三种负面状态；保留力量和敏捷。
+			for status in ["vulnerable", "weak", "poison"]:
+				if recipient["statuses"].has(status):
+					removed.append(status)
+					recipient["statuses"].erase(status)
+			events.append({"type": "cleanse", "target": target_key, "removed": removed, "amount": removed.size()})
+			state["log"].append("%s 净化了 %d 种负面状态" % [_unit_name(recipient), removed.size()])
 
 
 ## 基础值先加力量，再乘虚弱与易伤；中间保留精度，最后统一向下取整。
@@ -631,16 +640,19 @@ func _status_stacks(unit: Dictionary, status: String) -> int:
 	return maxi(0, int(unit.get("statuses", {}).get(status, {}).get("stacks", 0)))
 
 
-func _deal_damage(attacker_key: String, target: Dictionary, amount: int, events: Array) -> void:
+func _deal_damage(attacker_key: String, target: Dictionary, amount: int, events: Array, pierce := 0) -> void:
 	if int(target.get("hp", 0)) <= 0:
 		return
 	amount = maxi(0, amount)
-	var blocked := mini(amount, int(target["block"]))
+	var bypassed := mini(amount, maxi(0, pierce))
+	var blocked := mini(amount - bypassed, int(target["block"]))
 	target["block"] = int(target["block"]) - blocked
 	var to_hp := amount - blocked
 	target["hp"] = int(target["hp"]) - to_hp
-	events.append({"type": "damage", "source": attacker_key, "target": _unit_id(target), "amount": amount, "blocked": blocked, "to_hp": to_hp})
+	events.append({"type": "damage", "source": attacker_key, "target": _unit_id(target), "amount": amount, "blocked": blocked, "to_hp": to_hp, "pierce": bypassed})
 	state["log"].append("%s 受到 %d 伤害（格挡抵消 %d，生命 -%d）" % [_unit_name(target), amount, blocked, to_hp])
+	if bypassed > 0:
+		state["log"].append("其中 %d 点穿透格挡；穿透部分不消耗格挡" % bypassed)
 	if int(target["hp"]) <= 0:
 		if state["players"].has(_unit_id(target)):
 			target["hp"] = 0

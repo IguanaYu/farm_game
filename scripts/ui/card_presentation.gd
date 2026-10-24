@@ -6,10 +6,14 @@ static func effect_text(def: Dictionary) -> String:
 	var parts: Array[String] = []
 	for effect in def.get("effects", []):
 		match str(effect["kind"]):
-			"damage": parts.append("%d 伤害" % int(effect["value"]))
+			"damage":
+				parts.append("%d 伤害" % int(effect["value"]))
+				if int(effect.get("pierce", 0)) > 0:
+					parts.append("穿透 %d" % int(effect["pierce"]))
 			"block": parts.append("%d 格挡" % int(effect["value"]))
 			"heal": parts.append("恢复 %d" % int(effect["value"]))
 			"draw": parts.append("抽牌 %d" % int(effect["value"]))
+			"cleanse": parts.append("净化负面状态")
 			"status": parts.append("%s %d" % [CardDefs.STATUS_DISPLAY.get(str(effect["status"]), ""), int(effect.get("stacks", 1))])
 			"rescue": parts.append("救起 · %d 生命" % int(effect["value"]))
 	return " · ".join(parts) if not parts.is_empty() else "整理货物"

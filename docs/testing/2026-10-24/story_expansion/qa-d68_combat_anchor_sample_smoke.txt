@@ -1,0 +1,12 @@
+Godot Engine v4.6.1.stable.official.14d19694e - https://godotengine.org
+
+D68_ANCHOR_OBSERVATION {"enemy_hp_remaining":0,"energy_attack":11,"energy_spent":20,"hp_lost":4,"outcome":"won","pressure":7,"rounds":8,"tier":"initial"}
+D68_ANCHOR_OBSERVATION {"enemy_hp_remaining":0,"energy_attack":10,"energy_spent":18,"hp_lost":4,"outcome":"won","pressure":7,"rounds":7,"tier":"standard"}
+D68_ANCHOR_OBSERVATION {"enemy_hp_remaining":0,"energy_attack":7,"energy_spent":12,"hp_lost":4,"outcome":"won","pressure":7,"rounds":5,"tier":"quality"}
+D68_ANCHOR_OBSERVATION {"enemy_hp_remaining":0,"energy_attack":11,"energy_spent":25,"hp_lost":10,"outcome":"won","pressure":10,"rounds":9,"tier":"initial"}
+D68_ANCHOR_OBSERVATION {"enemy_hp_remaining":0,"energy_attack":10,"energy_spent":20,"hp_lost":9,"outcome":"won","pressure":10,"rounds":7,"tier":"standard"}
+D68_ANCHOR_OBSERVATION {"enemy_hp_remaining":0,"energy_attack":7,"energy_spent":13,"hp_lost":7,"outcome":"won","pressure":10,"rounds":5,"tier":"quality"}
+D68_ANCHOR_OBSERVATION {"enemy_hp_remaining":0,"energy_attack":13,"energy_spent":37,"hp_lost":24,"outcome":"won","pressure":15,"rounds":13,"tier":"initial"}
+D68_ANCHOR_OBSERVATION {"enemy_hp_remaining":0,"energy_attack":10,"energy_spent":25,"hp_lost":17,"outcome":"won","pressure":15,"rounds":9,"tier":"standard"}
+D68_ANCHOR_OBSERVATION {"enemy_hp_remaining":0,"energy_attack":8,"energy_spent":19,"hp_lost":13,"outcome":"won","pressure":15,"rounds":7,"tier":"quality"}
+D68_ANCHOR_SAMPLE_PASS checks=344

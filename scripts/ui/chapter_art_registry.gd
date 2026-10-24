@@ -12,7 +12,8 @@ const FALLBACK := {
 }
 
 const ART_ROOT := "res://assets/chapter_one/"
-const STORY_CARD_IDS := ["forest_shoot", "forest_thrust", "forest_power_shot", "forest_bell_strike", "forest_guard_bell", "forest_smoke_screen"]
+const STORY_CARD_IDS := ["forest_shoot", "forest_thrust", "forest_power_shot", "forest_bell_strike", "forest_guard_bell", "forest_smoke_screen",
+	"forest_rest_bell", "forest_glow_bolt", "forest_apply_gel", "forest_throw_fire_sac", "forest_throw_frost_sac", "forest_eat_honey", "forest_scatter_stings", "forest_torch_strike", "forest_throw_net", "forest_throw_spores"]
 
 
 ## 区域背景：1280×640 横幅，图片未就绪时仍保留原占位参数。

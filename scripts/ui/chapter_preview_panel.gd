@@ -54,7 +54,15 @@ func _build() -> void:
 	var story_play := ExpeditionUI.button("情境卡牌试玩", true)
 	story_play.name = "ForestStoryPlaytestButton"
 	story_play.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/forest_animation_playtest.tscn"))
-	header.add_child(story_play)
+	var story_row := HBoxContainer.new()
+	story_row.add_theme_constant_override("separation", 12)
+	stack.add_child(story_row)
+	story_row.add_child(story_play)
+	var expansion_play := ExpeditionUI.button("新卡试玩（10 张）", true)
+	expansion_play.name = "ForestExpansionPlaytestButton"
+	expansion_play.pressed.connect(func() -> void: get_tree().change_scene_to_file("res://scenes/forest_story_expansion_playtest.tscn"))
+	story_row.add_child(expansion_play)
+	story_row.add_child(ExpeditionUI.label("16 张情境卡 · 两套新牌组可在设置中切换", 14, ExpeditionUI.MUTED))
 	var back := ExpeditionUI.button("返回主菜单")
 	back.name = "BackButton"
 	back.pressed.connect(func() -> void: get_tree().change_scene_to_file(MENU_SCENE))
