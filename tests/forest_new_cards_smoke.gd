@@ -1,4 +1,5 @@
 extends SceneTree
+const GEO := preload("res://tests/helpers/control_geometry.gd")
 ## 独立样稿的六张新卡：真实点击、数值、纹理、牌堆、动画及小窗口。
 
 const OUT := "res://screenshots/card_story_v05/gameplay"
@@ -28,16 +29,16 @@ func _check_layout(screen: BattleScreen, width: float) -> void:
 	for button in screen.hand_row.get_children():
 		if not button is BattleScreen.CardButton:
 			continue
-		_check(button.get_global_rect().end.x <= width, "卡牌没有越过窗口右侧")
+		_check(GEO.in_rect(Rect2(Vector2.ZERO, Vector2(width, root.size.y)), button), "旋转卡牌没有越过窗口边界")
 		_check(button.size.x <= 149, "长牌名没有撑宽卡牌")
 		var title := button.find_child("CardTitle", true, false) as Label
 		_check(title != null and title.get_line_count() <= 2, "牌名至多两行")
 		if title != null:
-			_check(button.get_global_rect().encloses(title.get_global_rect()), "牌名位于卡内")
+			_check(GEO.contains_control(button, title), "牌名位于卡内")
 		var kind := button.find_child("CardKind", true, false) as Label
 		_check(kind != null and kind.text in ["攻击", "防御"], "攻防文字标签明确")
 		var effect := button.find_child("CardEffect", true, false) as Label
-		_check(effect != null and button.get_global_rect().encloses(effect.get_global_rect()), "全部效果文字位于卡内")
+		_check(effect != null and GEO.contains_control(button, effect), "全部效果文字位于卡内")
 
 func _fingerprints() -> Dictionary:
 	var result := {}
@@ -132,7 +133,7 @@ func _run() -> void:
 	await _frames(8)
 	_check_layout(screen, 1024)
 	for button in screen.hand_row.get_children():
-		_check(button.get_global_rect().end.x <= root.size.x, "小窗口卡牌可见")
+		_check(GEO.in_rect(root.get_visible_rect(), button), "小窗口旋转卡牌可见")
 	await _shot("04_small_window")
 	screen._on_end_turn()
 	await _frames(8)

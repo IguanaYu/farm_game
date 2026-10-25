@@ -21,7 +21,7 @@ func _shot(caption: String) -> void:
 	print("CARD_MINIMAL_SCREEN ", caption)
 
 func _battle_fits() -> void:
-	for control in [playtest.battle.end_button, playtest.battle.find_child("BattleSettingsButton", true, false), playtest.battle.find_child("HandScroll", true, false)]:
+	for control in [playtest.battle.end_button, playtest.battle.find_child("BattleSettingsButton", true, false), playtest.battle.hand_row]:
 		if not root.get_visible_rect().encloses(control.get_global_rect()):
 			failed = true
 			push_error("CARD_MINIMAL_OVERFLOW: " + control.name)

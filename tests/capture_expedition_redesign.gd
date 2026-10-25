@@ -1,4 +1,5 @@
 extends SceneTree
+const GEO := preload("res://tests/helpers/control_geometry.gd")
 ## 独立内存档；真实 GUI 输入、拖放与布局检查。带窗口时同时保存预览。
 
 class MemoryExpedition extends ExpeditionGame:
@@ -28,9 +29,12 @@ func _click(button: Button) -> void:
 	_check(button != null and button.is_visible_in_tree() and not button.disabled, "clickable button")
 	if button == null:
 		return
+	var point := button.get_global_rect().get_center()
+	if button is BattleScreen.CardButton:
+		point = screen.hand_row.slot_point(button.card_uid, Vector2(23, 26))
 	var event := InputEventMouseButton.new()
 	event.button_index = MOUSE_BUTTON_LEFT
-	event.position = button.get_global_rect().get_center()
+	event.position = point
 	event.global_position = event.position
 	event.pressed = true
 	root.push_input(event, true)
@@ -61,7 +65,7 @@ func _shot(caption: String, panel: Control) -> void:
 				clipped = true
 			parent = parent.get_parent()
 		if not clipped:
-			_check(button.get_global_rect().end.x <= viewport_rect.end.x + 1 and button.get_global_rect().end.y <= viewport_rect.end.y + 1, caption + " button fits: " + button.name)
+			_check(GEO.in_rect(viewport_rect, button), caption + " transformed button fits: " + button.name)
 	if DisplayServer.get_name() != "headless":
 		await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png("res://screenshots/expedition_redesign/%s.png" % caption)
@@ -81,7 +85,11 @@ func _run() -> void:
 	await _shot("01_camp_first_visit", hub)
 	inventory.grant_basic_kit()
 	for item in inventory.warehouse_list().duplicate():
-		inventory.move_to_loadout(int(item["instance_id"]), "chest")
+		var slot: String = {"old_shortsword": "main_weapon", "wooden_shield": "armor", "straw_hat": "helmet"}.get(str(item["def_id"]), "")
+		if slot != "":
+			inventory.equip(int(item["instance_id"]), slot)
+		else:
+			inventory.move_to_loadout(int(item["instance_id"]), "chest")
 	hub.open(game)
 	_check(not hub.depart_button.disabled, "equipped deck permits departure")
 	await _shot("02_camp_ready", hub)
@@ -103,23 +111,20 @@ func _run() -> void:
 	_check(screen._legal_target(int(card["uid"]), "e1"), "attack accepts living enemy")
 	_check(not screen._legal_target(int(card["uid"]), "p1"), "attack rejects own player")
 	combat.state["enemies"][0]["block"] = 4
-	_check(screen._target_preview(int(card["uid"]), "e1").contains("生命 −2"), "preview accounts for enemy block")
+	_check(screen._target_preview(int(card["uid"]), "e1").contains("生命 −1"), "initial 5 damage minus 4 block previews 1")
 	screen._refresh()
 	await _shot("04_target_preview", screen)
 	var hp_before := int(combat.state["enemies"][0]["hp"])
 	await _click(screen.target_controls["e1"])
-	_check(int(combat.state["enemies"][0]["hp"]) == hp_before - 2, "real target click applies previewed damage")
-	await _key(KEY_1)
-	_check(screen.selected_uid >= 0, "number shortcut selects current hand")
+	_check(int(combat.state["enemies"][0]["hp"]) == hp_before - 1, "real target click applies previewed damage")
 	var energy := int(combat.state["players"]["p1"]["energy"])
-	await _click(screen.target_controls["p1"])
-	_check(int(combat.state["players"]["p1"]["block"]) == 6, "self-target defense works")
+	await _key(KEY_1)
+	_check(screen.selected_uid == -1, "self-target number shortcut plays immediately")
+	_check(int(combat.state["players"]["p1"]["block"]) == 5, "initial self-target defense gives 5 block")
 	_check(int(combat.state["players"]["p1"]["energy"]) == energy - 1, "defense consumes energy once")
 	_check((screen.hand_row.get_child(0) as Button).disabled, "unaffordable card visibly disabled")
 	await _key(KEY_2)
-	_check(screen.selected_uid >= 0, "zero-cost card selectable")
-	await _key(KEY_ESCAPE)
-	_check(screen.selected_uid < 0, "escape cancels card without leaving battle")
+	_check(screen.selected_uid == -1 and int(combat.state["players"]["p1"]["block"]) == 8, "zero-cost self-target card plays immediately")
 	screen._open_pile("draw_pile", "抽牌堆")
 	await _shot("05_pile_inspector", screen)
 	await _key(KEY_E)
@@ -147,7 +152,7 @@ func _run() -> void:
 	if self_index >= 0:
 		var before := int(player["hand"].size())
 		var source: Button = screen.hand_row.get_child(self_index)
-		var start := source.get_global_rect().get_center()
+		var start := screen.hand_row.slot_point(source.card_uid, Vector2(23, 26))
 		root.warp_mouse(start)
 		var press := InputEventMouseButton.new()
 		press.position = start
@@ -264,8 +269,9 @@ func _run() -> void:
 	screen.open_run(large)
 	root.size = Vector2i(1024, 640)
 	await _shot("15_small_window_ten_cards", screen)
-	var hand_scroll: ScrollContainer = screen.find_child("HandScroll", true, false)
-	_check(screen.hand_row.size.x > hand_scroll.size.x, "ten-card hand can scroll")
+	_check(screen.hand_row.cards.size() == 10 and screen.find_child("HandScroll", true, false) == null, "ten-card hand uses fan without scrolling")
+	for fan_card in screen.hand_row.cards:
+		_check(GEO.in_rect(root.get_visible_rect(), fan_card), "all ten rotated cards stay in the window")
 	screen.queue_free()
 	hub.queue_free()
 	map_panel.queue_free()

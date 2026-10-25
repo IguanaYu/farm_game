@@ -49,7 +49,10 @@ var status_label: Label
 var detail_label: Label
 var log_label: RichTextLabel
 var enemy_row: HBoxContainer
-var hand_row: HBoxContainer
+var hand_row: HandFan
+var hand_space: Control
+var hand_hud: Control
+var energy_header: HBoxContainer
 var player_panel: HBoxContainer
 var battlefield: Control
 var battlefield_ground: BattlefieldGround
@@ -79,21 +82,76 @@ var pending_action_id := ""
 var pending_acknowledged := false
 var modal_shade: ColorRect
 var drag_uid := -1
+var pending_card_uid := -1
 var feedback_generation := 0
 
 class CardButton extends Button:
 	var card_uid := -1
 	var screen: BattleScreen
+	func _make_custom_tooltip(value: String) -> Object:
+		var panel := ExpeditionUI.panel(ExpeditionUI.PAPER, ExpeditionUI.LINE, 10)
+		var text_label := ExpeditionUI.label(value, 14, ExpeditionUI.INK)
+		text_label.custom_minimum_size.x = 340
+		text_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		panel.add_child(text_label)
+		return panel
+	func _has_point(point: Vector2) -> bool:
+		if screen == null:
+			return Rect2(Vector2.ZERO, size).has_point(point)
+		return screen._hand_input_open() and screen.hand_row.card_at(get_global_transform() * point) == self
 	func _get_drag_data(_position: Vector2) -> Variant:
 		if disabled or screen == null or not screen._can_act():
 			return null
 		screen.drag_uid = card_uid
 		screen.selected_uid = card_uid
+		screen.hand_row.set_interaction(card_uid, card_uid, card_uid)
 		screen._update_targets()
 		screen._refresh_detail()
-		var preview := ExpeditionUI.panel(ExpeditionUI.PAPER, ExpeditionUI.GOLD)
-		preview.add_child(ExpeditionUI.label(screen._card_definition(str(screen._hand_card(card_uid).get("card_id", ""))).get("name", "卡牌"), 18, ExpeditionUI.INK))
-		set_drag_preview(preview)
+		var holder := Control.new()
+		holder.name = "CardDragPreview"
+		var preview := duplicate(0) as Control
+		# duplicate(0) deliberately omits scripts and callbacks. Recreate each
+		# drawing surface from its resolved art so the visual copy keeps the illustration.
+		for original in find_children("*", "Control", true, false):
+			if not original is ExpeditionArt:
+				continue
+			var indices: Array[int] = []
+			var source_node: Node = original
+			while source_node != self:
+				indices.push_front(source_node.get_index())
+				source_node = source_node.get_parent()
+			# Duplicated internal nodes receive fresh generated names; their
+			# child order is the stable correspondence to the source surface.
+			var surface: Node = preview
+			for child_index in indices:
+				surface = surface.get_child(child_index)
+			var texture: Texture2D = original._resolve_texture()
+			var illustration: Control
+			if texture != null:
+				var picture := TextureRect.new()
+				picture.name = "CardDragArt"
+				picture.texture = texture
+				picture.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+				picture.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+				illustration = picture
+			else:
+				var fallback := ExpeditionArt.new()
+				fallback.name = "CardDragFallback"
+				fallback.subject = original.subject
+				fallback.tint = original.tint
+				fallback.layer_id = original.layer_id
+				illustration = fallback
+			surface.add_child(illustration)
+			illustration.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		preview.rotation = 0
+		preview.scale = Vector2.ONE
+		preview.pivot_offset = Vector2.ZERO
+		preview.position = -size / 2.0
+		preview.modulate = Color.WHITE
+		preview.tooltip_text = ""
+		holder.add_child(preview)
+		ExpeditionUI.ignore_tree(holder)
+		set_drag_preview(holder)
 		return {"battle_card_uid": card_uid, "screen_id": screen.get_instance_id()}
 
 class TargetButton extends Button:
@@ -197,6 +255,9 @@ func _ready() -> void:
 func open_run(combat: CombatGame, actor := "p1") -> void:
 	_clear_feedback()
 	pending_action = false
+	pending_card_uid = -1
+	hand_row.clear_cards()
+	ExpeditionUI.clear(hand_row)
 	hovered_uid = -1
 	hovered_target = ""
 	_close_inspector()
@@ -229,6 +290,8 @@ func open_demo(target_game: FarmGame = null) -> void:
 	visible = true
 	chooser_column.visible = true
 	battle_column.visible = false
+	hand_row.hide()
+	hand_hud.hide()
 	overlay_panel.visible = false
 	modal_shade.visible = false
 	overlay_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -299,43 +362,46 @@ func _build() -> void:
 	enemy_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	formation.add_child(enemy_row)
 
-	var dock := ExpeditionUI.panel(Color(ExpeditionUI.INK, 0.94), ExpeditionUI.LINE, 12)
-	battle_column.add_child(dock)
-	var dock_column := VBoxContainer.new()
-	dock_column.add_theme_constant_override("separation", 8)
-	dock.add_child(dock_column)
-	var hand_header := HBoxContainer.new()
-	hand_header.add_theme_constant_override("separation", 8)
-	dock_column.add_child(hand_header)
-	hand_header.add_child(BattleGlyph.make("energy", ExpeditionUI.GOLD, 22))
+	hand_space = Control.new()
+	hand_space.name = "HandSpace"
+	hand_space.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	battle_column.add_child(hand_space)
+	hand_row = HandFan.new()
+	hand_row.name = "HandFan"
+	hand_row.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	hand_row.z_index = 10
+	add_child(hand_row)
+	hand_hud = Control.new()
+	hand_hud.name = "HandHUD"
+	hand_hud.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hand_hud.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(hand_hud)
+	energy_header = HBoxContainer.new()
+	energy_header.add_theme_constant_override("separation", 8)
+	energy_header.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hand_hud.add_child(energy_header)
+	energy_header.add_child(BattleGlyph.make("energy", ExpeditionUI.GOLD, 22))
 	energy_label = _label("", 20, ExpeditionUI.GOLD)
-	hand_header.add_child(energy_label)
+	energy_header.add_child(energy_label)
 	energy_pips = HBoxContainer.new()
 	energy_pips.add_theme_constant_override("separation", 5)
-	hand_header.add_child(energy_pips)
+	energy_header.add_child(energy_pips)
 	hand_hint = _label("", 13, ExpeditionUI.MUTED)
 	hand_hint.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	hand_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	hand_header.add_child(hand_hint)
-	var scroll := ScrollContainer.new()
-	scroll.name = "HandScroll"
-	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	scroll.custom_minimum_size.y = 218
-	dock_column.add_child(scroll)
-	hand_row = HBoxContainer.new()
-	hand_row.add_theme_constant_override("separation", 10)
-	hand_row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	hand_row.alignment = BoxContainer.ALIGNMENT_CENTER
-	scroll.add_child(hand_row)
+	hand_hud.add_child(hand_hint)
 
 	var bottom := HBoxContainer.new()
 	bottom.add_theme_constant_override("separation", 12)
 	battle_column.add_child(bottom)
-	detail_label = _label("", 14, ExpeditionUI.TEXT)
-	detail_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail_label = _label("", 13, ExpeditionUI.TEXT)
 	detail_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	detail_label.custom_minimum_size.y = 28
-	bottom.add_child(detail_label)
+	hand_hud.add_child(detail_label)
+	var action_spacer := Control.new()
+	action_spacer.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	action_spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bottom.add_child(action_spacer)
 	end_button = ExpeditionUI.button("结束回合", true)
 	end_button.tooltip_text = "E · 弃掉手牌，敌人行动，然后恢复能量并抽牌。"
 	end_button.pressed.connect(_on_end_turn)
@@ -468,8 +534,11 @@ func _notification(what: int) -> void:
 		if not get_viewport().gui_is_drag_successful():
 			selected_uid = -1
 			_refresh()
+		hand_row.set_interaction(pending_card_uid if pending_action else selected_uid, hovered_uid)
 
 func _cancel_selection() -> void:
+	if get_viewport().gui_is_dragging():
+		get_viewport().gui_cancel_drag()
 	if inspector_panel.visible:
 		_close_inspector()
 	elif selected_uid >= 0:
@@ -503,8 +572,10 @@ func _on_target_clicked(target_key: String) -> void:
 		return
 	if action_sink.is_valid():
 		## 合作局：出牌意图交会话裁定（主机直通／客机发送），本地只消费回执与镜像。
-		var sent: Variant = action_sink.call("play_card", {"uid": selected_uid, "target": target_key})
+		var submitted_uid := selected_uid
+		var sent: Variant = action_sink.call("play_card", {"uid": submitted_uid, "target": target_key})
 		pending_action = not (sent is Dictionary)
+		pending_card_uid = submitted_uid if pending_action else -1
 		pending_action_id = str(sent) if sent is String else ""
 		pending_acknowledged = false
 		selected_uid = -1
@@ -539,6 +610,7 @@ func _on_end_turn() -> void:
 		return
 	selected_uid = -1
 	hovered_uid = -1
+	pending_card_uid = -1
 	if action_sink.is_valid():
 		var sent: Variant = action_sink.call("end_turn", {})
 		pending_action = not (sent is Dictionary)
@@ -577,10 +649,20 @@ func _refresh() -> void:
 	if combat == null or combat.state.is_empty() or not combat.state["players"].has(player_key):
 		return
 	var player: Dictionary = combat.state["players"][player_key]
+	if not pending_action:
+		pending_card_uid = -1
 	var small := size.y < 680
 	battlefield.custom_minimum_size.y = 232 if small else 332
-	var hand_scroll := find_child("HandScroll", true, false) as ScrollContainer
-	hand_scroll.custom_minimum_size.y = (208 if small else 240) if framed_cards else (178 if small else 218)
+	hand_space.custom_minimum_size.y = (248 if small else 300) if framed_cards else (218 if small else 278)
+	hand_row.show()
+	hand_hud.show()
+	hand_row.small = small
+	energy_header.position = Vector2(24, size.y - 125)
+	hand_hint.position = Vector2(size.x - 150, size.y - 115)
+	hand_hint.size = Vector2(126, 24)
+	detail_label.position = Vector2(24, size.y - 230)
+	detail_label.size = Vector2(120 if small else 128, 96)
+	pile_panel.add_theme_constant_override("separation", 6 if small else 10)
 	battle_column.add_theme_constant_override("separation", 8 if small else 12)
 	if selected_uid >= 0 and _hand_card(selected_uid).is_empty():
 		selected_uid = -1
@@ -594,7 +676,7 @@ func _refresh() -> void:
 		pip.custom_minimum_size = Vector2(18, 6)
 		pip.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		energy_pips.add_child(pip)
-	hand_hint.text = "%d 张手牌" % player["hand"].size()
+	hand_hint.text = "%d 张手牌" % player["hand"].size() if not player["hand"].is_empty() else "手牌用尽"
 	end_button.text = "等待队友…" if bool(player.get("ended", false)) else "结束回合"
 	end_button.disabled = not _can_act()
 	_refresh_enemies()
@@ -712,21 +794,44 @@ func _refresh_ground() -> void:
 	await get_tree().process_frame
 	if is_instance_valid(battlefield_ground):
 		battlefield_ground.queue_redraw()
+	if not is_instance_valid(hand_row):
+		return
+	var clearance := 0.0
+	for preview in target_previews.values():
+		if is_instance_valid(preview):
+			clearance = maxf(clearance, preview.get_global_rect().end.y + 8 - hand_row.global_position.y)
+	if absf(hand_row.hover_top_limit - clearance) > 0.5:
+		hand_row.hover_top_limit = clearance
+		hand_row.arrange(false)
 
 func _refresh_hand() -> void:
-	ExpeditionUI.clear(hand_row)
 	var player: Dictionary = combat.state["players"][player_key]
+	var live_uids: Array = player["hand"].map(func(card: Dictionary) -> int: return int(card["uid"]))
+	for old in hand_row.get_children():
+		if not old is CardButton or old.card_uid not in live_uids:
+			hand_row.remove_child(old)
+			old.queue_free()
+	if hovered_uid not in live_uids:
+		hovered_uid = -1
+	var ordered: Array[Control] = []
 	var index := 0
 	for card in player["hand"]:
 		index += 1
 		var def := _card_definition(str(card["card_id"]))
 		var uid := int(card["uid"])
-		var button := CardButton.new()
+		var button := hand_row.get_node_or_null("Card_%d" % uid) as CardButton
+		var is_new := button == null
+		if is_new:
+			button = CardButton.new()
 		button.screen = self
 		button.card_uid = uid
 		button.name = "Card_%d" % uid
+		button.set_meta("hand_uid", uid)
+		button.focus_mode = Control.FOCUS_NONE
+		ordered.append(button)
 		var small := size.y < 680
 		button.custom_minimum_size = (Vector2(132, 204) if small else Vector2(148, 236)) if framed_cards else (Vector2(132, 174) if small else Vector2(148, 216))
+		button.size = button.custom_minimum_size
 		button.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 		button.disabled = not _playable_card(uid)
 		button.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
@@ -752,6 +857,11 @@ func _refresh_hand() -> void:
 					if not selected:
 						surface.border_color = quality_tint.darkened(0.15).lerp(Color("#8e8069"), 0.6)
 				button.add_theme_stylebox_override(state_name, surface)
+		var face_key := str([card, def, source, small, framed_cards, index])
+		if not is_new and str(button.get_meta("face_key", "")) == face_key:
+			continue
+		button.set_meta("face_key", face_key)
+		ExpeditionUI.clear(button)
 		var margin := MarginContainer.new()
 		margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		for side in ["left", "right", "top", "bottom"]:
@@ -832,27 +942,25 @@ func _refresh_hand() -> void:
 		ExpeditionUI.ignore_tree(margin)
 		button.tooltip_text = CardPresentation.full_text(def) + "\n来自：" + str(card.get("preview_source_name", ItemDefs.get_item(str(source.get("def_id", ""))).get("name", "基础牌组"))) + " · " + ItemDefs.quality_name(ItemDefs.quality_of(source))
 		button.set_meta("source_quality", ItemDefs.quality_of(source))
-		if int(def["cost"]) > int(player["energy"]):
-			button.tooltip_text += "\n能量不足"
 		var source_inventory := _inventory()
 		if source_inventory != null and int(card.get("source_instance_id", 0)) > 0:
 			button.tooltip_text += "\n" + DeckBuilder.source_summary(source_inventory, int(card["source_instance_id"]))
 		button.set_meta("base_tooltip", button.tooltip_text)
-		button.pressed.connect(_on_card_clicked.bind(uid))
-		button.mouse_entered.connect(func() -> void:
-			hovered_uid = uid
-			var tween := margin.create_tween()
-			tween.tween_property(margin, "modulate", Color(1.06, 1.06, 1.03), 0.12)
-			_refresh_detail())
-		button.mouse_exited.connect(func() -> void:
-			hovered_uid = -1
-			var tween := margin.create_tween()
-			tween.tween_property(margin, "modulate", Color.WHITE, 0.12)
-			_refresh_detail())
-		hand_row.add_child(button)
-	if player["hand"].is_empty():
-		hand_row.add_child(_label("手牌用尽", 16, ExpeditionUI.MUTED))
+		if is_new:
+			button.pressed.connect(_on_card_clicked.bind(uid))
+			button.mouse_entered.connect(func() -> void:
+				hovered_uid = uid
+				hand_row.set_interaction(pending_card_uid if pending_action else selected_uid, hovered_uid, drag_uid)
+				_refresh_detail())
+			button.mouse_exited.connect(func() -> void:
+				if hovered_uid == uid:
+					hovered_uid = -1
+					hand_row.set_interaction(pending_card_uid if pending_action else selected_uid, hovered_uid, drag_uid)
+					_refresh_detail())
+			hand_row.add_child(button)
 	_refresh_card_values()
+	hand_row.set_cards(ordered)
+	hand_row.set_interaction(pending_card_uid if pending_action else selected_uid, hovered_uid, drag_uid)
 
 
 func _refresh_piles() -> void:
@@ -862,6 +970,8 @@ func _refresh_piles() -> void:
 		var button := ExpeditionUI.button("%s %d" % [entry[1], player[entry[0]].size()])
 		button.custom_minimum_size.y = 34
 		button.add_theme_font_size_override("font_size", 14)
+		if size.y < 680:
+			button.add_theme_font_size_override("font_size", 13)
 		button.tooltip_text = "查看" + str(entry[1]) + "堆"
 		button.pressed.connect(_open_pile.bind(str(entry[0]), str(entry[1])))
 		pile_panel.add_child(button)
@@ -936,6 +1046,7 @@ func _open_help() -> void:
 func _refresh_detail() -> void:
 	_refresh_card_values()
 	_update_targets()
+	_refresh_ground.call_deferred()
 	var uid := selected_uid if selected_uid >= 0 else hovered_uid
 	var card := _hand_card(uid)
 	if card.is_empty():
@@ -1115,7 +1226,7 @@ func _spawn_effect(kind: String, unit: String) -> void:
 	effect.kind = kind
 	effect.tint = {"damage": Color("#ffb086"), "poison": Color("#c196eb"), "block": Color("#74cfff"), "heal": Color("#8de8a5"), "rescue": Color("#8de8a5"), "draw": Color("#ffe08e"), "status": Color("#cda2ff")}.get(kind, ExpeditionUI.GOLD)
 	effect.center = anchor.get_global_rect().get_center() - global_position
-	effect.from = hand_row.get_global_rect().get_center() - global_position
+	effect.from = hand_row.global_position + Vector2(hand_row.size.x / 2.0, hand_row.size.y - 100) - global_position
 	effect.reduce_motion = SettingsStore.get_reduce_motion()
 	effect.add_to_group("battle_feedback_%d" % get_instance_id())
 	add_child(effect)
@@ -1244,6 +1355,9 @@ func _can_act() -> bool:
 		return false
 	var player: Dictionary = combat.state["players"][player_key]
 	return not combat.is_over() and combat.state["phase"] == "player" and int(player["hp"]) > 0 and not bool(player.get("ended", false)) and not pending_action
+
+func _hand_input_open() -> bool:
+	return is_visible_in_tree() and battle_column.visible and not inspector_panel.visible and not overlay_panel.visible and not (input_blocked.is_valid() and bool(input_blocked.call()))
 
 func _playable_card(uid: int) -> bool:
 	var card := _hand_card(uid)
@@ -1487,8 +1601,10 @@ func _refresh_card_values() -> void:
 		if desc != null:
 			desc.text = "\n".join(lines) if not lines.is_empty() else CardPresentation.effect_text(def).replace(" · ", "\n")
 		button.tooltip_text = str(button.get_meta("base_tooltip", CardPresentation.full_text(def)))
+		if int(def["cost"]) > int(combat.state["players"][player_key]["energy"]):
+			button.tooltip_text += "\n能量不足"
 		if bool(preview.get("ok", false)):
-			button.tooltip_text += "\n当前目标：%s\n当前效果：%s\n伤害已计入力量、虚弱和目标易伤；格挡已计入施放者敏捷。\n悬停目标可更新卡面数值，伤害在目标格挡抵扣前显示。" % [_preview_target_name(str(preview["selected_target"])), " / ".join(lines)]
+			button.tooltip_text += "\n当前目标：%s\n当前效果：%s" % [_preview_target_name(str(preview["selected_target"])), " / ".join(lines)]
 
 func _open_pile(key: String, caption: String) -> void:
 	inspector_panel.custom_minimum_size.x = 520

@@ -1,4 +1,5 @@
 extends SceneTree
+const GEO := preload("res://tests/helpers/control_geometry.gd")
 
 const OUT := "res://screenshots/card_story_v06/gameplay/"
 var checks := 0
@@ -24,10 +25,10 @@ func _shot(name: String) -> void:
 
 func _layout(screen: BattleScreen) -> void:
 	for button in screen.hand_row.get_children():
-		_check(Rect2(Vector2.ZERO, Vector2(root.size)).encloses(button.get_global_rect()), "card within window")
+		_check(GEO.in_rect(Rect2(Vector2.ZERO, Vector2(root.size)), button), "rotated card within window")
 		for name in ["CardTitle", "CardEffect", "CardKind"]:
 			var label := button.find_child(name, true, false) as Label
-			_check(label != null and button.get_global_rect().encloses(label.get_global_rect()), "label in card " + name)
+			_check(label != null and GEO.contains_control(button, label), "label in rotated card " + name)
 		for art in button.find_children("*", "Control", true, false):
 			if art is ExpeditionArt:
 				_check(art._resolve_texture() != null, "runtime illustration resolves")

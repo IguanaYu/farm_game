@@ -1,0 +1,5 @@
+[  98% ] [90m[1msavepack[22m | 保存文件：res://.godot/uid_cache.bin[39m[0m
+[  98% ] [90m[1msavepack[22m | 保存文件：res://.godot/extension_list.cfg[39m[0m
+[  98% ] [90m[1msavepack[22m | 保存文件：res://project.binary[39m[0m
+[92m[ DONE ][39m [1msavepack[22m
+[0m

@@ -1,4 +1,5 @@
 extends SceneTree
+const GEO := preload("res://tests/helpers/control_geometry.gd")
 ## 固定内存战斗：五状态图标、混合牌预览、敌人多段意图与 1024×640 布局。
 
 var failed := false
@@ -78,8 +79,11 @@ func _run() -> void:
 	for button in screen.hand_row.get_children():
 		if button is BattleScreen.CardButton:
 			var effect_label := button.find_child("CardEffect", true, false) as Control
-			_check(button.get_global_rect().encloses(effect_label.get_global_rect()), "卡面效果位于卡内")
-	var dock_top := (screen.hand_row.get_parent().get_parent().get_parent() as Control).global_position.y
+			_check(GEO.contains_control(button, effect_label), "卡面效果位于旋转卡内")
+	var dock_top := INF
+	for card in screen.hand_row.cards:
+		for point in GEO.corners(card):
+			dock_top = minf(dock_top, point.y)
 	for label in screen.target_previews.values():
 		_check(label.get_global_rect().end.y <= dock_top, "角色预览没有被手牌区遮挡（底部 %.1f，手牌顶部 %.1f）" % [label.get_global_rect().end.y, dock_top])
 	_check(screen.end_button.get_global_rect().end.y <= 640, "结束回合按钮位于小窗口内")
