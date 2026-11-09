@@ -8,8 +8,8 @@ var failed := false
 
 func _initialize() -> void:
 	# —— 内容预算核对（总计划 §10-2.8 ＋ 内容扩展轮）——
-	_check(ItemDefs.ITEMS.size() - 3 == 26, "预算：正式物品 26 种（20＋扩展轮 4＋三栏改版 2）")
-	_check(CardDefs.CARDS.size() == 19, "预算：牌效果模板 %d 个（17＋扩展轮 2）" % CardDefs.CARDS.size())
+	_check(ItemDefs.ITEMS.size() - 3 == 57, "预算：正式物品 57 种（旧 26＋森林第一章 31）")
+	_check(CardDefs.CARDS.size() == 35, "预算：牌效果模板 %d 个（旧 19＋森林 16）" % CardDefs.CARDS.size())
 	var enemy_count := 0
 	for def_id in CombatGame.ENEMIES:
 		if str(CombatGame.ENEMIES[def_id]["name"]).find("首领") < 0:

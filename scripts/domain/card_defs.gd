@@ -100,12 +100,95 @@ const CARDS := {
 		"effects": [{"kind": "rescue", "value": 8}],
 		"desc": "救起倒地队友并恢复到 8 生命（每人每场一次；倒地规则见 2.6），消耗来源救援包一次。",
 	},
+	# —— 第一章苔冠森林（P1）：16 张新牌。新效果：灼烧/寒冷（status）、cleanse（净化）、pierce（部分穿透）。——
+	"forest_shoot": {
+		"name": "射击", "cost": 1, "target": "enemy", "after": "discard",
+		"effects": [{"kind": "damage", "value": 6}],
+		"desc": "对一名敌人造成 6 点伤害（弓箭射击）。",
+	},
+	"forest_thrust": {
+		"name": "突刺", "cost": 1, "target": "enemy", "after": "discard",
+		"effects": [{"kind": "damage", "value": 6}],
+		"desc": "对一名敌人造成 6 点伤害（长矛突刺）。",
+	},
+	"forest_power_shot": {
+		"name": "强射", "cost": 2, "target": "enemy", "after": "discard",
+		"effects": [{"kind": "damage", "value": 13}],
+		"desc": "对一名敌人造成 13 点伤害（弩的爆发一击）。",
+	},
+	"forest_bell_strike": {
+		"name": "敲击", "cost": 1, "target": "enemy", "after": "discard",
+		"effects": [{"kind": "damage", "value": 4}],
+		"desc": "对一名敌人造成 4 点伤害（祭铃敲击）。",
+	},
+	"forest_rest_bell": {
+		"name": "安息铃", "cost": 1, "target": "ally", "after": "discard",
+		"effects": [{"kind": "cleanse", "status": "poison", "stacks": 2, "clear": ["burn"]}],
+		"desc": "移除自己或一名队友的 2 层中毒，并清除灼烧。",
+	},
+	"forest_guard_bell": {
+		"name": "守护铃", "cost": 1, "target": "ally", "after": "discard",
+		"effects": [{"kind": "block", "value": 5}],
+		"desc": "给予自己或一名存活队友 5 点格挡（铃音护佑）。",
+	},
+	"forest_glow_bolt": {
+		"name": "微光弹", "cost": 1, "target": "enemy", "after": "discard",
+		"effects": [{"kind": "damage", "value": 5, "pierce": 3}],
+		"desc": "造成 5 点伤害；结算此击时忽略至多 3 点格挡，被忽略的格挡不会被删除。",
+	},
+	"forest_apply_gel": {
+		"name": "凝胶敷药", "cost": 0, "target": "ally", "after": "exhaust_source",
+		"effects": [{"kind": "heal", "value": 6}],
+		"desc": "恢复自己或一名存活队友 6 点生命，消耗来源绿凝胶一次。",
+	},
+	"forest_throw_fire_sac": {
+		"name": "投掷火囊", "cost": 1, "target": "enemy", "after": "exhaust_source",
+		"effects": [{"kind": "damage", "value": 4}, {"kind": "status", "status": "burn", "stacks": 2}],
+		"desc": "造成 4 点伤害并附加灼烧 2（其下次行动开始受到 2 点无视格挡的伤害），消耗来源赤凝胶囊一次。",
+	},
+	"forest_throw_frost_sac": {
+		"name": "投掷冰囊", "cost": 1, "target": "enemy", "after": "exhaust_source",
+		"effects": [{"kind": "damage", "value": 3}, {"kind": "status", "status": "chill", "stacks": 1}],
+		"desc": "造成 3 点伤害并附加寒冷（其下次行动的第一段攻击 -2，行动结束清除），消耗来源蓝凝胶囊一次。",
+	},
+	"forest_eat_honey": {
+		"name": "食蜜", "cost": 0, "target": "self", "after": "exhaust_source",
+		"effects": [{"kind": "heal", "value": 3}, {"kind": "draw", "value": 1}],
+		"desc": "恢复自己 3 点生命并抽 1 张牌，消耗来源蜂蜜块一次。",
+	},
+	"forest_scatter_stings": {
+		"name": "撒蜂针", "cost": 1, "target": "enemy", "after": "exhaust_source",
+		"effects": [{"kind": "damage", "value": 3}, {"kind": "status", "status": "poison", "stacks": 2}],
+		"desc": "造成 3 点伤害并附加 2 层中毒，消耗来源蜂针囊一次。",
+	},
+	"forest_torch_strike": {
+		"name": "火把挥击", "cost": 1, "target": "enemy", "after": "discard",
+		"effects": [{"kind": "damage", "value": 4}, {"kind": "status", "status": "burn", "stacks": 1}],
+		"desc": "造成 4 点伤害并附加灼烧 1（其下次行动开始受到 1 点无视格挡的伤害）；不消耗火把。",
+	},
+	"forest_smoke_screen": {
+		"name": "烟幕", "cost": 1, "target": "ally", "after": "discard",
+		"effects": [{"kind": "block", "value": 4}],
+		"desc": "给予自己或一名存活队友 4 点格挡（扬起烟幕遮蔽身形）。",
+	},
+	"forest_throw_net": {
+		"name": "投网", "cost": 1, "target": "enemy", "after": "exhaust_source",
+		"effects": [{"kind": "damage", "value": 2}, {"kind": "status", "status": "weak", "stacks": 1}],
+		"desc": "造成 2 点伤害并附加 1 回合虚弱，消耗来源绳网一次（连同其笨重货物牌一并移除）。",
+	},
+	"forest_throw_spores": {
+		"name": "抛孢", "cost": 1, "target": "enemy", "after": "exhaust_source",
+		"effects": [{"kind": "status", "status": "poison", "stacks": 4}],
+		"desc": "对一名敌人附加 4 层中毒，消耗来源腐菌囊一次。",
+	},
 }
 
 const STATUS_DISPLAY := {
 	"vulnerable": "易伤",
 	"weak": "虚弱",
 	"poison": "中毒",
+	"burn": "灼烧",
+	"chill": "寒冷",
 }
 
 

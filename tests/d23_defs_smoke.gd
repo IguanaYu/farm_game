@@ -14,7 +14,7 @@ func _initialize() -> void:
 			demo_count += 1
 		else:
 			real_count += 1
-	_check(real_count == 26, "物品池：正式物品 26 种（2.3 的 15＋2.5 的 4＋2.8 的 1＋扩展轮 4＋三栏改版 2）")
+	_check(real_count == 57, "物品池：正式物品 57 种（旧 26＋森林第一章 31）")
 	_check(demo_count == 3, "物品池：演示物品 3 种隔离")
 
 	var cargo_value := 0

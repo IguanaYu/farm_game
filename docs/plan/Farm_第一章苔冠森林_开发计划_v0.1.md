@@ -480,6 +480,51 @@ UI 只提交来源、区域、实例和目标位置；权威端验证当前节�
   （登记表已锁 ID 与前缀）；P5 打开 DEPARTURE_ENABLED 时需同步 server_main 特性表与 PROTO 版本。
 ```
 
+### C2. P1（2026-10-20）
+
+```text
+阶段：P1
+状态：已验证（headless 专项＋全量回归）；待实机
+实际改动文件：
+  修改 scripts/domain/card_defs.gd（16 张新牌定义＋STATUS_DISPLAY 增灼烧/寒冷；
+    新效果 kind：cleanse（净化）；damage 效果新增 pierce 参数（部分穿透））
+  修改 scripts/domain/item_defs.gd（31 件森林物品：弓/匕/斧/铃杖/符杖/矛/弩=weapon，
+    树脂护甲/蝠纹披肩=armor，羽饰/号角/火把/提灯=tool 走容器；8 件一次性补给带 uses=1；
+    两种新种子 safe_allowed，其余新物品不进保险白名单；数值为 P8 前初值）
+  修改 scripts/domain/combat_game.gd（灼烧：行动开始结算一次无视格挡、取最高不叠加、
+    即清；寒冷：行动第一段攻击 -2 最低 0、首段结算即消耗、行动结束必清（不攻击也清）、
+    重复施加只刷新；_add_status 对 burn/chill 特判；cleanse 效果；_deal_damage 增
+    pierce——先忽略至多 N 点格挡再吸收、被忽略格挡不删除；伤害顺序=易伤/虚弱取整→
+    寒冷减值→穿透→格挡→生命；_outgoing_damage 增 apply_chill 参数，预览共用入口）
+  修改 scripts/ui/battle_screen.gd（灼烧/净化事件弹字与特效着色；穿透预览数据）
+  修改 scripts/domain/chapter_one_defs.gd（validate_registrations 升级为 P1 契约：
+    36 件物品全部在 ItemDefs 且面积=牌数；27 个牌型全部在 CardDefs）
+  修改 tests/d21_defs_smoke.gd、tests/d23_defs_smoke.gd、tests/d28_content_smoke.gd
+    （定义表数量断言 19→35、26→57）
+  新增 tests/forest_combat_smoke.gd（33 断言：穿透算例/剩余格挡阻挡/灼烧时点与最高强度/
+    寒冷多段与防守清除/玩家寒冷顺序/净化/三类补给清牌/序列化恢复）
+  修改 tests/forest_defs_smoke.gd（P1 口径：36 物品落地、35 牌模板、种子白名单）
+覆盖功能编号：F05（物品定义）、F06（来源卡牌）、F07（新战斗行为）
+采用的内容/规则版本与数值初值：牌数值取内容设计 §10.2 提案（射击6/突刺6/强射13/敲击4/
+  微光弹5+穿3/凝胶敷药6/火囊4+灼2/冰囊3+寒/食蜜3+抽1/蜂针3+毒2/火把4+灼1/烟幕4挡/
+  守护铃5挡/安息铃净2毒+清灼/投网2+虚1/抛孢毒4）；物品数值初值按现有同档锚点自定
+  （铜短剑 40/铁剑 90 → 森林武器 30~75；古银器 95 对标古旧摆件 90）；P8 统一调平
+专项验证结果与证据路径：forest_combat_smoke 33/33；forest_defs_smoke 全绿；
+  全量回归 72 项全绿（REGRESSION_ALL_PASS，0 失败）
+旧档、本地合作、专用服务端验证情况：旧局不带森林物品（掉落池未接线，P3+）；
+  战斗序列化走既有 fmt=1 快照，新状态随 statuses 字典自动持久化并有专项断言；
+  新牌经 exhaust_source 复用既有实体消耗/清牌管线，无第二套算法
+与计划偏差及原因：
+  ① 计划要求"同步卡牌短文案、完整说明、图标、伤害预览和战斗日志"——文案/预览/日志已同步，
+    图标沿用现有按效果类型的符号绘制（BattleGlyph 按 kind/tint），未为新牌单独画图形，
+    属表现层打磨，随 P8 换图轮统一处理；
+  ② 敌人施加灼烧/寒冷的入口（意图 status 字段）机制已通用支持，实际配装在 P2 敌人轮落地；
+  ③ 绳网"投网消耗后连同尚未洗入的关联牌一起移除"复用 _purge_source_cards 既有口径
+    （hand/draw/discard 三堆全清），有专项断言，未新写清牌逻辑。
+已知问题与下一阶段依赖：P2 需落地 11 个敌人（配装引用新物品做固定掉落）、敌方有限治疗/
+  护佑同伴行为、战斗快照增补行为计数；灼烧/寒冷意图字段待 P2 首个使用者验证反向算例。
+```
+
 工程模块地图登记（本轮新增模块，后续阶段按 §4.1 扩展）：
 
 | 模块 | P0 状态 | 后续阶段 |

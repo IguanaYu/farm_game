@@ -41,18 +41,21 @@ func _run() -> void:
 	_check(ChapterOneDefs.ITEM_MAPPING.size() == 36, "物品映射：36 条")
 	_check(ChapterOneDefs.NEW_CARDS.size() == 16 and ChapterOneDefs.REUSED_CARDS.size() == 11, "牌登记：16 新增＋11 复用")
 
-	# —— 复用与新增边界：复用项存在、新增项不撞名 ————————————
+	# —— P1 落地：36 件物品全部定义、27 个牌型全部可解析 ————————————
 	for design_no in ChapterOneDefs.ITEM_MAPPING:
 		var record: Dictionary = ChapterOneDefs.ITEM_MAPPING[design_no]
-		if bool(record["reuse"]):
-			_check(ItemDefs.is_known_item(str(record["def_id"])), "复用物品 %s=%s 已存在" % [design_no, str(record["def_id"])])
-		else:
-			_check(not ItemDefs.is_known_item(str(record["def_id"])), "新增物品 %s 未提前写入 ItemDefs（P1 落地）" % design_no)
+		_check(ItemDefs.is_known_item(str(record["def_id"])), "物品 %s=%s 已在 ItemDefs 落地" % [design_no, str(record["def_id"])])
 	for card_id in ChapterOneDefs.REUSED_CARDS:
 		_check(CardDefs.CARDS.has(card_id), "复用牌 %s 已存在" % card_id)
 	for card_id in ChapterOneDefs.NEW_CARDS:
-		_check(not CardDefs.CARDS.has(card_id), "新增牌 %s 未提前写入 CardDefs（P1 落地）" % card_id)
-	_check(CardDefs.CARDS.size() == 19, "旧牌表未被 P0 改动：仍为 19 个模板")
+		_check(CardDefs.CARDS.has(card_id), "新增牌 %s 已在 CardDefs 落地" % card_id)
+	_check(CardDefs.CARDS.size() == 35, "牌模板：19 个旧模板＋16 张森林新牌")
+	_check(ItemDefs.validate_definitions().is_empty(), "ItemDefs 全表一致（含森林 31 件新物品：面积=牌数、牌引用有效）")
+	var seed_safe_ok := true
+	for seed_id in ["forest_silverleaf_seed", "forest_glowcap_spawn"]:
+		if not bool(ItemDefs.get_item(seed_id).get("safe_allowed", false)):
+			seed_safe_ok = false
+	_check(seed_safe_ok, "两种新种子进保险白名单；其余新物品不自动保护")
 
 	# —— 内容开关与版本检查 ————————————
 	_check(ChapterOneDefs.departure_problem("") == "", "出发检查：空内容集（旧洞窟）放行")

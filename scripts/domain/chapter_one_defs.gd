@@ -254,7 +254,7 @@ static func enemies_for_batch(batch: int) -> Array:
 
 
 ## 登记表自检（tests/forest_defs_smoke.gd 使用）：数量、归属、前缀与跨表引用全部有效。
-## reuse 物品必须已在 ItemDefs 存在；新增 def_id 不得与现有定义撞名（不创建同名重复）。
+## P1 起：全部 36 件物品必须在 ItemDefs 落地且面积=牌数；27 个牌型必须在 CardDefs 可解析。
 ## 搜索模板与敌人的 art_id 约定为 prop.<模板ID>／enemy.<敌人ID>（计划 §3 资源 ID 示例）。
 static func validate_registrations() -> Array:
 	var problems: Array = []
@@ -314,21 +314,22 @@ static func validate_registrations() -> Array:
 		if def_owner.has(def_id):
 			problems.append("def_id %s 被 %s 与 %s 重复映射" % [def_id, str(def_owner[def_id]), design_no])
 		def_owner[def_id] = design_no
-		if bool(record.get("reuse", false)):
-			if not ItemDefs.is_known_item(def_id):
-				problems.append("映射 %s 声明复用但 ItemDefs 缺少 %s" % [design_no, def_id])
-		elif not def_id.begins_with("forest_"):
-			problems.append("新增物品 %s（%s）应使用 forest_ 前缀" % [design_no, def_id])
-		elif ItemDefs.is_known_item(def_id):
-			problems.append("新增物品 %s 与现有定义 %s 撞名" % [design_no, def_id])
+		if not ItemDefs.is_known_item(def_id):
+			problems.append("物品 %s 的定义 %s 未在 ItemDefs 落地" % [design_no, def_id])
+			continue
+		var def: Dictionary = ItemDefs.get_item(def_id)
+		var cells := int(def["size"].x) * int(def["size"].y)
+		if (def["cards"] as Array).size() != cells:
+			problems.append("物品 %s（%s）面积 %d ≠ 牌数 %d" % [design_no, def_id, cells, (def["cards"] as Array).size()])
+		for card_id in def["cards"]:
+			if not CardDefs.CARDS.has(str(card_id)):
+				problems.append("物品 %s 引用了未定义的牌 %s" % [design_no, str(card_id)])
 
 	if NEW_CARDS.size() != 16:
 		problems.append("新增牌应为 16 个，实际 %d" % NEW_CARDS.size())
 	for card_id in NEW_CARDS:
-		if not card_id.begins_with("forest_"):
-			problems.append("新增牌 %s 应使用 forest_ 前缀" % card_id)
-		elif CardDefs.CARDS.has(card_id):
-			problems.append("新增牌 %s 已存在于 CardDefs（P1 前不得提前写入）" % card_id)
+		if not CardDefs.CARDS.has(card_id):
+			problems.append("新增牌 %s 未在 CardDefs 落地" % card_id)
 	if REUSED_CARDS.size() != 11:
 		problems.append("复用牌应为 11 个，实际 %d" % REUSED_CARDS.size())
 	for card_id in REUSED_CARDS:

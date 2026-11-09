@@ -852,7 +852,7 @@ func _present_events(events: Array, generation: int) -> void:
 	for event in events:
 		var kind := str(event.get("type", ""))
 		var unit := str(event.get("target", event.get("who", event.get("owner", ""))))
-		if kind in ["card_played", "damage", "block", "heal", "poison", "draw", "rescue", "status"]:
+		if kind in ["card_played", "damage", "block", "heal", "poison", "draw", "rescue", "status", "burn", "cleanse"]:
 			_spawn_effect(kind, unit)
 		match str(event.get("type", "")):
 			"damage":
@@ -869,6 +869,10 @@ func _present_events(events: Array, generation: int) -> void:
 				_popup_on_unit(unit, "救起 · %d 生命" % int(event["hp"]), Color("#a7f0ae"))
 			"poison":
 				_popup_on_unit(str(event["target"]), "毒 -%d" % int(event["amount"]), Color("#a5679f"))
+			"burn":
+				_popup_on_unit(str(event["target"]), "灼烧 -%d" % int(event["amount"]), Color("#ff9d5c"))
+			"cleanse":
+				_popup_on_unit(unit, "净化" if int(event.get("stacks", 0)) <= 0 else "净化 %s ×%d" % [CardDefs.STATUS_DISPLAY.get(str(event["status"]), event["status"]), int(event["stacks"])], Color("#bdeffc"))
 			"outcome":
 				AudioKit.play(self, "victory" if str(event["outcome"]) == "won" else "defeat")
 				_popup_center("胜利！" if str(event["outcome"]) == "won" else "失败……", WARN_GOLD)
@@ -930,7 +934,7 @@ func _spawn_effect(kind: String, unit: String) -> void:
 		return
 	var effect := BattleEffect.new()
 	effect.kind = kind
-	effect.tint = {"damage": Color("#ffb086"), "poison": Color("#c196eb"), "block": Color("#74cfff"), "heal": Color("#8de8a5"), "rescue": Color("#8de8a5"), "draw": Color("#ffe08e"), "status": Color("#cda2ff")}.get(kind, ExpeditionUI.GOLD)
+	effect.tint = {"damage": Color("#ffb086"), "poison": Color("#c196eb"), "block": Color("#74cfff"), "heal": Color("#8de8a5"), "rescue": Color("#8de8a5"), "draw": Color("#ffe08e"), "status": Color("#cda2ff"), "burn": Color("#ff9d5c"), "cleanse": Color("#bdeffc")}.get(kind, ExpeditionUI.GOLD)
 	effect.center = anchor.get_global_rect().get_center() - global_position
 	effect.from = hand_row.get_global_rect().get_center() - global_position
 	effect.reduce_motion = SettingsStore.get_reduce_motion()

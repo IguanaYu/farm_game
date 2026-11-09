@@ -314,6 +314,8 @@ func preview_play(owner_key: String, uid: int, target_key: String) -> Dictionary
 		match str(effect.get("kind", "")):
 			"damage":
 				preview["damage"] = _outgoing_damage(owner_key, target, int(effect["value"]))
+				if int(effect.get("pierce", 0)) > 0:
+					preview["pierce"] = int(effect["pierce"])
 			"block":
 				preview["block"] = int(effect["value"])
 			"heal":
@@ -439,6 +441,9 @@ func _run_discard_phase(events: Array) -> void:
 		player["hand"] = []
 		# 易伤/虚弱在受影响单位完成自身行动阶段后减 1（设计 §4）：玩家阶段在此结束。
 		_decrement_own_statuses(player)
+		## 寒冷在玩家行动（回合）结束清除，即使该回合没攻击过（P1 §10.3）。
+		if _has_status(player, "chill"):
+			player["statuses"].erase("chill")
 	events.append({"type": "discarded"})
 
 
@@ -453,7 +458,13 @@ func _run_enemy_phase(events: Array) -> void:
 		_apply_poison(enemy, events)
 		if not bool(enemy["alive"]):
 			continue
+		_apply_burn(enemy, events)
+		if not bool(enemy["alive"]):
+			continue
 		_execute_intent(enemy, events)
+		## 寒冷在其行动结束清除（即使该次只防守，P1 §10.3）。
+		if _has_status(enemy, "chill"):
+			enemy["statuses"].erase("chill")
 		_decrement_own_statuses(enemy)
 		if state["outcome"] != "":
 			return
@@ -461,6 +472,7 @@ func _run_enemy_phase(events: Array) -> void:
 	for key in state["players"]:
 		var player: Dictionary = state["players"][key]
 		_apply_poison(player, events)
+		_apply_burn(player, events)
 	if _all_players_downed():
 		_set_outcome("lost", events)
 		return
@@ -509,7 +521,11 @@ func _apply_effect(owner_key: String, target_key: String, effect: Dictionary, ev
 		"damage":
 			var target := _find_unit(target_key)
 			var amount := _outgoing_damage(owner_key, target, int(effect["value"]))
-			_deal_damage(owner_key, target, amount, events)
+			## 寒冷只减受影响单位行动阶段的第一段攻击：结算完这一段即消耗（P1 §10.3）。
+			var owner_unit := _find_unit(owner_key)
+			if not owner_unit.is_empty() and _has_status(owner_unit, "chill"):
+				owner_unit["statuses"].erase("chill")
+			_deal_damage(owner_key, target, amount, events, int(effect.get("pierce", 0)))
 		"block":
 			var target := _find_unit(target_key)
 			var amount := int(effect["value"])
@@ -549,21 +565,51 @@ func _apply_effect(owner_key: String, target_key: String, effect: Dictionary, ev
 			_add_status(target, status, stacks)
 			events.append({"type": "status", "target": target_key, "status": status, "stacks": stacks})
 			state["log"].append("%s 获得 %s ×%d" % [_unit_name(target), CardDefs.STATUS_DISPLAY.get(status, status), stacks])
+		"cleanse":
+			## 净化（安息铃）：移除指定状态若干层，并整项清除 clear 列表里的状态（P1）。
+			var target := _find_unit(target_key)
+			var status := str(effect.get("status", ""))
+			var stacks := int(effect.get("stacks", 0))
+			var removed := 0
+			if status != "" and _has_status(target, status):
+				var entry: Dictionary = target["statuses"][status]
+				removed = mini(stacks, int(entry["stacks"]))
+				entry["stacks"] = int(entry["stacks"]) - removed
+				if int(entry["stacks"]) <= 0:
+					target["statuses"].erase(status)
+			var cleared: Array = []
+			for clear_status in effect.get("clear", []):
+				if _has_status(target, str(clear_status)):
+					target["statuses"].erase(str(clear_status))
+					cleared.append(CardDefs.STATUS_DISPLAY.get(str(clear_status), str(clear_status)))
+			events.append({"type": "cleanse", "target": target_key, "status": status, "stacks": removed, "cleared": cleared})
+			var parts: Array = []
+			if removed > 0:
+				parts.append("%s ×%d" % [CardDefs.STATUS_DISPLAY.get(status, status), removed])
+			if not cleared.is_empty():
+				parts.append("清除%s" % "、".join(cleared))
+			state["log"].append("%s %s" % [_unit_name(target), "、".join(parts) if not parts.is_empty() else "状态如常"])
 
 
-## 伤害计算（设计 §4）：基础值 ×易伤(×1.5，受击方) ×虚弱(×0.75，攻击方)，向下取整且≥0。
-func _outgoing_damage(attacker_key: String, target: Dictionary, base: int) -> int:
+## 伤害计算（设计 §4；森林 P1 顺序）：基础值 ×易伤(×1.5，受击方) ×虚弱(×0.75，攻击方) 取整
+## → 寒冷减值（攻击方带寒冷时 -2，最低 0）→ 部分穿透与格挡在 _deal_damage 结算。
+## apply_chill=false 供预览外的非消耗场景；预览共用本入口但不消耗寒冷。
+func _outgoing_damage(attacker_key: String, target: Dictionary, base: int, apply_chill := true) -> int:
 	var amount := base
 	if _has_status(target, "vulnerable"):
 		amount = int(amount * 1.5)
 	var attacker := _find_unit(attacker_key)
 	if not attacker.is_empty() and _has_status(attacker, "weak"):
 		amount = int(amount * 0.75)
+	if apply_chill and not attacker.is_empty() and _has_status(attacker, "chill"):
+		amount = maxi(0, amount - 2)
 	return maxi(0, amount)
 
 
-func _deal_damage(attacker_key: String, target: Dictionary, amount: int, events: Array) -> void:
-	var blocked := mini(amount, int(target["block"]))
+func _deal_damage(attacker_key: String, target: Dictionary, amount: int, events: Array, pierce := 0) -> void:
+	## 部分穿透（微光弹）：先忽略至多 pierce 点格挡再吸收；被忽略的格挡不被删除。
+	var effective_block := maxi(0, int(target["block"]) - maxi(0, pierce))
+	var blocked := mini(amount, effective_block)
 	target["block"] = int(target["block"]) - blocked
 	var to_hp := amount - blocked
 	target["hp"] = int(target["hp"]) - to_hp
@@ -610,12 +656,40 @@ func _apply_poison(unit: Dictionary, events: Array) -> void:
 
 func _add_status(unit: Dictionary, status: String, stacks: int) -> void:
 	var current: Dictionary = unit["statuses"].get(status, {"stacks": 0})
-	current["stacks"] = int(current["stacks"]) + stacks
+	## 灼烧只保留最高强度、寒冷只刷新不叠加（森林 P1 §10.3）；其余状态沿用累加基线。
+	if status == "burn" or status == "chill":
+		current["stacks"] = maxi(int(current["stacks"]), stacks)
+	else:
+		current["stacks"] = int(current["stacks"]) + stacks
 	unit["statuses"][status] = current
 
 
 func _has_status(unit: Dictionary, status: String) -> bool:
 	return int(unit["statuses"].get(status, {}).get("stacks", 0)) > 0
+
+
+## 灼烧（森林 P1 §10.3）：受影响单位行动开始时受到 X 点无视格挡的伤害，随后清除。
+## 与中毒分别实现：中毒按层衰减、行动前结算；灼烧一次性、不衰减。
+func _apply_burn(unit: Dictionary, events: Array) -> void:
+	var stacks := int(unit["statuses"].get("burn", {}).get("stacks", 0))
+	if stacks <= 0:
+		return
+	unit["statuses"].erase("burn")
+	unit["hp"] = int(unit["hp"]) - stacks
+	events.append({"type": "burn", "target": _unit_id(unit), "amount": stacks})
+	state["log"].append("%s 灼烧受到 %d 伤害（无视格挡），火焰消退" % [_unit_name(unit), stacks])
+	if int(unit["hp"]) <= 0:
+		if state["players"].has(_unit_id(unit)):
+			unit["hp"] = 0
+			unit["downed"] = true
+			unit["block"] = 0
+			state["log"].append("%s 灼烧倒地" % unit["name"])
+			events.append({"type": "player_downed", "player": _unit_id(unit)})
+		else:
+			unit["alive"] = false
+			unit["hp"] = 0
+			state["log"].append("%s 被烧毁" % unit["name"])
+			events.append({"type": "enemy_died", "enemy_id": _unit_id(unit)})
 
 
 ## 易伤/虚弱在受影响单位完成自身行动阶段后减 1 回合（设计 §4 状态表）。
@@ -652,6 +726,9 @@ func _execute_intent(enemy: Dictionary, events: Array) -> void:
 				if victim.is_empty():
 					break
 				var amount := _outgoing_damage(enemy["id"], victim, int(intent["value"]))
+				if strike == 0 and _has_status(enemy, "chill"):
+					## 寒冷只减第一段攻击，即使这一段被格挡也消耗（P1 §10.3）。
+					enemy["statuses"].erase("chill")
 				_deal_damage(enemy["id"], victim, amount, events)
 				if str(intent.get("status", "")) != "":
 					_add_status(victim, str(intent["status"]), int(intent.get("status_stacks", 1)))
